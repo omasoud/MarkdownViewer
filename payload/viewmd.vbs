@@ -32,7 +32,7 @@ ps = ps & "$out=Join-Path ([IO.Path]::GetTempPath()) ([IO.Path]::GetRandomFileNa
 ps = ps & "$title=[System.Net.WebUtility]::HtmlEncode([IO.Path]::GetFileName($p)); "
 ps = ps & "$base=([Uri]::new((Split-Path $p)+'\')).AbsoluteUri; "
 
-ps = ps & "$ico=Join-Path $env:LOCALAPPDATA 'Programs\MarkdownViewer\markdown-mark-solid-win10-filled.ico'; "
+ps = ps & "$ico=Join-Path $env:LOCALAPPDATA 'Programs\MarkdownViewer\markdown-mark-solid-win10-light.ico'; "
 ps = ps & "$favicon=(Test-Path -LiteralPath $ico) ? ('<link rel=''icon'' type=''image/x-icon'' href=''data:image/x-icon;base64,' + [Convert]::ToBase64String([IO.File]::ReadAllBytes($ico)) + '''>') : ''; "
 
 ps = ps & "Set-Content -NoNewline -LiteralPath $out -Encoding UTF8 -Value ('<html><head><meta charset=''utf-8''>'+ $favicon +'<base href='''+ $base +'''><title>'+ $title +'</title>'+ $style +'</head><body>'+ $html +'</body></html>'); "

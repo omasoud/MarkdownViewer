@@ -44,7 +44,7 @@ Note: This is not a standalone executable app. Instead, it leverages Windows' bu
 - `INSTALL.cmd` / `install.ps1`: Installation scripts
 - `UNINSTALL.cmd` / `uninstall.ps1` / `uninstall.vbs`: Uninstallation scripts
 - `payload/viewmd.vbs`: The main viewer script
-- `payload/markdown-mark-solid-win10-filled.ico`: Application icon (modified from the public domain Markdown Mark: https://github.com/dcurtis/markdown-mark)
+- `payload/markdown-mark-solid-win10-light.ico` (used) / `payload/markdown-mark-solid-win10-filled.ico` (not used): Application icon (modified from the public domain Markdown Mark: https://github.com/dcurtis/markdown-mark)
 - `payload/viewmd-experimental-not-used.reg`: Unused registry file (legacy)
 
 ## License

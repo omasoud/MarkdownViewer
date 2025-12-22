@@ -59,14 +59,14 @@ function Ensure-Pwsh {
 function Copy-Payload {
   New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
   Copy-Item -Force (Join-Path $PayloadDir "viewmd.vbs")    $InstallDir
-  Copy-Item -Force (Join-Path $PayloadDir "markdown-mark-solid-win10-filled.ico")  $InstallDir
+  Copy-Item -Force (Join-Path $PayloadDir "markdown-mark-solid-win10-light.ico")  $InstallDir
   Copy-Item -Force (Join-Path $ScriptRoot "uninstall.ps1") $InstallDir
   Copy-Item -Force (Join-Path $ScriptRoot "uninstall.vbs") $InstallDir
 }
 
 function Set-Registry {
   $vbsPath  = Join-Path $InstallDir "viewmd.vbs"
-  $icoPath  = Join-Path $InstallDir "markdown-mark-solid-win10-filled.ico"
+  $icoPath  = Join-Path $InstallDir "markdown-mark-solid-win10-light.ico"
   $cmd      = "wscript.exe `"$vbsPath`" `"%1`""
 
   # ProgId command
@@ -87,7 +87,7 @@ function Set-Registry {
   New-Item -Path "HKCU:\Software\$AppId\Capabilities\FileAssociations" -Force | Out-Null
   New-ItemProperty -Path "HKCU:\Software\$AppId\Capabilities" -Name "ApplicationName" -Value $AppName -Force | Out-Null
   New-ItemProperty -Path "HKCU:\Software\$AppId\Capabilities" -Name "ApplicationDescription" -Value "View Markdown rendered in your browser" -Force | Out-Null
-  New-ItemProperty -Path "HKCU:\Software\$AppId\Capabilities" -Name "ApplicationIcon" -Value (Join-Path $InstallDir "markdown-mark-solid-win10-filled.ico") -Force | Out-Null
+  New-ItemProperty -Path "HKCU:\Software\$AppId\Capabilities" -Name "ApplicationIcon" -Value (Join-Path $InstallDir "markdown-mark-solid-win10-light.ico") -Force | Out-Null
 
   # File associations (both .md and .markdown)
   New-ItemProperty -Path "HKCU:\Software\$AppId\Capabilities\FileAssociations" -Name ".md" -Value $AppId -Force | Out-Null
@@ -110,7 +110,7 @@ function Set-ContextMenu {
 }
 
 function Register-UninstallEntry {
-  $icoPath = Join-Path $InstallDir "markdown-mark-solid-win10-filled.ico"
+  $icoPath = Join-Path $InstallDir "markdown-mark-solid-win10-light.ico"
   $unVbs   = Join-Path $InstallDir "uninstall.vbs"
 
   $k = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$AppId"
