@@ -1,0 +1,38 @@
+Windows Registry Editor Version 5.00
+
+; Context menu
+[HKEY_CURRENT_USER\Software\Classes\SystemFileAssociations\.md\shell\viewmarkdown]
+@="View Markdown"
+
+[HKEY_CURRENT_USER\Software\Classes\SystemFileAssociations\.md\shell\viewmarkdown\command]
+@="wscript.exe \"C:\\Users\\<user>\\Bin\\viewmd.vbs\" \"%1\""
+
+; ProgId
+[HKEY_CURRENT_USER\Software\Classes\MarkdownViewer]
+@="Markdown Viewer"
+
+[HKEY_CURRENT_USER\Software\Classes\MarkdownViewer\shell]
+@="open"
+
+[HKEY_CURRENT_USER\Software\Classes\MarkdownViewer\shell\open\command]
+@="wscript.exe \"C:\\Users\\<user>\\Bin\\viewmd.vbs\" \"%1\""
+
+; Extension binding
+[HKEY_CURRENT_USER\Software\Classes\.md]
+@="MarkdownViewer"
+
+; Register app
+[HKEY_CURRENT_USER\Software\RegisteredApplications]
+"MarkdownViewer"="Software\\MarkdownViewer\\Capabilities"
+
+; Declare capabilities
+[HKEY_CURRENT_USER\Software\MarkdownViewer\Capabilities]
+"ApplicationName"="Markdown Viewer"
+"ApplicationDescription"="View Markdown rendered in browser"
+
+; File associations
+[HKEY_CURRENT_USER\Software\MarkdownViewer\Capabilities\FileAssociations]
+".md"="MarkdownViewer"
+
+[HKEY_CURRENT_USER\Software\Classes\MarkdownViewer\DefaultIcon]
+@="C:\\Users\\<user>\\Bin\\markdown.ico"
