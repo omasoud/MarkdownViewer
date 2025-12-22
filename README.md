@@ -6,6 +6,12 @@ A simple tool to view Markdown files rendered in your browser on Windows.
 
 This project provides a way to open `.md` and `.markdown` files directly in your default web browser, rendered as HTML using PowerShell's built-in Markdown conversion. It uses a VBScript wrapper to execute PowerShell commands seamlessly.
 
+## How It Works
+
+When you open a Markdown file, the app uses PowerShell's `ConvertFrom-Markdown` cmdlet to transform the Markdown into HTML. To ensure the output doesn't look like it's 1995, it adds some basic CSS styling. The result is then saved as a temporary HTML file and opened in your default web browser. A VBScript wrapper handles the execution to avoid console flashes and ensure smooth operation. The browser tab will display the app's icon and the actual Markdown filename as the title.
+
+Note: This is not a standalone executable app. Instead, it leverages Windows' built-in Windows Script Host (wscript.exe, located in System32) to run the VBScript, which in turn executes the PowerShell command.
+
 ## Installation
 
 1. Download or clone this repository.
