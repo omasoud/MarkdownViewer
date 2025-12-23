@@ -59,6 +59,9 @@ function Ensure-Pwsh {
 function Copy-Payload {
   New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
   Copy-Item -Force (Join-Path $PayloadDir "viewmd.vbs")    $InstallDir
+  Copy-Item -Force (Join-Path $PayloadDir "Open-Markdown.ps1") $InstallDir
+  Copy-Item -Force (Join-Path $PayloadDir "style.html") $InstallDir
+  Copy-Item -Force (Join-Path $PayloadDir "script.html") $InstallDir
   Copy-Item -Force (Join-Path $PayloadDir "markdown-mark-solid-win10-light.ico")  $InstallDir
   Copy-Item -Force (Join-Path $ScriptRoot "uninstall.ps1") $InstallDir
   Copy-Item -Force (Join-Path $ScriptRoot "uninstall.vbs") $InstallDir

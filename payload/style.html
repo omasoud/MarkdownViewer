@@ -1,0 +1,107 @@
+<style>
+    :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --fg: #111111;
+        --muted: #444;
+        --codebg: #f4f4f4;
+        --border: #dddddd;
+        --link: #0b57d0;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --bg: #0f1115;
+            --fg: #e7e7e7;
+            --muted: #b8b8b8;
+            --codebg: #1b1f2a;
+            --border: #2a2f3a;
+            --link: #7ab7ff;
+        }
+    }
+
+    :root[data-theme="light"] {
+        --bg: #ffffff;
+        --fg: #111111;
+        --muted: #444;
+        --codebg: #f4f4f4;
+        --border: #dddddd;
+        --link: #0b57d0;
+    }
+
+    :root[data-theme="dark"] {
+        --bg: #0f1115;
+        --fg: #e7e7e7;
+        --muted: #b8b8b8;
+        --codebg: #1b1f2a;
+        --border: #2a2f3a;
+        --link: #7ab7ff;
+    }
+
+    body {
+        background: var(--bg);
+        color: var(--fg);
+        font-family: -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif;
+        max-width: 900px;
+        margin: 40px auto;
+        padding: 0 20px;
+        line-height: 1.6;
+    }
+
+    pre {
+        background: var(--codebg);
+        padding: 12px;
+        overflow-x: auto;
+        border-radius: 8px;
+    }
+
+    code {
+        background: var(--codebg);
+        padding: 2px 6px;
+        border-radius: 6px;
+    }
+
+    table {
+        border-collapse: collapse;
+        margin: 16px 0;
+        width: 100%;
+    }
+
+    th,
+    td {
+        border: 1px solid var(--border);
+        padding: 6px 10px;
+        text-align: left;
+        vertical-align: top;
+    }
+
+    blockquote {
+        border-left: 4px solid var(--border);
+        padding-left: 12px;
+        color: var(--muted);
+        margin: 16px 0;
+    }
+
+    a {
+        color: var(--link);
+        text-decoration: none;
+    }
+
+    a:hover {
+        text-decoration: underline;
+    }
+
+    #mvTheme {
+        position: fixed;
+        top: 14px;
+        right: 14px;
+        z-index: 9999;
+        border: 1px solid var(--border);
+        background: var(--codebg);
+        color: var(--fg);
+        padding: 6px 10px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 12px;
+    }
+</style>
