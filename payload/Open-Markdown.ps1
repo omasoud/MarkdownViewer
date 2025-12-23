@@ -3,21 +3,21 @@ param(
   [Parameter(Mandatory)]
   [string] $Path,
 
-  [string] $StylePath  = (Join-Path $PSScriptRoot 'style.html'),
-  [string] $ScriptPath = (Join-Path $PSScriptRoot 'script.html'),
-  [string] $IconPath   = (Join-Path $env:LOCALAPPDATA 'Programs\MarkdownViewer\markdown-mark-solid-win10-light.ico')
+  [string] $StylePath  = (Join-Path $PSScriptRoot 'style.css'),
+  [string] $ScriptPath = (Join-Path $PSScriptRoot 'script.js'),
+  [string] $IconPath   = (Join-Path $PSScriptRoot 'markdown.ico')
 )
 
 $ErrorActionPreference = 'Stop'
 
 try {
-  $p = (Resolve-Path -LiteralPath $Path).Path
+  $p     = (Resolve-Path -LiteralPath $Path).Path
   $title = [System.Net.WebUtility]::HtmlEncode([IO.Path]::GetFileName($p))
   $base  = ([Uri]::new((Split-Path -LiteralPath $p) + '\')).AbsoluteUri
 
-  $style  = Get-Content -Raw -LiteralPath $StylePath
-  $script = Get-Content -Raw -LiteralPath $ScriptPath
-  $html   = (ConvertFrom-Markdown -Path $p).Html
+  $css  = Get-Content -Raw -LiteralPath $StylePath
+  $js   = Get-Content -Raw -LiteralPath $ScriptPath
+  $html = (ConvertFrom-Markdown -Path $p).Html
 
   $favicon = ""
   if (Test-Path -LiteralPath $IconPath) {
@@ -35,11 +35,15 @@ try {
 $favicon
 <base href="$base">
 <title>$title</title>
-$style
+<style>
+$css
+</style>
 </head>
 <body>
 <button id="mvTheme" type="button">Theme</button>
-$script
+<script>
+$js
+</script>
 $html
 </body>
 </html>
@@ -52,7 +56,12 @@ catch {
   Add-Type -AssemblyName System.Windows.Forms | Out-Null
   $msg = $_.Exception.Message
   if ($_.InvocationInfo -and $_.InvocationInfo.PositionMessage) {
-    $msg = $msg + "`r`n`r`n" + $_.InvocationInfo.PositionMessage
+    $msg += "`r`n`r`n" + $_.InvocationInfo.PositionMessage
   }
-  [System.Windows.Forms.MessageBox]::Show($msg, "Markdown Viewer Error", 0, 16) | Out-Null
+  [System.Windows.Forms.MessageBox]::Show(
+    $msg,
+    "Markdown Viewer Error",
+    [System.Windows.Forms.MessageBoxButtons]::OK,
+    [System.Windows.Forms.MessageBoxIcon]::Error
+  ) | Out-Null
 }

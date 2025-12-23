@@ -22,8 +22,13 @@ $AppName    = "Markdown Viewer"
 $AppId      = "MarkdownViewer"
 $InstallDir = Join-Path $env:LOCALAPPDATA "Programs\MarkdownViewer"
 
+# The source icon file to use
+$SourceIconFileName = "markdown-mark-solid-win10-light.ico"
 
 $PayloadDir = Join-Path $ScriptRoot "payload"
+
+# The icon file path after installation
+$InstalledIconPath = Join-Path $InstallDir "markdown.ico"
 
 
 function Ask($prompt, $defaultYes=$true) {
@@ -60,16 +65,16 @@ function Copy-Payload {
   New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
   Copy-Item -Force (Join-Path $PayloadDir "viewmd.vbs")    $InstallDir
   Copy-Item -Force (Join-Path $PayloadDir "Open-Markdown.ps1") $InstallDir
-  Copy-Item -Force (Join-Path $PayloadDir "style.html") $InstallDir
-  Copy-Item -Force (Join-Path $PayloadDir "script.html") $InstallDir
-  Copy-Item -Force (Join-Path $PayloadDir "markdown-mark-solid-win10-light.ico")  $InstallDir
+  Copy-Item -Force (Join-Path $PayloadDir "style.css") $InstallDir
+  Copy-Item -Force (Join-Path $PayloadDir "script.js") $InstallDir
+  Copy-Item -Force (Join-Path $PayloadDir $SourceIconFileName) $InstalledIconPath
   Copy-Item -Force (Join-Path $ScriptRoot "uninstall.ps1") $InstallDir
   Copy-Item -Force (Join-Path $ScriptRoot "uninstall.vbs") $InstallDir
 }
 
 function Set-Registry {
   $vbsPath  = Join-Path $InstallDir "viewmd.vbs"
-  $icoPath  = Join-Path $InstallDir "markdown-mark-solid-win10-light.ico"
+  $icoPath  = $InstalledIconPath
   $cmd      = "wscript.exe `"$vbsPath`" `"%1`""
 
   # ProgId command
@@ -90,7 +95,7 @@ function Set-Registry {
   New-Item -Path "HKCU:\Software\$AppId\Capabilities\FileAssociations" -Force | Out-Null
   New-ItemProperty -Path "HKCU:\Software\$AppId\Capabilities" -Name "ApplicationName" -Value $AppName -Force | Out-Null
   New-ItemProperty -Path "HKCU:\Software\$AppId\Capabilities" -Name "ApplicationDescription" -Value "View Markdown rendered in your browser" -Force | Out-Null
-  New-ItemProperty -Path "HKCU:\Software\$AppId\Capabilities" -Name "ApplicationIcon" -Value (Join-Path $InstallDir "markdown-mark-solid-win10-light.ico") -Force | Out-Null
+  New-ItemProperty -Path "HKCU:\Software\$AppId\Capabilities" -Name "ApplicationIcon" -Value $icoPath -Force | Out-Null
 
   # File associations (both .md and .markdown)
   New-ItemProperty -Path "HKCU:\Software\$AppId\Capabilities\FileAssociations" -Name ".md" -Value $AppId -Force | Out-Null
@@ -113,7 +118,7 @@ function Set-ContextMenu {
 }
 
 function Register-UninstallEntry {
-  $icoPath = Join-Path $InstallDir "markdown-mark-solid-win10-light.ico"
+  $icoPath = $InstalledIconPath
   $unVbs   = Join-Path $InstallDir "uninstall.vbs"
 
   $k = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$AppId"
