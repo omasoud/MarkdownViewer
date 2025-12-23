@@ -14,7 +14,6 @@ if (-not $ScriptRoot) {
 if (-not $ScriptRoot) {
   throw "Cannot determine script directory. Run this script via -File."
 }
-$PayloadDir = Join-Path $ScriptRoot "payload"
 
 $ErrorActionPreference = "Stop"
 

@@ -1,4 +1,5 @@
 Option Explicit
+If WScript.Arguments.Count < 1 Then WScript.Quit 1
 Dim mdPath : mdPath = WScript.Arguments(0)
 
 Dim fso : Set fso = CreateObject("Scripting.FileSystemObject")

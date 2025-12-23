@@ -14,6 +14,7 @@ try {
   $p     = (Resolve-Path -LiteralPath $Path).Path
   $title = [System.Net.WebUtility]::HtmlEncode([IO.Path]::GetFileName($p))
   $base  = ([Uri]::new((Split-Path -LiteralPath $p) + '\')).AbsoluteUri
+  $base = ([Uri]::new((Split-Path $p) + '\')).AbsoluteUri
 
   $css  = Get-Content -Raw -LiteralPath $StylePath
   $js   = Get-Content -Raw -LiteralPath $ScriptPath
@@ -25,7 +26,13 @@ try {
     $favicon = "<link rel='icon' type='image/x-icon' href='data:image/x-icon;base64,$b64'>"
   }
 
-  $out = Join-Path ([IO.Path]::GetTempPath()) ([IO.Path]::GetRandomFileName() + '.html')
+  # Create a stable MD5 hash of the full path (but only keep the first 8 characters) so the temp filename is stable for this specific file
+  # We use ToLower() because Windows paths are case-insensitive
+  $bytes = [System.Text.Encoding]::UTF8.GetBytes($p.ToLower())
+  $hashBytes = [System.Security.Cryptography.MD5]::Create().ComputeHash($bytes)
+  $hash = [BitConverter]::ToString($hashBytes).Replace("-", "").Substring(0, 8)
+  
+  $out = Join-Path ([IO.Path]::GetTempPath()) ("viewmd_$hash.html")
 
   $doc = @"
 <!doctype html>
