@@ -31,8 +31,15 @@ try {
   $bytes = [System.Text.Encoding]::UTF8.GetBytes($p.ToLower())
   $hashBytes = [System.Security.Cryptography.MD5]::Create().ComputeHash($bytes)
   $hash = [BitConverter]::ToString($hashBytes).Replace("-", "").Substring(0, 8)
-  
-  $out = Join-Path ([IO.Path]::GetTempPath()) ("viewmd_$hash.html")
+
+  # Also, include the filename (truncated if too long) in the temp filename
+  $name = [IO.Path]::GetFileNameWithoutExtension($p) -replace '[^\w\-]', '_'
+  $maxLen = 18
+  if ($name.Length -gt $maxLen) {
+    $keep = [int](($maxLen - 2) / 2)  # 8 chars each side
+    $name = $name.Substring(0, $keep) + ".." + $name.Substring($name.Length - $keep)
+  }
+  $out = Join-Path ([IO.Path]::GetTempPath()) ("viewmd_$($name)_$hash.html")
 
   $doc = @"
 <!doctype html>
