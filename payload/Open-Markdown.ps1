@@ -127,6 +127,9 @@ try {
     # 4) Block data: URIs only in href/xlink:href (not src, to preserve images)
     $html = $html -replace '(?is)\b(href|xlink:href)\s*=\s*(?:"\s*data:[^"]*"|''\s*data:[^'']*''|\s*data:[^\s>]+)', '$1="#"'
 
+    # Detect remote images in the rendered HTML (<img src=...> or srcset=... containing https/http or //)
+    $hasRemoteImages =
+    $html -match '(?is)<img\b[^>]*(?:\bsrc\b|\bsrcset\b)\s*=\s*(?:"[^"]*(?:https?:|//)|''[^'']*(?:https?:|//)|\s*(?:https?:|//))'
 
     
     $favicon = ""
@@ -148,29 +151,55 @@ try {
         $keep = [int](($maxLen - 2) / 2)  # 8 chars each side
         $name = $name.Substring(0, $keep) + ".." + $name.Substring($name.Length - $keep)
     }
-    $out = Join-Path ([IO.Path]::GetTempPath()) ("viewmd_$($name)_$hash.html")
+    $baseName = "viewmd_$($name)_$hash"
+    $outLocal = Join-Path ([IO.Path]::GetTempPath()) "$baseName.html"
+    $outRemote = Join-Path ([IO.Path]::GetTempPath()) ($baseName + "_remote.html")
 
-    # --- CSP + nonce ---
-    # 1) nonce
+    $uLocal = ([Uri]::new($outLocal)).AbsoluteUri
+    $uRemote = ([Uri]::new($outRemote)).AbsoluteUri    
+
+    function New-Csp([bool]$allowRemoteImages, [string]$nonce) {
+        # CSP: block everything by default; allow only your nonce'd inline JS/CSS;
+        # allow local/data images (for local md images + favicon); no network.
+        # allow remote images if $allowRemoteImages is $true
+
+        $img = if ($allowRemoteImages) { "img-src file: data: https:" } else { "img-src file: data:" }
+
+        @(
+            "default-src 'none'",
+            "connect-src 'none'",
+            "object-src 'none'",
+            "frame-src 'none'",
+            "form-action 'none'",
+            "base-uri file:",
+            $img,
+            "style-src 'nonce-$nonce'",
+            "script-src 'nonce-$nonce'"
+        ) -join '; '
+    }
+
+    # nonce
     $nonceBytes = New-Object byte[] 16
     [System.Security.Cryptography.RandomNumberGenerator]::Fill($nonceBytes)
     $nonce = [Convert]::ToBase64String($nonceBytes)
- 
-    # 2) CSP: block everything by default; allow only your nonce'd inline JS/CSS;
-    # allow local/data images (for local md images + favicon); no network. 
-    $csp = @(
-        "default-src 'none'",
-        "connect-src 'none'",
-        "object-src 'none'",
-        "frame-src 'none'",
-        "form-action 'none'",
-        "base-uri file:",             # Vital for <base> tag to work with local images
-        "img-src file: data:",        # Allows local images and embedded icon
-        "style-src 'nonce-$nonce'",   # Blocks inline style="..." attributes
-        "script-src 'nonce-$nonce'"   # Blocks all unauthorized scripts
-    ) -join '; '
 
-    $doc = @"
+    
+    function Write-Doc([string]$outPath, [bool]$allowRemoteImages, [bool]$hasRemoteImages) {
+        $csp = New-Csp -allowRemoteImages:$allowRemoteImages -nonce $nonce
+
+        $cfgObj = @{
+            docId         = $hash
+            localUrl      = $uLocal
+            remoteUrl     = if ($hasRemoteImages) { $uRemote } else { "" }
+            remoteEnabled = $allowRemoteImages
+            hasRemoteImgs = $hasRemoteImages
+        }
+        $cfg = $cfgObj | ConvertTo-Json -Compress
+        $js2 = "window.mdviewer_config=$cfg;`n" + $js
+
+        $imgButton = if ($hasRemoteImages) { '<button id="mvImages" type="button">Images</button>' } else { '' }
+
+        $doc = @"
 <!doctype html>
 <html>
 <head>
@@ -186,17 +215,25 @@ $css
 </head>
 <body>
 <button id="mvTheme" type="button">Theme</button>
+$imgButton
 <script nonce="$nonce">
-$js
+$js2
 </script>
 $html
 </body>
 </html>
 "@
 
+        [IO.File]::WriteAllText($outPath, $doc, [Text.UTF8Encoding]::new($false))
+    }
 
-    [IO.File]::WriteAllText($out, $doc, [Text.UTF8Encoding]::new($false))
-    Start-Process $out
+    Write-Doc -outPath $outLocal -allowRemoteImages:$false -hasRemoteImages:$hasRemoteImages
+
+    if ($hasRemoteImages) {
+        Write-Doc -outPath $outRemote -allowRemoteImages:$true -hasRemoteImages:$hasRemoteImages
+    }
+
+    Start-Process $outLocal
 }
 catch {
     $msg = $_.Exception.Message

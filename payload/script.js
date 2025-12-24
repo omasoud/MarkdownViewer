@@ -40,3 +40,45 @@
         } else m.addListener(onChange);
     }
 })();
+
+(function () {
+    const cfg = window.mdviewer_config || {};
+    const docId = cfg.docId || "global";
+    const imgKey = "mdviewer_remote_images_" + docId;
+
+    const btn = document.getElementById("mvImages");
+
+    function safeGet(k) {
+        try {
+            return localStorage.getItem(k);
+        } catch {
+            return null;
+        }
+    }
+    function safeSet(k, v) {
+        try {
+            localStorage.setItem(k, v);
+        } catch {}
+    }
+
+    const wantRemote = safeGet(imgKey) === "1";
+    const hasRemote = !!cfg.remoteUrl;
+    const isRemotePage = !!cfg.remoteEnabled;
+
+    // If the remote variant exists, enforce the user preference by switching pages.
+    if (hasRemote && wantRemote !== isRemotePage) {
+        window.location.replace(wantRemote ? cfg.remoteUrl : cfg.localUrl);
+        return;
+    }
+
+    // Only show/enable the button if remote images exist for this doc
+    if (!btn || !hasRemote) return;
+
+    btn.textContent = isRemotePage ? "Images: Remote" : "Images: Local";
+
+    btn.addEventListener("click", function () {
+        const nextRemote = !isRemotePage;
+        safeSet(imgKey, nextRemote ? "1" : "0");
+        window.location.href = nextRemote ? cfg.remoteUrl : cfg.localUrl;
+    });
+})();
