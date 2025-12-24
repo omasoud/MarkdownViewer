@@ -74,6 +74,38 @@ function Show-MotwWarning {
     }
 }
 
+function Get-FileBaseHref {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [string] $FilePath
+  )
+
+  $dir = Split-Path -LiteralPath $FilePath
+
+  if ($dir.StartsWith('\\?\UNC\', [StringComparison]::OrdinalIgnoreCase)) {
+    # \\?\UNC\server\share\path -> file://server/share/path/
+    $unc = $dir.Substring(8)
+    return 'file://' + ($unc.Replace('\','/')) + '/'
+  }
+
+  if ($dir.StartsWith('\\', [StringComparison]::OrdinalIgnoreCase) -and
+      -not $dir.StartsWith('\\?\', [StringComparison]::OrdinalIgnoreCase)) {
+    # \\server\share\path -> file://server/share/path/
+    return 'file://' + ($dir.TrimStart('\').Replace('\','/')) + '/'
+  }
+
+  if ($dir.StartsWith('\\?\', [StringComparison]::OrdinalIgnoreCase)) {
+    # \\?\C:\path -> file:///C:/path/
+    $norm = $dir.Substring(4)
+    return 'file:///' + ($norm.Replace('\','/')) + '/'
+  }
+
+  # C:\path -> file:///C:/path/
+  return 'file:///' + ($dir.Replace('\','/')) + '/'
+}
+
+
 try {
     $p = (Resolve-Path -LiteralPath $Path).Path
 	
@@ -97,7 +129,8 @@ try {
     }
 
     $title = [System.Net.WebUtility]::HtmlEncode([IO.Path]::GetFileName($p))
-    $base = ([Uri]::new((Split-Path -LiteralPath $p) + '\')).AbsoluteUri
+    $base = Get-FileBaseHref -FilePath $p
+
 
     $css = Get-Content -Raw -LiteralPath $StylePath
     $js = Get-Content -Raw -LiteralPath $ScriptPath
