@@ -10,8 +10,89 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+[System.Windows.Forms.Application]::EnableVisualStyles() # Required for TaskDialog
+	
+
+function Test-Motw {
+    param([string]$FilePath)
+    
+    $adsPath = $FilePath + ":Zone.Identifier"
+    
+    if (-not (Test-Path -LiteralPath $adsPath)) {
+        return $null
+    }
+    
+    try {
+        $content = Get-Content -LiteralPath $adsPath -ErrorAction Stop
+        foreach ($line in $content) {
+            if ($line -match '^ZoneId=(\d+)') {
+                return [int]$Matches[1]
+            }
+        }
+    } catch {
+        return $null
+    }
+    return $null
+}
+
+function Show-MotwWarning {
+    param([string]$FilePath)
+    
+    $fileName = [IO.Path]::GetFileName($FilePath)
+    
+    $owner = New-Object System.Windows.Forms.Form
+    $owner.TopMost = $true
+    
+    $page = New-Object System.Windows.Forms.TaskDialogPage
+    $page.Caption = "Security Warning - Markdown Viewer"
+    $page.Heading = "This file was downloaded from the internet"
+    $page.Text = "$fileName`n`nIt may contain malicious content."
+    $page.Icon = [System.Windows.Forms.TaskDialogIcon]::Warning
+    
+    $btnOpen = New-Object System.Windows.Forms.TaskDialogButton("Open")
+    $btnUnblock = New-Object System.Windows.Forms.TaskDialogButton("Unblock && Open")
+    $btnCancel = New-Object System.Windows.Forms.TaskDialogButton("Cancel")
+    
+    $page.Buttons.Add($btnOpen)
+    $page.Buttons.Add($btnUnblock)
+    $page.Buttons.Add($btnCancel)
+    $page.DefaultButton = $btnCancel
+    
+    $result = [System.Windows.Forms.TaskDialog]::ShowDialog($owner.Handle, $page)
+    $owner.Dispose()
+    [System.Windows.Forms.Application]::DoEvents() # Required 
+    
+    if ($result -eq $btnUnblock) {
+        return "Unblock"
+    } elseif ($result -eq $btnOpen) {
+        return "Open"
+    } else {
+        return "Cancel"
+    }
+}
+
 try {
     $p = (Resolve-Path -LiteralPath $Path).Path
+	
+    # --- MOTW check (early exit if user cancels) ---
+    # 0 = Local machine
+    # 1 = Local intranet
+    # 2 = Trusted sites
+    # 3 = Internet
+    # 4 = Restricted sites
+    # Checking $zone -ge 3 catches both Internet and Restricted zones.    
+	$zone = Test-Motw -FilePath $p
+	if ($zone -ge 3) {
+		$result = Show-MotwWarning -FilePath $p
+		
+		if ($result -eq "Unblock") {
+			Unblock-File -LiteralPath $p
+		}
+		elseif ($result -ne "Open") {
+			exit 0
+		}
+	}
+
     $title = [System.Net.WebUtility]::HtmlEncode([IO.Path]::GetFileName($p))
     $base = ([Uri]::new((Split-Path -LiteralPath $p) + '\')).AbsoluteUri
 
@@ -89,15 +170,22 @@ $html
     Start-Process $out
 }
 catch {
-    Add-Type -AssemblyName System.Windows.Forms | Out-Null
     $msg = $_.Exception.Message
     if ($_.InvocationInfo -and $_.InvocationInfo.PositionMessage) {
         $msg += "`r`n`r`n" + $_.InvocationInfo.PositionMessage
     }
-    [System.Windows.Forms.MessageBox]::Show(
-        $msg,
-        "Markdown Viewer Error",
-        [System.Windows.Forms.MessageBoxButtons]::OK,
-        [System.Windows.Forms.MessageBoxIcon]::Error
-    ) | Out-Null
+    
+    $owner = New-Object System.Windows.Forms.Form
+    $owner.TopMost = $true
+    
+    $page = New-Object System.Windows.Forms.TaskDialogPage
+    $page.Caption = "Markdown Viewer"
+    $page.Heading = "Error opening file"
+    $page.Text = $msg
+    $page.Icon = [System.Windows.Forms.TaskDialogIcon]::Error
+    $page.Buttons.Add([System.Windows.Forms.TaskDialogButton]::OK)
+    
+    [System.Windows.Forms.TaskDialog]::ShowDialog($owner.Handle, $page) | Out-Null
+    $owner.Dispose()
+    [System.Windows.Forms.Application]::DoEvents()
 }

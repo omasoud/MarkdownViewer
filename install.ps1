@@ -71,6 +71,17 @@ function Copy-Payload {
   Copy-Item -Force (Join-Path $ScriptRoot "uninstall.vbs") $InstallDir
 }
 
+function Set-ReadOnlyAcl {
+    $InstalledIconFileName = [IO.Path]::GetFileName($InstalledIconPath)
+    $files = @("Open-Markdown.ps1", "viewmd.vbs", "script.js", "style.css", $InstalledIconFileName, "uninstall.ps1", "uninstall.vbs")
+    foreach ($f in $files) {
+        $path = Join-Path $InstallDir $f
+        if (Test-Path $path) {
+            Set-ItemProperty $path -Name IsReadOnly -Value $true
+        }
+    }
+}
+
 function Set-Registry {
   $vbsPath  = Join-Path $InstallDir "viewmd.vbs"
   $icoPath  = $InstalledIconPath
@@ -146,6 +157,7 @@ public static class ShellNotify {
 
 Ensure-Pwsh | Out-Null
 Copy-Payload
+Set-ReadOnlyAcl
 Set-Registry
 
 if (Ask "Enable the right-click context menu item 'View Markdown' for .md and .markdown files?") {
