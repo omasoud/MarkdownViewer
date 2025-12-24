@@ -46,6 +46,14 @@ This tool includes several security measures for viewing Markdown files safely:
 
 - **Content Security Policy (CSP):** The rendered HTML uses a strict CSP with a cryptographic nonce. Only the app's own scripts and styles execute; any scripts embedded in the Markdown (malicious or otherwise) are blocked by the browser.
 
+- **HTML Sanitization:** Before rendering, the app strips dangerous HTML elements and attributes from the Markdown output:
+  - Removes `<script>`, `<iframe>`, `<object>`, `<embed>`, `<meta>`, `<base>`, `<link>`, `<style>` tags
+  - Removes event handlers (`onclick`, `onerror`, etc.)
+  - Neutralizes `javascript:` URIs in links and sources
+  - Blocks `data:` URIs in links (but allows them in images)
+  
+  This is defense-in-depth behind the CSP.
+
 - **Mark-of-the-Web (MOTW) detection:** Files downloaded from the internet are flagged by Windows with a Zone Identifier. When you open such a file, the app displays a warning dialog with options to:
   - **Open** — view this time (will warn again next time)
   - **Unblock & Open** — permanently trust this file
@@ -57,7 +65,7 @@ This tool includes several security measures for viewing Markdown files safely:
 
 ### Limitations
 
-- **Not a sandbox:** The app opens HTML in your default browser. While CSP blocks scripts, a malicious Markdown file could still contain misleading HTML content (e.g., fake login forms). Exercise caution with files from untrusted sources.
+- **Not a sandbox:** The app opens HTML in your default browser. While CSP blocks scripts and sanitization removes dangerous elements, a malicious Markdown file could still contain misleading HTML content (e.g., fake login forms). Exercise caution with files from untrusted sources.
 
 - **No code signing:** The scripts are not digitally signed. If you're security-conscious, review the source code before running.
 

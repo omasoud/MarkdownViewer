@@ -29,7 +29,8 @@ function Test-Motw {
                 return [int]$Matches[1]
             }
         }
-    } catch {
+    }
+    catch {
         return $null
     }
     return $null
@@ -64,9 +65,11 @@ function Show-MotwWarning {
     
     if ($result -eq $btnUnblock) {
         return "Unblock"
-    } elseif ($result -eq $btnOpen) {
+    }
+    elseif ($result -eq $btnOpen) {
         return "Open"
-    } else {
+    }
+    else {
         return "Cancel"
     }
 }
@@ -81,17 +84,17 @@ try {
     # 3 = Internet
     # 4 = Restricted sites
     # Checking $zone -ge 3 catches both Internet and Restricted zones.    
-	$zone = Test-Motw -FilePath $p
-	if ($zone -ge 3) {
-		$result = Show-MotwWarning -FilePath $p
+    $zone = Test-Motw -FilePath $p
+    if ($zone -ge 3) {
+        $result = Show-MotwWarning -FilePath $p
 		
-		if ($result -eq "Unblock") {
-			Unblock-File -LiteralPath $p
-		}
-		elseif ($result -ne "Open") {
-			exit 0
-		}
-	}
+        if ($result -eq "Unblock") {
+            Unblock-File -LiteralPath $p
+        }
+        elseif ($result -ne "Open") {
+            exit 0
+        }
+    }
 
     $title = [System.Net.WebUtility]::HtmlEncode([IO.Path]::GetFileName($p))
     $base = ([Uri]::new((Split-Path -LiteralPath $p) + '\')).AbsoluteUri
@@ -100,6 +103,32 @@ try {
     $js = Get-Content -Raw -LiteralPath $ScriptPath
     $html = (ConvertFrom-Markdown -Path $p).Html
 
+
+    # --- HTML SANITIZATION (Defense-in-Depth) ---
+
+    # 1) Drop dangerous elements (paired, self-closing, and leftover start tags)
+    $dangerousTags = 'script|object|embed|iframe|meta|base|link|style'
+
+    # paired: <tag ...> ... </tag>
+    $html = $html -replace "(?is)<\s*($dangerousTags)\b[^>]*>.*?</\s*\1\s*>", ''
+
+    # self-closing: <tag ... />
+    $html = $html -replace "(?is)<\s*($dangerousTags)\b[^>]*/\s*>", ''
+
+    # leftover start tags: <meta ...> or malformed starts
+    $html = $html -replace "(?is)<\s*($dangerousTags)\b[^>]*>", ''
+
+    # 2) Remove event handlers (quoted or unquoted)
+    $html = $html -replace '(?is)\s+on[a-z0-9_-]+\s*=\s*(?:"[^"]*"|''[^'']*''|[^\s>]+)', ''
+
+    # 3) Neutralize javascript: URIs in href/src/xlink:href/srcset
+    $html = $html -replace '(?is)\b(href|src|xlink:href|srcset)\s*=\s*(?:"\s*javascript:[^"]*"|''\s*javascript:[^'']*''|\s*javascript:[^\s>]+)', '$1="#"'
+
+    # 4) Block data: URIs only in href/xlink:href (not src, to preserve images)
+    $html = $html -replace '(?is)\b(href|xlink:href)\s*=\s*(?:"\s*data:[^"]*"|''\s*data:[^'']*''|\s*data:[^\s>]+)', '$1="#"'
+
+
+    
     $favicon = ""
     if (Test-Path -LiteralPath $IconPath) {
         $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($IconPath))
