@@ -40,6 +40,32 @@ Note: This is not a standalone executable app. Instead, it leverages Windows' bu
 - Windows 10 or later
 - PowerShell 7 (pwsh) - automatically installed if missing
 
+## Security
+
+This tool includes several security measures for viewing Markdown files safely:
+
+- **Content Security Policy (CSP):** The rendered HTML uses a strict CSP with a cryptographic nonce. Only the app's own scripts and styles execute; any scripts embedded in the Markdown (malicious or otherwise) are blocked by the browser.
+
+- **Mark-of-the-Web (MOTW) detection:** Files downloaded from the internet are flagged by Windows with a Zone Identifier. When you open such a file, the app displays a warning dialog with options to:
+  - **Open** — view this time (will warn again next time)
+  - **Unblock & Open** — permanently trust this file
+  - **Cancel** — don't open
+
+- **Read-only installation:** Installed files are marked read-only to deter casual tampering.
+
+- **No network access:** The CSP blocks all network requests (`connect-src 'none'`). The rendered page cannot phone home or load remote resources.
+
+### Limitations
+
+- **Not a sandbox:** The app opens HTML in your default browser. While CSP blocks scripts, a malicious Markdown file could still contain misleading HTML content (e.g., fake login forms). Exercise caution with files from untrusted sources.
+
+- **No code signing:** The scripts are not digitally signed. If you're security-conscious, review the source code before running.
+
+### Reporting issues
+
+If you discover a security vulnerability, please open an issue on GitHub.
+
+
 ## Files
 
 - `INSTALL.cmd` / `install.ps1`: Installation scripts
