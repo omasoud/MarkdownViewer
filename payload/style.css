@@ -103,3 +103,17 @@ a:hover {
     cursor: pointer;
     font-size: 12px;
 }
+
+#mvImages {
+    position: fixed;
+    top: 50px;
+    right: 14px;
+    z-index: 9999;
+    border: 1px solid var(--border);
+    background: var(--codebg);
+    color: var(--fg);
+    padding: 6px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 12px;
+}

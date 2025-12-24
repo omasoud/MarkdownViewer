@@ -63,6 +63,8 @@ This tool includes several security measures for viewing Markdown files safely:
 
 - **No network access:** The CSP blocks all network requests (`connect-src 'none'`). The rendered page cannot phone home or load remote resources.
 
+- **Remote images opt-in:** By default, external images (badges, etc.) are blocked. If a Markdown file contains remote images, an "Images" button appears. Clicking it prompts for confirmation before enabling remote image loading. This preference is stored per-document and can be toggled back to local-only at any time.
+
 ### Limitations
 
 - **Not a sandbox:** The app opens HTML in your default browser. While CSP blocks scripts and sanitization removes dangerous elements, a malicious Markdown file could still contain misleading HTML content (e.g., fake login forms). Exercise caution with files from untrusted sources.
