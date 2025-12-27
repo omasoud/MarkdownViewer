@@ -60,6 +60,14 @@ code {
     border-radius: 6px;
 }
 
+/* code blocks: remove inner padding/background */
+pre code {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    display: block;
+}
+
 table {
     border-collapse: collapse;
     margin: 16px 0;
