@@ -99,3 +99,30 @@
         window.location.href = nextRemote ? cfg.remoteUrl : cfg.localUrl;
     });
 })();
+
+(function () {
+  function rewriteInPageAnchors() {
+    const page = window.location.href.split("#")[0];
+
+    document.querySelectorAll('a[href^="#"], a[href^="./#"]').forEach(a => {
+      let href = a.getAttribute("href");
+      if (!href) return;
+
+      // Normalize "./#id" -> "#id"
+      if (href.startsWith("./#")) href = href.slice(1);
+
+      // Skip plain "#"
+      if (href === "#" || href === "") return;
+
+      if (!href.startsWith("#")) return;
+
+      a.setAttribute("href", page + href);
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", rewriteInPageAnchors);
+  } else {
+    rewriteInPageAnchors();
+  }
+})();
