@@ -35,6 +35,10 @@ Remove-Item "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$AppId" -
 # Files
 Remove-Item $InstallDir -Recurse -Force -ErrorAction SilentlyContinue
 
+# Protocol
+Remove-Item "HKCU:\Software\Classes\mdview" -Recurse -Force -ErrorAction SilentlyContinue
+
+
 Refresh-ShellAssociations
 
 Write-Host "Done."

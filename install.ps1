@@ -112,6 +112,20 @@ function Set-Registry {
   New-ItemProperty -Path "HKCU:\Software\$AppId\Capabilities\FileAssociations" -Name ".markdown" -Value $AppId -Force | Out-Null
 }
 
+function Register-Protocol {
+  $proto = 'mdview'
+  $vbsPath = Join-Path $InstallDir 'viewmd.vbs'
+  $cmd = "wscript.exe `"$vbsPath`" `"%1`""
+
+  New-Item -Path "HKCU:\Software\Classes\$proto" -Force | Out-Null
+  New-ItemProperty -Path "HKCU:\Software\Classes\$proto" -Name '(default)' -Value 'URL:Markdown Viewer' -Force | Out-Null
+  New-ItemProperty -Path "HKCU:\Software\Classes\$proto" -Name 'URL Protocol' -Value '' -Force | Out-Null
+
+  New-Item -Path "HKCU:\Software\Classes\$proto\shell\open\command" -Force | Out-Null
+  New-ItemProperty -Path "HKCU:\Software\Classes\$proto\shell\open\command" -Name '(default)' -Value $cmd -Force | Out-Null
+}
+
+
 function Set-ContextMenu {
   $vbsPath = Join-Path $InstallDir "viewmd.vbs"
   $cmd     = "wscript.exe `"$vbsPath`" `"%1`""
@@ -159,6 +173,7 @@ Ensure-Pwsh | Out-Null
 Copy-Payload
 Set-ReadOnlyAcl
 Set-Registry
+Register-Protocol
 
 if (Ask "Enable the right-click context menu item 'View Markdown' for .md and .markdown files?") {
   Set-ContextMenu

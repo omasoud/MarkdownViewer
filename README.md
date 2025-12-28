@@ -29,6 +29,7 @@ Note: This is not a standalone executable app. Instead, it leverages Windows' bu
 - If the context menu was enabled during installation, right-click on a Markdown file and select "View Markdown".
 - The rendered HTML includes basic styling for readability.
 - Dark mode support: Use the "Theme" toggle button in the top-right corner of the page to switch between system theme (follows OS preference) and inverted theme (opposite of system preference).
+- **Linked markdown files:** Clicking links to other local `.md` files within a document opens them in Markdown Viewer. First time you click a linked Markdown file, Chrome/Edge will ask to allow launching the Markdown Viewer. Check ‘Always allow…’ to avoid future prompts.
 
 ## Uninstallation
 

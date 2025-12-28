@@ -101,28 +101,72 @@
 })();
 
 (function () {
-  function rewriteInPageAnchors() {
-    const page = window.location.href.split("#")[0];
+    function rewriteInPageAnchors() {
+        const page = window.location.href.split("#")[0];
 
-    document.querySelectorAll('a[href^="#"], a[href^="./#"]').forEach(a => {
-      let href = a.getAttribute("href");
-      if (!href) return;
+        document.querySelectorAll('a[href^="#"], a[href^="./#"]').forEach(
+            (a) => {
+                let href = a.getAttribute("href");
+                if (!href) return;
 
-      // Normalize "./#id" -> "#id"
-      if (href.startsWith("./#")) href = href.slice(1);
+                // Normalize "./#id" -> "#id"
+                if (href.startsWith("./#")) href = href.slice(1);
 
-      // Skip plain "#"
-      if (href === "#" || href === "") return;
+                // Skip plain "#"
+                if (href === "#" || href === "") return;
 
-      if (!href.startsWith("#")) return;
+                if (!href.startsWith("#")) return;
 
-      a.setAttribute("href", page + href);
-    });
-  }
+                a.setAttribute("href", page + href);
+            },
+        );
+    }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", rewriteInPageAnchors);
-  } else {
-    rewriteInPageAnchors();
-  }
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", rewriteInPageAnchors);
+    } else {
+        rewriteInPageAnchors();
+    }
+})();
+
+(function () {
+    const cfg = window.mdviewer_config || {};
+    const base = cfg.mdDirBase;
+    if (!base) return;
+
+    function isMarkdownHref(href) {
+        return /\.(md|markdown)(\?.*)?(#.*)?$/i.test(href);
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", rewriteMarkdownLinks);
+    } else {
+        rewriteMarkdownLinks();
+    }
+
+    function rewriteMarkdownLinks() {
+        document.querySelectorAll("a[href]").forEach((a) => {
+            const href = a.getAttribute("href");
+            if (!href) return;
+
+            const h = href.trim();
+
+            // Skip in-page anchors and already-custom protocol
+            if (h.startsWith("#") || h.toLowerCase().startsWith("mdview:")) {
+                return;
+            }
+
+            let abs;
+            try {
+                abs = new URL(h, base).href; // resolves against the markdown dir base
+            } catch {
+                return;
+            }
+
+            // Only rewrite local markdown targets
+            if (abs.toLowerCase().startsWith("file:") && isMarkdownHref(abs)) {
+                a.setAttribute("href", "mdview:" + abs);
+            }
+        });
+    }
 })();

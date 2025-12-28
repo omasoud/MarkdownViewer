@@ -74,40 +74,94 @@ function Show-MotwWarning {
     }
 }
 
+function Show-FileNotFound {
+    param(
+        [Parameter(Mandatory)][string]$FilePath,
+        [string]$FromLink = ''
+    )
+
+    $owner = New-Object System.Windows.Forms.Form
+    $owner.TopMost = $true
+
+    $page = New-Object System.Windows.Forms.TaskDialogPage
+    $page.Caption = "Markdown Viewer"
+    $page.Heading = "File not found"
+    $page.Text = if ($FromLink) {
+        "The linked Markdown file could not be found:`n`n$FilePath`n`nLink: $FromLink"
+    } else {
+        "The Markdown file could not be found:`n`n$FilePath"
+    }
+    $page.Icon = [System.Windows.Forms.TaskDialogIcon]::Warning
+    $page.Buttons.Add([System.Windows.Forms.TaskDialogButton]::OK)
+
+    [System.Windows.Forms.TaskDialog]::ShowDialog($owner.Handle, $page) | Out-Null
+    $owner.Dispose()
+    [System.Windows.Forms.Application]::DoEvents()
+}
+
+
 function Get-FileBaseHref {
-  [CmdletBinding()]
-  param(
-    [Parameter(Mandatory)]
-    [string] $FilePath
-  )
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $FilePath
+    )
 
-  $dir = Split-Path -LiteralPath $FilePath
+    $dir = Split-Path -LiteralPath $FilePath
 
-  if ($dir.StartsWith('\\?\UNC\', [StringComparison]::OrdinalIgnoreCase)) {
-    # \\?\UNC\server\share\path -> file://server/share/path/
-    $unc = $dir.Substring(8)
-    return 'file://' + ($unc.Replace('\','/')) + '/'
-  }
+    if ($dir.StartsWith('\\?\UNC\', [StringComparison]::OrdinalIgnoreCase)) {
+        # \\?\UNC\server\share\path -> file://server/share/path/
+        $unc = $dir.Substring(8)
+        return 'file://' + ($unc.Replace('\', '/')) + '/'
+    }
 
-  if ($dir.StartsWith('\\', [StringComparison]::OrdinalIgnoreCase) -and
-      -not $dir.StartsWith('\\?\', [StringComparison]::OrdinalIgnoreCase)) {
-    # \\server\share\path -> file://server/share/path/
-    return 'file://' + ($dir.TrimStart('\').Replace('\','/')) + '/'
-  }
+    if ($dir.StartsWith('\\', [StringComparison]::OrdinalIgnoreCase) -and
+        -not $dir.StartsWith('\\?\', [StringComparison]::OrdinalIgnoreCase)) {
+        # \\server\share\path -> file://server/share/path/
+        return 'file://' + ($dir.TrimStart('\').Replace('\', '/')) + '/'
+    }
 
-  if ($dir.StartsWith('\\?\', [StringComparison]::OrdinalIgnoreCase)) {
-    # \\?\C:\path -> file:///C:/path/
-    $norm = $dir.Substring(4)
-    return 'file:///' + ($norm.Replace('\','/')) + '/'
-  }
+    if ($dir.StartsWith('\\?\', [StringComparison]::OrdinalIgnoreCase)) {
+        # \\?\C:\path -> file:///C:/path/
+        $norm = $dir.Substring(4)
+        return 'file:///' + ($norm.Replace('\', '/')) + '/'
+    }
 
-  # C:\path -> file:///C:/path/
-  return 'file:///' + ($dir.Replace('\','/')) + '/'
+    # C:\path -> file:///C:/path/
+    return 'file:///' + ($dir.Replace('\', '/')) + '/'
 }
 
 
 try {
-    $p = (Resolve-Path -LiteralPath $Path).Path
+    $raw = $Path
+    $frag = ''
+
+    if ($raw -match '^(?i)mdview:(.+)$') {
+        $raw = $Matches[1]
+    }
+
+    if ($raw -match '^(?i)file:') {
+        $u = [Uri]$raw
+        $frag = $u.Fragment  # includes leading '#', or empty
+        $raw = $u.LocalPath
+    }
+    else {
+        # If someone passes a literal path containing '#', treat it as fragment.
+        $hash = $raw.IndexOf('#')
+        if ($hash -ge 0) {
+            $frag = $raw.Substring($hash)
+            $raw = $raw.Substring(0, $hash)
+        }
+    }
+
+    # $raw is the path after decoding (no fragment)
+    if (-not (Test-Path -LiteralPath $raw)) {
+        # Optional: if we still have the original incoming argument, pass it as context
+        Show-FileNotFound -FilePath $raw -FromLink $Path
+        return
+    }
+
+    $p = (Resolve-Path -LiteralPath $raw).Path
 	
     # --- MOTW check (early exit if user cancels) ---
     # 0 = Local machine
@@ -130,7 +184,6 @@ try {
 
     $title = [System.Net.WebUtility]::HtmlEncode([IO.Path]::GetFileName($p))
     $base = Get-FileBaseHref -FilePath $p
-
 
     $css = Get-Content -Raw -LiteralPath $StylePath
     $js = Get-Content -Raw -LiteralPath $ScriptPath
@@ -226,6 +279,7 @@ try {
             remoteUrl     = if ($hasRemoteImages) { $uRemote } else { "" }
             remoteEnabled = $allowRemoteImages
             hasRemoteImgs = $hasRemoteImages
+            mdDirBase     = $base
         }
         $cfg = $cfgObj | ConvertTo-Json -Compress
         $js2 = "window.mdviewer_config=$cfg;`n" + $js
@@ -266,7 +320,8 @@ $html
         Write-Doc -outPath $outRemote -allowRemoteImages:$true -hasRemoteImages:$hasRemoteImages
     }
 
-    Start-Process $outLocal
+    $launch = if ($frag) { $outLocal + $frag } else { $outLocal }
+    Start-Process $launch
 }
 catch {
     $msg = $_.Exception.Message
