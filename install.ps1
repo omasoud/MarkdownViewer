@@ -64,6 +64,7 @@ function Copy-Payload {
   New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
   Copy-Item -Force (Join-Path $PayloadDir "viewmd.vbs")    $InstallDir
   Copy-Item -Force (Join-Path $PayloadDir "Open-Markdown.ps1") $InstallDir
+  Copy-Item -Force (Join-Path $PayloadDir "MarkdownViewer.psm1") $InstallDir
   Copy-Item -Force (Join-Path $PayloadDir "style.css") $InstallDir
   Copy-Item -Force (Join-Path $PayloadDir "script.js") $InstallDir
   Copy-Item -Force (Join-Path $PayloadDir $SourceIconFileName) $InstalledIconPath
@@ -73,7 +74,7 @@ function Copy-Payload {
 
 function Set-ReadOnlyAcl {
     $InstalledIconFileName = [IO.Path]::GetFileName($InstalledIconPath)
-    $files = @("Open-Markdown.ps1", "viewmd.vbs", "script.js", "style.css", $InstalledIconFileName, "uninstall.ps1", "uninstall.vbs")
+    $files = @("Open-Markdown.ps1", "MarkdownViewer.psm1", "viewmd.vbs", "script.js", "style.css", $InstalledIconFileName, "uninstall.ps1", "uninstall.vbs")
     foreach ($f in $files) {
         $path = Join-Path $InstallDir $f
         if (Test-Path $path) {

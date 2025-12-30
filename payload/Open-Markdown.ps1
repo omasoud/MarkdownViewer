@@ -9,32 +9,15 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Import the shared module
+Import-Module (Join-Path $PSScriptRoot 'MarkdownViewer.psm1') -Force
+
 Add-Type -AssemblyName System.Windows.Forms | Out-Null
 [System.Windows.Forms.Application]::EnableVisualStyles() # Required for TaskDialog
 	
 
-function Test-Motw {
-    param([string]$FilePath)
-    
-    $adsPath = $FilePath + ":Zone.Identifier"
-    
-    if (-not (Test-Path -LiteralPath $adsPath)) {
-        return $null
-    }
-    
-    try {
-        $content = Get-Content -LiteralPath $adsPath -ErrorAction Stop
-        foreach ($line in $content) {
-            if ($line -match '^ZoneId=(\d+)') {
-                return [int]$Matches[1]
-            }
-        }
-    }
-    catch {
-        return $null
-    }
-    return $null
-}
+# Note: Test-Motw and Get-FileBaseHref are now provided by the MarkdownViewer module
 
 function Show-MotwWarning {
     param([string]$FilePath)
@@ -100,38 +83,6 @@ function Show-FileNotFound {
 }
 
 
-function Get-FileBaseHref {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)]
-        [string] $FilePath
-    )
-
-    $dir = Split-Path -LiteralPath $FilePath
-
-    if ($dir.StartsWith('\\?\UNC\', [StringComparison]::OrdinalIgnoreCase)) {
-        # \\?\UNC\server\share\path -> file://server/share/path/
-        $unc = $dir.Substring(8)
-        return 'file://' + ($unc.Replace('\', '/')) + '/'
-    }
-
-    if ($dir.StartsWith('\\', [StringComparison]::OrdinalIgnoreCase) -and
-        -not $dir.StartsWith('\\?\', [StringComparison]::OrdinalIgnoreCase)) {
-        # \\server\share\path -> file://server/share/path/
-        return 'file://' + ($dir.TrimStart('\').Replace('\', '/')) + '/'
-    }
-
-    if ($dir.StartsWith('\\?\', [StringComparison]::OrdinalIgnoreCase)) {
-        # \\?\C:\path -> file:///C:/path/
-        $norm = $dir.Substring(4)
-        return 'file:///' + ($norm.Replace('\', '/')) + '/'
-    }
-
-    # C:\path -> file:///C:/path/
-    return 'file:///' + ($dir.Replace('\', '/')) + '/'
-}
-
-
 try {
     $raw = $Path
     $frag = ''
@@ -191,31 +142,11 @@ try {
 
 
     # --- HTML SANITIZATION (Defense-in-Depth) ---
+    # Uses the module function which properly handles content in code blocks
+    $html = Invoke-HtmlSanitization -Html $html
 
-    # 1) Drop dangerous elements (paired, self-closing, and leftover start tags)
-    $dangerousTags = 'script|object|embed|iframe|meta|base|link|style'
-
-    # paired: <tag ...> ... </tag>
-    $html = $html -replace "(?is)<\s*($dangerousTags)\b[^>]*>.*?</\s*\1\s*>", ''
-
-    # self-closing: <tag ... />
-    $html = $html -replace "(?is)<\s*($dangerousTags)\b[^>]*/\s*>", ''
-
-    # leftover start tags: <meta ...> or malformed starts
-    $html = $html -replace "(?is)<\s*($dangerousTags)\b[^>]*>", ''
-
-    # 2) Remove event handlers (quoted or unquoted)
-    $html = $html -replace '(?is)\s+on[a-z0-9_-]+\s*=\s*(?:"[^"]*"|''[^'']*''|[^\s>]+)', ''
-
-    # 3) Neutralize javascript: URIs in href/src/xlink:href/srcset
-    $html = $html -replace '(?is)\b(href|src|xlink:href|srcset)\s*=\s*(?:"\s*javascript:[^"]*"|''\s*javascript:[^'']*''|\s*javascript:[^\s>]+)', '$1="#"'
-
-    # 4) Block data: URIs only in href/xlink:href (not src, to preserve images)
-    $html = $html -replace '(?is)\b(href|xlink:href)\s*=\s*(?:"\s*data:[^"]*"|''\s*data:[^'']*''|\s*data:[^\s>]+)', '$1="#"'
-
-    # Detect remote images in the rendered HTML (<img src=...> or srcset=... containing https/http or //)
-    $hasRemoteImages =
-    $html -match '(?is)<img\b[^>]*(?:\bsrc\b|\bsrcset\b)\s*=\s*(?:"[^"]*(?:https?:|//)|''[^'']*(?:https?:|//)|\s*(?:https?:|//))'
+    # Detect remote images in the rendered HTML
+    $hasRemoteImages = Test-RemoteImages -Html $html
 
     
     $favicon = ""
