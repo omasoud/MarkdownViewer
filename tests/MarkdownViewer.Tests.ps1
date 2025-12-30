@@ -609,3 +609,213 @@ Describe 'Test-Motw' {
         }
     }
 }
+
+Describe 'Theme Variation Feature - CSS' {
+    BeforeAll {
+        $cssPath = Join-Path $PSScriptRoot '..\payload\style.css'
+        $cssContent = Get-Content -Raw -LiteralPath $cssPath
+    }
+
+    Context 'Light theme variations exist' {
+        It 'has Light Default (variation 0) styles' {
+            $cssContent | Should -Match '\[data-theme="light"\]\[data-variation="0"\]'
+        }
+
+        It 'has Light Warm (variation 1) styles' {
+            $cssContent | Should -Match '\[data-theme="light"\]\[data-variation="1"\]'
+        }
+
+        It 'has Light Cool (variation 2) styles' {
+            $cssContent | Should -Match '\[data-theme="light"\]\[data-variation="2"\]'
+        }
+
+        It 'has Light Sepia (variation 3) styles' {
+            $cssContent | Should -Match '\[data-theme="light"\]\[data-variation="3"\]'
+        }
+
+        It 'has Light High Contrast (variation 4) styles' {
+            $cssContent | Should -Match '\[data-theme="light"\]\[data-variation="4"\]'
+        }
+    }
+
+    Context 'Dark theme variations exist' {
+        It 'has Dark Default (variation 0) styles' {
+            $cssContent | Should -Match '\[data-theme="dark"\]\[data-variation="0"\]'
+        }
+
+        It 'has Dark Warm (variation 1) styles' {
+            $cssContent | Should -Match '\[data-theme="dark"\]\[data-variation="1"\]'
+        }
+
+        It 'has Dark Cool (variation 2) styles' {
+            $cssContent | Should -Match '\[data-theme="dark"\]\[data-variation="2"\]'
+        }
+
+        It 'has Dark OLED Black (variation 3) styles' {
+            $cssContent | Should -Match '\[data-theme="dark"\]\[data-variation="3"\]'
+        }
+
+        It 'has Dark Dimmed (variation 4) styles' {
+            $cssContent | Should -Match '\[data-theme="dark"\]\[data-variation="4"\]'
+        }
+    }
+
+    Context 'CSS custom properties are defined' {
+        It 'defines --bg property' {
+            $cssContent | Should -Match '--bg:\s*#[0-9a-fA-F]+'
+        }
+
+        It 'defines --fg property' {
+            $cssContent | Should -Match '--fg:\s*#[0-9a-fA-F]+'
+        }
+
+        It 'defines --codebg property' {
+            $cssContent | Should -Match '--codebg:\s*#[0-9a-fA-F]+'
+        }
+
+        It 'defines --border property' {
+            $cssContent | Should -Match '--border:\s*#[0-9a-fA-F]+'
+        }
+
+        It 'defines --link property' {
+            $cssContent | Should -Match '--link:\s*#[0-9a-fA-F]+'
+        }
+    }
+
+    Context 'Dropdown menu styles exist' {
+        It 'has .mv-var-menu styles' {
+            $cssContent | Should -Match '\.mv-var-menu\s*\{'
+        }
+
+        It 'has .mv-var-item styles' {
+            $cssContent | Should -Match '\.mv-var-item\s*\{'
+        }
+
+        It 'has .mv-var-item:hover styles' {
+            $cssContent | Should -Match '\.mv-var-item:hover\s*\{'
+        }
+
+        It 'has .mv-var-item.active styles' {
+            $cssContent | Should -Match '\.mv-var-item\.active\s*\{'
+        }
+    }
+
+    Context 'Button styles exist' {
+        It 'has #mvVariation button styles' {
+            $cssContent | Should -Match '#mvVariation\s*\{'
+        }
+
+        It 'has #mvImages button styles' {
+            $cssContent | Should -Match '#mvImages\s*\{'
+        }
+    }
+}
+
+Describe 'Theme Variation Feature - JavaScript' {
+    BeforeAll {
+        $jsPath = Join-Path $PSScriptRoot '..\payload\script.js'
+        $jsContent = Get-Content -Raw -LiteralPath $jsPath
+    }
+
+    Context 'localStorage keys are defined' {
+        It 'defines mdviewer_light_variation key' {
+            $jsContent | Should -Match 'mdviewer_light_variation'
+        }
+
+        It 'defines mdviewer_dark_variation key' {
+            $jsContent | Should -Match 'mdviewer_dark_variation'
+        }
+    }
+
+    Context 'Theme variation names are defined' {
+        It 'defines light theme names array' {
+            $jsContent | Should -Match 'lightNames\s*=\s*\['
+        }
+
+        It 'defines dark theme names array' {
+            $jsContent | Should -Match 'darkNames\s*=\s*\['
+        }
+
+        It 'includes Default variation name' {
+            $jsContent | Should -Match '"Default"'
+        }
+
+        It 'includes Warm variation name' {
+            $jsContent | Should -Match '"Warm"'
+        }
+
+        It 'includes Cool variation name' {
+            $jsContent | Should -Match '"Cool"'
+        }
+
+        It 'includes Sepia variation name' {
+            $jsContent | Should -Match '"Sepia"'
+        }
+
+        It 'includes High Contrast variation name' {
+            $jsContent | Should -Match '"High Contrast"'
+        }
+
+        It 'includes OLED Black variation name' {
+            $jsContent | Should -Match '"OLED Black"'
+        }
+
+        It 'includes Dimmed variation name' {
+            $jsContent | Should -Match '"Dimmed"'
+        }
+    }
+
+    Context 'Core functions exist' {
+        It 'defines getVariation function' {
+            $jsContent | Should -Match 'function getVariation'
+        }
+
+        It 'defines setVariation function' {
+            $jsContent | Should -Match 'function setVariation'
+        }
+
+        It 'defines applyVariation function' {
+            $jsContent | Should -Match 'function applyVariation'
+        }
+
+        It 'defines updateVariationButton function' {
+            $jsContent | Should -Match 'function updateVariationButton'
+        }
+
+        It 'defines openMenu function' {
+            $jsContent | Should -Match 'function openMenu'
+        }
+
+        It 'defines closeMenu function' {
+            $jsContent | Should -Match 'function closeMenu'
+        }
+    }
+
+    Context 'Event handlers exist' {
+        It 'handles Escape key' {
+            $jsContent | Should -Match 'Escape'
+        }
+
+        It 'handles mouseenter for preview' {
+            $jsContent | Should -Match 'mouseenter'
+        }
+
+        It 'creates variation button dynamically' {
+            $jsContent | Should -Match 'mvVariation'
+        }
+    }
+
+    Context 'Menu item structure' {
+        It 'creates menu items with mv-var-item class' {
+            $jsContent | Should -Match 'mv-var-item'
+        }
+
+        It 'creates menu container with mv-var-menu class' {
+            $jsContent | Should -Match 'mv-var-menu'
+        }
+
+        It 'marks active item with active class' {
+            $jsContent | Should -Match '"active"'
+        }
+    }
+}
