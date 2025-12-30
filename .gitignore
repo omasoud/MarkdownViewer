@@ -2,3 +2,4 @@ payload/scrap/*
 PSScriptAnalyzerSettings.psd1
 .vscode/settings.json
 all.txt
+.github/
