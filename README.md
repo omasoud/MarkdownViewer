@@ -38,6 +38,7 @@ Note: This is not a standalone executable app. Instead, it leverages Windows' bu
   - **JavaScript/TypeScript:** `javascript`, `js`, `typescript`, `ts`, `jsx`, `tsx`
   - **Web:** `html`, `css`, `json`, `xml`, `yaml`, `yml`
   - **Other:** `python`, `py`, `bash`, `sh`, `sql`, `csharp`, `cs`, `cpp`, `c`, `java`, `go`, `rust`, `ruby`, `rb`, `php`, `markdown`, `md`, `diff`, `dockerfile`
+  - Supports all languages included in the bundled `highlight.min.js` (currently 192 languages)
   - Code blocks without a recognized language tag are displayed as plain preformatted text (no auto-detection).
 - **Linked markdown files:** Clicking links to other local `.md` files within a document opens them in Markdown Viewer. First time you click a linked Markdown file, Chrome/Edge will ask to allow launching the Markdown Viewer. Check 'Always allow…' to avoid future prompts.
 
