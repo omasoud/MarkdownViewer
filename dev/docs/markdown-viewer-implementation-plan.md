@@ -1,200 +1,288 @@
-# Theme Variation Feature - Implementation Plan
+# highlight.js Integration Implementation Plan
 
 ## Overview
 
-This document outlines the implementation plan for the Theme Variation feature as specified in [theme-variation-feature.md](theme-variation-feature.md).
+This document outlines the implementation plan for the highlight.js syntax highlighting feature as specified in:
+- [highlight-integration-spec.md](highlight-integration-spec.md)
+- [highlight-integration-spec-addendum.md](highlight-integration-spec-addendum.md)
 
-## Phase 1: CSS Theme Variations
+**Key Goals:**
+- Shared local assets (not inlined into HTML) for efficient multi-tab usage
+- No auto-detection (class-only highlighting to avoid CPU spikes)
+- Theme integration with existing light/dark/variation system
+- Strict CSP maintained with `file:` addition for local scripts/styles
 
-### 1.1 Define Light Theme Variations
+---
 
-- [x] 1.1.1 Add CSS custom properties for Light Default (variation 0) - existing colors
-- [x] 1.1.2 Add CSS custom properties for Light Warm (variation 1)
-- [x] 1.1.3 Add CSS custom properties for Light Cool (variation 2)
-- [x] 1.1.4 Add CSS custom properties for Light Sepia (variation 3)
-- [x] 1.1.5 Add CSS custom properties for Light High Contrast (variation 4)
+## Phase 1: Asset Preparation
 
-### 1.2 Define Dark Theme Variations
+### 1.1 Generate Combined Theme CSS
 
-- [x] 1.2.1 Add CSS custom properties for Dark Default (variation 0) - existing colors
-- [x] 1.2.2 Add CSS custom properties for Dark Warm (variation 1)
-- [x] 1.2.3 Add CSS custom properties for Dark Cool (variation 2)
-- [x] 1.2.4 Add CSS custom properties for Dark OLED Black (variation 3)
-- [x] 1.2.5 Add CSS custom properties for Dark Dimmed (variation 4)
+**File:** `payload/highlight-theme.css` (new)
 
-### 1.3 CSS Selectors for Variations
+- [x] 1.1.1 Copy `dev/scripts/highlight-theme-tomorrow.css` to `payload/highlight-theme.css`
+- [x] 1.1.2 Verify CSS contains reset block with `background: transparent`
+- [x] 1.1.3 Verify CSS contains `:root[data-theme="light"]` scoped rules
+- [x] 1.1.4 Verify CSS contains `:root[data-theme="dark"]` scoped rules
 
-- [x] 1.3.1 Use `[data-theme="light"][data-variation="N"]` selectors
-- [x] 1.3.2 Use `[data-theme="dark"][data-variation="N"]` selectors
-- [x] 1.3.3 Ensure default (variation 0) works without data-variation attribute
+### 1.2 Prepare highlight.js Bundle
 
-### 1.4 Dropdown Menu Styling
+**File:** `payload/highlight.min.js` (new)
 
-- [x] 1.4.1 Add `.mv-var-menu` styles for dropdown container
-- [x] 1.4.2 Add `.mv-var-item` styles for menu items
-- [x] 1.4.3 Add `.mv-var-item:hover` styles for hover state
-- [x] 1.4.4 Add `.mv-var-item.active` styles for current selection
+- [x] 1.2.1 Copy `dev/scripts/highlight.min.js` to `payload/highlight.min.js`
+- [x] 1.2.2 Verify bundle is UMD build (defines `window.hljs`)
 
-## Phase 2: JavaScript Theme Variation Logic
+---
 
-### 2.1 Theme Variation State Management
+## Phase 2: CSP and HTML Infrastructure
 
-- [x] 2.1.1 Add localStorage keys: `mdviewer_light_variation`, `mdviewer_dark_variation`
-- [x] 2.1.2 Create `getVariation(theme)` function to read from localStorage
-- [x] 2.1.3 Create `setVariation(theme, index)` function to save to localStorage
-- [x] 2.1.4 Define variation names array: `["Default", "Warm", "Cool", "Sepia/OLED", "High Contrast/Dimmed"]`
+### 2.1 Update CSP Generation
 
-### 2.2 Apply Variation on Page Load
+**File:** `payload/Open-Markdown.ps1`
 
-- [x] 2.2.1 Read variation for current theme from localStorage
-- [x] 2.2.2 Set `data-variation` attribute on `<html>` element
-- [x] 2.2.3 Coordinate with existing theme toggle (when theme changes, re-apply correct variation)
+**Changes to `New-Csp` function:**
+- [x] 2.1.1 Add `file:` to `style-src` directive: `"style-src 'nonce-$nonce' file:"`
+- [x] 2.1.2 Add `file:` to `script-src` directive: `"script-src 'nonce-$nonce' file:"`
+- [x] 2.1.3 Add comment documenting security tradeoff (sanitization strips all script/link/style tags)
 
-### 2.3 Create Variation Button
+### 2.2 Add Asset Path Handling
 
-- [x] 2.3.1 Create button element dynamically after Theme button
-- [x] 2.3.2 Set button ID to `mvVariation`
-- [x] 2.3.3 Update button label to show current theme and variation name
+**File:** `payload/Open-Markdown.ps1`
 
-### 2.4 Dropdown Menu
+**Changes:**
+- [x] 2.2.1 Add `$HighlightJsPath` variable with default `(Join-Path $PSScriptRoot 'highlight.min.js')`
+- [x] 2.2.2 Add `$HighlightThemePath` variable with default `(Join-Path $PSScriptRoot 'highlight-theme.css')`
+- [x] 2.2.3 Generate `file:///` URLs for both assets using Uri class
+- [x] 2.2.4 Check if asset files exist before including references
 
-- [x] 2.4.1 Create menu container dynamically on button click
-- [x] 2.4.2 Populate menu with 5 items for current theme
-- [x] 2.4.3 Position menu below button (or above if not enough space)
-- [x] 2.4.4 Mark current variation as active
+### 2.3 Update HTML Template
 
-### 2.5 Preview on Hover
+**File:** `payload/Open-Markdown.ps1`
 
-- [x] 2.5.1 On mouseenter of menu item, set `data-variation` attribute temporarily
-- [x] 2.5.2 Store original variation before preview
-- [x] 2.5.3 On mouseleave of menu (without selection), restore original variation
+**Changes to `Write-Doc` function:**
+- [x] 2.3.1 Add `<link rel="stylesheet" href="$highlightThemeUri">` after nonce'd style block
+- [x] 2.3.2 Add `<script src="$highlightJsUri" defer></script>` before nonce'd script
+- [x] 2.3.3 Only include highlight assets if both files exist (graceful degradation)
+- [x] 2.3.4 Ensure NO query strings on asset URLs (breaks caching)
 
-### 2.6 Selection and Dismissal
-
-- [x] 2.6.1 On click of menu item, save selection and close menu
-- [x] 2.6.2 On click outside menu, close menu and restore original
-- [x] 2.6.3 On Escape key, close menu and restore original
-- [x] 2.6.4 On button re-click (while menu open), close menu and restore original
-
-### 2.7 Integration with Theme Toggle
-
-- [x] 2.7.1 When theme changes via Theme button, apply the correct variation for new theme
-- [x] 2.7.2 Update Variation button label when theme changes
-
-## Phase 3: Unit Tests
-
-### 3.1 CSS Tests (Visual/Manual)
-
-- [x] 3.1.1 Create test markdown file with various elements to verify all variations render correctly
-
-### 3.2 JavaScript Logic Tests
-
-Since the JS runs in the browser, we'll create a test HTML file that can be used to verify behavior:
-
-- [x] 3.2.1 Create `tests/theme-variation-test.md` for manual testing
-- [x] 3.2.2 Test variation persistence across page reload
-- [x] 3.2.3 Test preview-on-hover behavior
-- [x] 3.2.4 Test dismissal scenarios (click outside, Escape, re-click button)
-- [x] 3.2.5 Test theme toggle coordination
-
-### 3.3 Integration Tests
-
-- [x] 3.3.1 Test that generated HTML includes the new CSS
-- [x] 3.3.2 Test that generated HTML includes the new JS
-- [x] 3.3.3 Verify button appears in rendered output
-
-## Phase 4: Documentation Updates
-
-- [x] 4.1 Update README.md with theme variation feature description
-- [x] 4.2 Update architecture document
-
-## Implementation Details
-
-### CSS Color Values
-
-#### Light Theme Variations
-
-```css
-/* Light Default (0) - existing */
---bg: #ffffff; --fg: #111111; --muted: #444; --codebg: #f4f4f4; --border: #dddddd; --link: #0b57d0;
-
-/* Light Warm (1) */
---bg: #fdfbf7; --fg: #1a1815; --muted: #5c5347; --codebg: #f5f0e8; --border: #e5ddd0; --link: #8b5c2a;
-
-/* Light Cool (2) */
---bg: #f8fafc; --fg: #0f172a; --muted: #475569; --codebg: #f1f5f9; --border: #e2e8f0; --link: #2563eb;
-
-/* Light Sepia (3) */
---bg: #f4ecd8; --fg: #2c2416; --muted: #5c5040; --codebg: #ebe3cf; --border: #d4c9b0; --link: #7c4d12;
-
-/* Light High Contrast (4) */
---bg: #ffffff; --fg: #000000; --muted: #333333; --codebg: #f0f0f0; --border: #000000; --link: #0000cc;
+**Expected HTML structure (within `<head>/<body>`):**
+```html
+<style nonce="...">/* viewer CSS */</style>
+<link rel="stylesheet" href="file:///...highlight-theme.css">
+</head>
+<body>
+...
+<script src="file:///...highlight.min.js" defer></script>
+<script nonce="...">/* viewer JS */</script>
 ```
 
-#### Dark Theme Variations
+---
 
-```css
-/* Dark Default (0) - existing */
---bg: #0f1115; --fg: #e7e7e7; --muted: #b8b8b8; --codebg: #1b1f2a; --border: #2a2f3a; --link: #7ab7ff;
+## Phase 3: JavaScript Highlighting Module
 
-/* Dark Warm (1) */
---bg: #1a1614; --fg: #e8e2dc; --muted: #b5a899; --codebg: #252019; --border: #3a332a; --link: #e0a870;
+### 3.1 Create Highlighting IIFE
 
-/* Dark Cool (2) */
---bg: #0c1222; --fg: #e2e8f0; --muted: #94a3b8; --codebg: #1e293b; --border: #334155; --link: #60a5fa;
+**File:** `payload/script.js`
 
-/* Dark OLED Black (3) */
---bg: #000000; --fg: #ffffff; --muted: #a0a0a0; --codebg: #0a0a0a; --border: #222222; --link: #6db3f2;
+**Add new IIFE at end of file:**
+- [x] 3.1.1 Add configuration constants: `MAX_BLOCK_SIZE = 102400`, `MAX_BLOCKS = 500`
+- [x] 3.1.2 Add `LANG_MAP` object with all alias mappings from spec (30+ entries)
+- [x] 3.1.3 Add guard: check `typeof hljs === 'undefined'` and return early with console.warn
+- [x] 3.1.4 Add `highlighted = false` flag to prevent re-execution
 
-/* Dark Dimmed (4) */
---bg: #161b22; --fg: #c9d1d9; --muted: #8b949e; --codebg: #21262d; --border: #30363d; --link: #58a6ff;
-```
+### 3.2 Helper Functions
 
-### Variation Names
+**File:** `payload/script.js`
 
-```javascript
-const lightNames = ["Default", "Warm", "Cool", "Sepia", "High Contrast"];
-const darkNames = ["Default", "Warm", "Cool", "OLED Black", "Dimmed"];
-```
+- [x] 3.2.1 Implement `getLanguageClass(codeEl)` - extracts language from class list
+- [x] 3.2.2 Implement `normalizeLanguage(lang)` - maps alias via LANG_MAP
+- [x] 3.2.3 Implement `shouldHighlight(codeEl)` - checks language class, size limit, plaintext
+- [x] 3.2.4 Implement `highlightBlock(codeEl)` - normalizes class, calls hljs.highlightElement in try/catch
 
-### Button Position
+### 3.3 Main Function
 
-```css
-#mvVariation {
-    position: fixed;
-    top: 50px;  /* Below Theme button (14px) + button height (~30px) + gap */
-    right: 14px;
-    /* Same styling as other buttons */
-}
+**File:** `payload/script.js`
 
-/* If Images button exists, it moves down */
-#mvImages {
-    top: 86px;  /* Below Variation button */
-}
-```
+- [x] 3.3.1 Implement `runHighlighting()` with block count limit
+- [x] 3.3.2 Use selector `'pre code[class*="language-"], pre code[class*="lang-"]'`
+- [x] 3.3.3 Add console.debug for highlighting summary
+- [x] 3.3.4 Add console.warn when block count exceeds MAX_BLOCKS
+- [x] 3.3.5 Handle DOMContentLoaded vs already-loaded document
 
-## Execution Order
+---
 
-1. **Phase 1.1-1.3:** Add all CSS variations to `style.css`
-2. **Phase 1.4:** Add dropdown menu CSS
-3. **Phase 2.1-2.7:** Implement JavaScript in `script.js`
-4. **Phase 3:** Create test files and verify behavior
-5. **Phase 4:** Update documentation
+## Phase 4: Installer/Uninstaller Updates
 
-## Testing Checklist
+### 4.1 Update Installer
 
-- [x] Variation button appears below Theme button
-- [x] Button label shows correct theme (Light/Dark) and variation name
-- [x] Clicking button opens dropdown menu
-- [x] Menu shows 5 items with correct names for current theme
-- [x] Current variation is visually marked in menu
-- [x] Hovering over item previews that color scheme
-- [x] Clicking item saves selection and closes menu
-- [x] Clicking elsewhere closes menu without saving
-- [x] Pressing Escape closes menu without saving
-- [x] Re-clicking button closes menu without saving
-- [x] Selection persists after page reload
-- [x] Switching theme mode applies correct variation for new theme
-- [x] All 5 light variations render correctly
-- [x] All 5 dark variations render correctly
-- [x] Images button (if present) positions correctly below Variation button
+**File:** `install.ps1`
+
+- [x] 4.1.1 Add `Copy-Item` for `highlight.min.js` in `Copy-Payload` function
+- [x] 4.1.2 Add `Copy-Item` for `highlight-theme.css` in `Copy-Payload` function
+- [x] 4.1.3 Add both files to `$files` array in `Set-ReadOnlyAcl` function
+
+### 4.2 Update Uninstaller
+
+**File:** `uninstall.ps1`
+
+- [x] 4.2.1 Verify existing `Remove-Item -Recurse` on install directory removes all files (likely no changes needed)
+
+---
+
+## Phase 5: Unit Tests
+
+### 5.1 CSP Tests
+
+**File:** `tests/MarkdownViewer.Tests.ps1`
+
+- [x] 5.1.1 Test: New-Csp returns CSP with `file:` in script-src
+- [x] 5.1.2 Test: New-Csp returns CSP with `file:` in style-src
+- [x] 5.1.3 Test: CSP does NOT contain `https:` in script-src
+- [x] 5.1.4 Test: CSP does NOT contain `'unsafe-inline'` in script-src
+
+### 5.2 Asset File Tests
+
+**File:** `tests/MarkdownViewer.Tests.ps1`
+
+- [x] 5.2.1 Test: highlight.min.js exists in payload directory
+- [x] 5.2.2 Test: highlight-theme.css exists in payload directory
+- [x] 5.2.3 Test: highlight-theme.css contains `.hljs { background: transparent`
+- [x] 5.2.4 Test: highlight-theme.css contains `:root[data-theme="light"]` rules
+- [x] 5.2.5 Test: highlight-theme.css contains `:root[data-theme="dark"]` rules
+
+### 5.3 JavaScript Module Tests
+
+**File:** `tests/MarkdownViewer.Tests.ps1`
+
+- [x] 5.3.1 Test: script.js contains `LANG_MAP` object
+- [x] 5.3.2 Test: script.js contains guard for `hljs === 'undefined'`
+- [x] 5.3.3 Test: script.js contains `MAX_BLOCK_SIZE` constant (102400)
+- [x] 5.3.4 Test: script.js contains `MAX_BLOCKS` constant (500)
+- [x] 5.3.5 Test: script.js does NOT contain `highlightAuto`
+- [x] 5.3.6 Test: LANG_MAP contains PowerShell aliases (ps1, pwsh, psm1, psd1 → powershell)
+- [x] 5.3.7 Test: LANG_MAP contains shell aliases (sh, shell, zsh → bash)
+- [x] 5.3.8 Test: LANG_MAP contains JS aliases (js, ts, jsx, tsx)
+- [x] 5.3.9 Test: LANG_MAP contains yml → yaml mapping
+- [x] 5.3.10 Test: LANG_MAP contains plaintext mappings (text, txt, plain, none)
+
+### 5.4 Installer Tests
+
+**File:** `tests/MarkdownViewer.Tests.ps1`
+
+- [x] 5.4.1 Test: install.ps1 contains Copy-Item for highlight.min.js
+- [x] 5.4.2 Test: install.ps1 contains Copy-Item for highlight-theme.css
+
+---
+
+## Phase 6: Documentation Updates
+
+### 6.1 Update README.md
+
+**File:** `README.md`
+
+- [x] 6.1.1 Add section on syntax highlighting feature
+- [x] 6.1.2 Document that highlighting requires language tag in fence (e.g., \`\`\`powershell)
+- [x] 6.1.3 List commonly supported languages
+
+### 6.2 Update Architecture Documentation
+
+**File:** `dev/docs/markdown-viewer-architecture.md`
+
+- [x] 6.2.1 Add highlight.js to component diagram
+- [x] 6.2.2 Update file structure to include highlight.min.js and highlight-theme.css
+- [x] 6.2.3 Document CSP changes (`file:` in script-src/style-src)
+- [x] 6.2.4 Add highlight.js to Dependencies section
+- [x] 6.2.5 Document security tradeoff in Security Architecture section
+
+---
+
+## Phase 7: Manual Testing
+
+### 7.1 Functional Testing
+
+- [x] 7.1.1 Create `tests/highlight-test.md` with various fenced code blocks
+- [ ] 7.1.2 Test: PowerShell code blocks (`ps1`, `pwsh`, `powershell`) highlight correctly
+- [ ] 7.1.3 Test: JavaScript/TypeScript code blocks highlight correctly
+- [ ] 7.1.4 Test: Python, JSON, YAML, Bash code blocks highlight correctly
+- [ ] 7.1.5 Test: Code blocks without language class remain unhighlighted (no CPU spike)
+- [ ] 7.1.6 Test: Inline code (single backticks) is NOT block-highlighted
+- [ ] 7.1.7 Test: Unknown language code blocks remain readable (styled as plaintext)
+
+### 7.2 Theme Variation Testing
+
+- [ ] 7.2.1 Test: Highlighting colors correct in Light Default (variation 0)
+- [ ] 7.2.2 Test: Highlighting colors correct in Light Warm (variation 1)
+- [ ] 7.2.3 Test: Highlighting colors correct in Light Cool (variation 2)
+- [ ] 7.2.4 Test: Highlighting colors correct in Light Sepia (variation 3)
+- [ ] 7.2.5 Test: Highlighting colors correct in Light High Contrast (variation 4)
+- [ ] 7.2.6 Test: Highlighting colors correct in Dark Default (variation 0)
+- [ ] 7.2.7 Test: Highlighting colors correct in Dark Warm (variation 1)
+- [ ] 7.2.8 Test: Highlighting colors correct in Dark Cool (variation 2)
+- [ ] 7.2.9 Test: Highlighting colors correct in Dark OLED Black (variation 3)
+- [ ] 7.2.10 Test: Highlighting colors correct in Dark Dimmed (variation 4)
+
+### 7.3 Error Handling Testing
+
+- [ ] 7.3.1 Test: Page renders when highlight.min.js is missing (graceful degradation)
+- [ ] 7.3.2 Test: Page renders when highlight-theme.css is missing
+- [ ] 7.3.3 Test: Console shows warning when highlight.js fails to load
+- [ ] 7.3.4 Test: Theme toggle does NOT trigger re-highlighting
+- [ ] 7.3.5 Test: Variation change does NOT trigger re-highlighting
+
+### 7.4 Performance Testing
+
+- [ ] 7.4.1 Test: Document with 100+ small code blocks highlights without significant delay
+- [ ] 7.4.2 Test: Large code block (>100KB) is skipped with console.debug message
+- [ ] 7.4.3 Test: Console shows warning when block count exceeds 500
+
+### 7.5 Path Testing
+
+- [ ] 7.5.1 Test: Highlighting works with local drive path (C:\...)
+- [ ] 7.5.2 Test: Highlighting works with UNC path (\\\\server\\share\\...)
+
+---
+
+## Implementation Order
+
+1. **Phase 1** (Asset Preparation) - Copy files to payload directory
+2. **Phase 2** (CSP and HTML) - Foundation for loading assets
+3. **Phase 3** (JavaScript Module) - Core highlighting logic
+4. **Phase 5** (Unit Tests) - Validate implementation
+5. **Phase 4** (Installer Updates) - Production deployment
+6. **Phase 6** (Documentation) - User-facing docs
+7. **Phase 7** (Manual Testing) - End-to-end validation
+
+---
+
+## Risk Mitigation
+
+| Risk | Mitigation |
+|------|------------|
+| CSP blocks highlight.js | Verify `file:` in script-src before testing |
+| highlight.js version incompatibility | Ship tested version, document in architecture |
+| Theme contrast issues | Test all 10 variations, add overrides as needed |
+| Performance with many tabs | Use defer, no auto-detect, block limits |
+| Breaking existing functionality | Run full test suite after each phase |
+
+---
+
+## Security Notes
+
+**Security Tradeoff:** Adding `file:` to `script-src` and `style-src` allows any local JavaScript or CSS file to execute/load if referenced in the HTML.
+
+**Why this is acceptable:**
+1. HTML sanitization strips ALL `<script>`, `<link>`, and `<style>` tags from markdown before HTML generation
+2. CSP nonce still blocks inline scripts without the correct nonce
+3. An attacker would need BOTH: bypass sanitization AND have a malicious .js file already on user's disk
+
+**Mandatory constraint:** HTML sanitization is a REQUIRED security layer, not optional defense-in-depth.
+
+---
+
+## Rollback Plan
+
+If critical issues are found post-release:
+1. Revert CSP changes (remove `file:` from script-src/style-src)
+2. Remove highlight asset references from HTML template
+3. Keep highlight.js IIFE in script.js (will no-op without hljs global)
+4. Users will see unstyled code blocks (acceptable fallback)

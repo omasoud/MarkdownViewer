@@ -819,3 +819,302 @@ Describe 'Theme Variation Feature - JavaScript' {
         }
     }
 }
+
+Describe 'Syntax Highlighting Feature - Asset Files' {
+    BeforeAll {
+        $payloadDir = Join-Path $PSScriptRoot '..\payload'
+    }
+
+    Context 'highlight.js bundle' {
+        It 'highlight.min.js exists in payload directory' {
+            $path = Join-Path $payloadDir 'highlight.min.js'
+            Test-Path -LiteralPath $path | Should -BeTrue
+        }
+    }
+
+    Context 'highlight-theme.css' {
+        BeforeAll {
+            $themePath = Join-Path $PSScriptRoot '..\payload\highlight-theme.css'
+            $themeContent = Get-Content -Raw -LiteralPath $themePath
+        }
+
+        It 'highlight-theme.css exists in payload directory' {
+            Test-Path -LiteralPath $themePath | Should -BeTrue
+        }
+
+        It 'contains .hljs background reset to transparent' {
+            $themeContent | Should -Match '\.hljs\s*\{[^}]*background:\s*transparent'
+        }
+
+        It 'contains light mode scoped rules' {
+            $themeContent | Should -Match ':root\[data-theme="light"\]'
+        }
+
+        It 'contains dark mode scoped rules' {
+            $themeContent | Should -Match ':root\[data-theme="dark"\]'
+        }
+
+        It 'contains .hljs-keyword token rule' {
+            $themeContent | Should -Match '\.hljs-keyword'
+        }
+
+        It 'contains .hljs-string token rule' {
+            $themeContent | Should -Match '\.hljs-string'
+        }
+    }
+}
+
+Describe 'Syntax Highlighting Feature - JavaScript Module' {
+    BeforeAll {
+        $jsPath = Join-Path $PSScriptRoot '..\payload\script.js'
+        $jsContent = Get-Content -Raw -LiteralPath $jsPath
+    }
+
+    Context 'Configuration constants' {
+        It 'defines MAX_BLOCK_SIZE constant as 102400' {
+            $jsContent | Should -Match 'MAX_BLOCK_SIZE\s*=\s*102400'
+        }
+
+        It 'defines MAX_BLOCKS constant as 500' {
+            $jsContent | Should -Match 'MAX_BLOCKS\s*=\s*500'
+        }
+    }
+
+    Context 'LANG_MAP language aliases' {
+        It 'defines LANG_MAP object' {
+            $jsContent | Should -Match 'LANG_MAP\s*='
+        }
+
+        It 'maps ps1 to powershell' {
+            $jsContent | Should -Match "'ps1':\s*'powershell'"
+        }
+
+        It 'maps pwsh to powershell' {
+            $jsContent | Should -Match "'pwsh':\s*'powershell'"
+        }
+
+        It 'maps psm1 to powershell' {
+            $jsContent | Should -Match "'psm1':\s*'powershell'"
+        }
+
+        It 'maps psd1 to powershell' {
+            $jsContent | Should -Match "'psd1':\s*'powershell'"
+        }
+
+        It 'maps sh to bash' {
+            $jsContent | Should -Match "'sh':\s*'bash'"
+        }
+
+        It 'maps shell to bash' {
+            $jsContent | Should -Match "'shell':\s*'bash'"
+        }
+
+        It 'maps zsh to bash' {
+            $jsContent | Should -Match "'zsh':\s*'bash'"
+        }
+
+        It 'maps js to javascript' {
+            $jsContent | Should -Match "'js':\s*'javascript'"
+        }
+
+        It 'maps ts to typescript' {
+            $jsContent | Should -Match "'ts':\s*'typescript'"
+        }
+
+        It 'maps tsx to typescript' {
+            $jsContent | Should -Match "'tsx':\s*'typescript'"
+        }
+
+        It 'maps jsx to javascript' {
+            $jsContent | Should -Match "'jsx':\s*'javascript'"
+        }
+
+        It 'maps yml to yaml' {
+            $jsContent | Should -Match "'yml':\s*'yaml'"
+        }
+
+        It 'maps py to python' {
+            $jsContent | Should -Match "'py':\s*'python'"
+        }
+
+        It 'maps cs to csharp' {
+            $jsContent | Should -Match "'cs':\s*'csharp'"
+        }
+
+        It 'maps text to plaintext' {
+            $jsContent | Should -Match "'text':\s*'plaintext'"
+        }
+
+        It 'maps txt to plaintext' {
+            $jsContent | Should -Match "'txt':\s*'plaintext'"
+        }
+
+        It 'maps plain to plaintext' {
+            $jsContent | Should -Match "'plain':\s*'plaintext'"
+        }
+
+        It 'maps none to plaintext' {
+            $jsContent | Should -Match "'none':\s*'plaintext'"
+        }
+    }
+
+    Context 'Guard checks' {
+        It 'checks if hljs is undefined' {
+            $jsContent | Should -Match "typeof hljs === 'undefined'"
+        }
+
+        It 'logs warning when hljs not loaded' {
+            $jsContent | Should -Match "highlight\.js not loaded"
+        }
+
+        It 'has highlighted flag to prevent re-execution' {
+            $jsContent | Should -Match 'highlighted\s*=\s*false'
+        }
+    }
+
+    Context 'Helper functions' {
+        It 'defines getLanguageClass function' {
+            $jsContent | Should -Match 'function getLanguageClass'
+        }
+
+        It 'defines normalizeLanguage function' {
+            $jsContent | Should -Match 'function normalizeLanguage'
+        }
+
+        It 'defines shouldHighlight function' {
+            $jsContent | Should -Match 'function shouldHighlight'
+        }
+
+        It 'defines highlightBlock function' {
+            $jsContent | Should -Match 'function highlightBlock'
+        }
+
+        It 'defines runHighlighting function' {
+            $jsContent | Should -Match 'function runHighlighting'
+        }
+    }
+
+    Context 'Safety constraints' {
+        It 'does NOT call highlightAuto' {
+            $jsContent | Should -Not -Match 'highlightAuto'
+        }
+
+        It 'uses hljs.highlightElement for individual blocks' {
+            $jsContent | Should -Match 'hljs\.highlightElement'
+        }
+
+        It 'wraps highlighting in try/catch' {
+            $jsContent | Should -Match 'try\s*\{[^}]*highlightElement[^}]*\}\s*catch'
+        }
+    }
+
+    Context 'Selector and limits' {
+        It 'selects only pre code blocks with language class' {
+            $jsContent | Should -Match "pre code\[class\*=.language-.\]"
+        }
+
+        It 'limits blocks to MAX_BLOCKS' {
+            $jsContent | Should -Match 'Math\.min\(blocks\.length,\s*MAX_BLOCKS\)'
+        }
+
+        It 'checks block size against MAX_BLOCK_SIZE' {
+            $jsContent | Should -Match 'size\s*>\s*MAX_BLOCK_SIZE'
+        }
+    }
+}
+
+Describe 'Syntax Highlighting Feature - CSP' {
+    BeforeAll {
+        $scriptPath = Join-Path $PSScriptRoot '..\payload\Open-Markdown.ps1'
+        $scriptContent = Get-Content -Raw -LiteralPath $scriptPath
+    }
+
+    Context 'CSP includes file: source' {
+        It 'style-src includes file:' {
+            $scriptContent | Should -Match "style-src 'nonce-.+' file:"
+        }
+
+        It 'script-src includes file:' {
+            $scriptContent | Should -Match "script-src 'nonce-.+' file:"
+        }
+    }
+
+    Context 'CSP security constraints' {
+        It 'does NOT add https: to script-src' {
+            # Check that script-src line doesn't include https
+            $scriptContent | Should -Not -Match 'script-src[^"]*https:'
+        }
+
+        It 'does NOT add unsafe-inline to script-src' {
+            $scriptContent | Should -Not -Match "script-src[^`"]*'unsafe-inline'"
+        }
+    }
+
+    Context 'Security documentation' {
+        It 'contains security note about file: in script-src' {
+            $scriptContent | Should -Match 'SECURITY NOTE'
+        }
+
+        It 'mentions sanitization requirement' {
+            $scriptContent | Should -Match 'Invoke-HtmlSanitization'
+        }
+    }
+}
+
+Describe 'Syntax Highlighting Feature - HTML Template' {
+    BeforeAll {
+        $scriptPath = Join-Path $PSScriptRoot '..\payload\Open-Markdown.ps1'
+        $scriptContent = Get-Content -Raw -LiteralPath $scriptPath
+    }
+
+    Context 'Asset path handling' {
+        It 'defines HighlightJsPath parameter' {
+            $scriptContent | Should -Match '\$HighlightJsPath\s*='
+        }
+
+        It 'defines HighlightThemePath parameter' {
+            $scriptContent | Should -Match '\$HighlightThemePath\s*='
+        }
+
+        It 'checks if highlight assets exist' {
+            $scriptContent | Should -Match 'Test-Path.*HighlightJsPath'
+        }
+    }
+
+    Context 'HTML includes highlight assets' {
+        It 'includes link to highlight-theme.css' {
+            $scriptContent | Should -Match 'highlightThemeLink.*<link rel='
+        }
+
+        It 'includes script tag with defer for highlight.min.js' {
+            $scriptContent | Should -Match 'highlightScript.*<script src=.*defer>'
+        }
+    }
+}
+
+Describe 'Syntax Highlighting Feature - Installer' {
+    BeforeAll {
+        $installerPath = Join-Path $PSScriptRoot '..\install.ps1'
+        $installerContent = Get-Content -Raw -LiteralPath $installerPath
+    }
+
+    Context 'Copy-Payload includes highlight assets' {
+        It 'copies highlight.min.js' {
+            $installerContent | Should -Match 'Copy-Item.*highlight\.min\.js'
+        }
+
+        It 'copies highlight-theme.css' {
+            $installerContent | Should -Match 'Copy-Item.*highlight-theme\.css'
+        }
+    }
+
+    Context 'Set-ReadOnlyAcl includes highlight assets' {
+        It 'includes highlight.min.js in files array' {
+            $installerContent | Should -Match '"highlight\.min\.js"'
+        }
+
+        It 'includes highlight-theme.css in files array' {
+            $installerContent | Should -Match '"highlight-theme\.css"'
+        }
+    }
+}

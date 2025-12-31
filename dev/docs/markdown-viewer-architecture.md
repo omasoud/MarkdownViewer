@@ -27,7 +27,7 @@ Markdown Viewer is a Windows application that renders Markdown files as styled H
 │  - MOTW security check + user prompts                                       │
 │  - Converts Markdown → HTML via ConvertFrom-Markdown                        │
 │  - Sanitizes HTML (removes dangerous elements/attributes)                   │
-│  - Injects CSS, JS, CSP, favicon into HTML document                         │
+│  - Injects CSS, JS, CSP, highlight.js, favicon into HTML document           │
 │  - Writes temp HTML file(s) to %TEMP%                                       │
 │  - Launches default browser                                                 │
 └──────────────────────────────────┬──────────────────────────────────────────┘
@@ -40,7 +40,8 @@ Markdown Viewer is a Windows application that renders Markdown files as styled H
 │  - Test-RemoteImages          │  │  │ <head>                              │   │
 │  - Get-FileBaseHref           │  │  │   - CSP meta tag (nonce-based)      │   │
 │  - Test-Motw                  │  │  │   - Inline CSS (style.css)          │   │
-└───────────────────────────────┘  │  │   - Base href for relative links    │   │
+└───────────────────────────────┘  │  │   - highlight-theme.css (file:)     │   │
+                                   │  │   - Base href for relative links    │   │
                                    │  │   - Favicon (base64-encoded)        │   │
                                    │  └─────────────────────────────────────┘   │
                                    │  ┌─────────────────────────────────────┐   │
@@ -48,6 +49,7 @@ Markdown Viewer is a Windows application that renders Markdown files as styled H
                                    │  │   - Theme toggle button             │   │
                                    │  │   - Images toggle button (if needed)│   │
                                    │  │   - Inline JS (script.js)           │   │
+                                   │  │   - highlight.min.js (file: defer)  │   │
                                    │  │   - Sanitized HTML content          │   │
                                    │  └─────────────────────────────────────┘   │
                                    └───────────────────────────────────────────┘
@@ -141,14 +143,52 @@ CreateObject("WScript.Shell").Run cmd, 0, False
 | Module | Purpose |
 |--------|---------|
 | Theme Toggle | Switches between System/Invert mode, persists to localStorage |
+| Theme Variations | Manages 5 color scheme variations per theme (Default, Warm, Cool, etc.) |
 | Remote Images | Manages opt-in for remote image loading, page switching |
 | Anchor Rewrite | Fixes in-page `#anchor` links for file:// context |
 | Markdown Links | Rewrites local `.md` links to use `mdview:` protocol |
+| Syntax Highlighting | Applies highlight.js to fenced code blocks with language tags |
 
 **localStorage Keys:**
 - `mdviewer_theme_mode` - "system" or "invert"
+- `mdviewer_theme_variation_light` - Light theme variation (e.g., "default", "warm", "cool", "sepia", "high-contrast")
+- `mdviewer_theme_variation_dark` - Dark theme variation (e.g., "default", "warm", "cool", "oled", "dimmed")
 - `mdviewer_remote_images_<docId>` - "0" or "1"
 - `mdviewer_remote_images_ack_<docId>` - "1" (user acknowledged prompt)
+
+### 6. Syntax Highlighting: highlight.min.js & highlight-theme.css
+
+**Purpose:** Provides syntax highlighting for fenced code blocks with language tags.
+
+**Location:** `payload/highlight.min.js`, `payload/highlight-theme.css`
+
+**Architecture:**
+- **highlight.min.js:** Full highlight.js UMD bundle (~1MB) with all 190+ languages
+- **highlight-theme.css:** Combined Tomorrow/Tomorrow Night theme with transparent backgrounds
+- Both files loaded via `file:` URLs (external scripts/styles)
+
+**Language Alias Map (script.js):**
+Maps common aliases to canonical highlight.js language names:
+```javascript
+const LANG_MAP = {
+    'ps1': 'powershell', 'pwsh': 'powershell', 'psm1': 'powershell', 'psd1': 'powershell',
+    'js': 'javascript', 'ts': 'typescript', 'jsx': 'javascript', 'tsx': 'typescript',
+    'yml': 'yaml', 'py': 'python', 'sh': 'bash', 'cs': 'csharp', 'rb': 'ruby',
+    'md': 'markdown', 'dockerfile': 'docker', 'c++': 'cpp', /* ... */
+};
+```
+
+**Performance Guards:**
+- `MAX_BLOCK_SIZE = 102400` (100KB) - Skips blocks larger than this
+- `MAX_BLOCKS = 500` - Stops processing after this many blocks
+- No auto-detection - only highlights blocks with recognized language class
+
+**Flow:**
+1. On DOMContentLoaded, check if `window.hljs` exists
+2. Query all `pre > code` elements
+3. For each block: extract language class, normalize via LANG_MAP, skip if too large
+4. Call `hljs.highlightElement()` for each valid block
+5. Set `highlighted` flag to prevent re-execution on theme toggle
 
 ### 6. Installation: install.ps1
 
@@ -180,9 +220,11 @@ frame-src 'none';
 form-action 'none';
 base-uri file:;
 img-src file: data: [https: if remote enabled];
-style-src 'nonce-<random>';
-script-src 'nonce-<random>'
+style-src 'nonce-<random>' file:;
+script-src 'nonce-<random>' file:
 ```
+
+**Note:** The `file:` directive is required for loading external highlight.js assets (`highlight.min.js` and `highlight-theme.css`) from the installation directory. Inline scripts and styles still require the cryptographic nonce.
 
 ### HTML Sanitization (Defense-in-Depth)
 
@@ -259,14 +301,20 @@ MarkdownViewer/
 │   ├── MarkdownViewer.psm1  # Shared module (testable functions)
 │   ├── script.js            # Client-side JavaScript
 │   ├── style.css            # Client-side CSS
+│   ├── highlight.min.js     # highlight.js UMD bundle (all languages)
+│   ├── highlight-theme.css  # Combined Tomorrow/Tomorrow Night theme
 │   └── markdown-mark-solid-win10-light.ico  # App icon
 │
 ├── tests/                   # Pester unit tests
 │   └── MarkdownViewer.Tests.ps1
 │
 └── dev/
+    ├── scripts/             # Build/dev scripts
+    │   ├── highlight.min.js     # Source highlight.js bundle
+    │   └── highlight-theme.css  # Source theme CSS
     └── docs/                # Development documentation
         ├── markdown-viewer-architecture.md (this file)
+        ├── markdown-viewer-implementation-plan.md
         └── sanitization-bug-fix-plan.md
 ```
 
@@ -279,6 +327,8 @@ Unit tests use Pester 5.x and are located in `tests/MarkdownViewer.Tests.ps1`.
 - Remote image detection
 - File path to URL conversion
 - MOTW detection
+- Syntax highlighting (asset files, LANG_MAP, CSP, HTML template, installer)
+- Theme variations
 
 **Running Tests:**
 ```powershell
@@ -301,3 +351,4 @@ The application uses localStorage in the browser for user preferences:
 - **PowerShell 7 (pwsh):** Required for `ConvertFrom-Markdown` cmdlet
 - **Windows Script Host:** Built into Windows, runs VBScript
 - **Default Web Browser:** Chrome, Edge, Firefox, etc.
+- **highlight.js:** Bundled (~1MB UMD build) for syntax highlighting

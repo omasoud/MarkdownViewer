@@ -5,7 +5,9 @@ param(
 
     [string] $StylePath = (Join-Path $PSScriptRoot 'style.css'),
     [string] $ScriptPath = (Join-Path $PSScriptRoot 'script.js'),
-    [string] $IconPath = (Join-Path $PSScriptRoot 'markdown.ico')
+    [string] $IconPath = (Join-Path $PSScriptRoot 'markdown.ico'),
+    [string] $HighlightJsPath = (Join-Path $PSScriptRoot 'highlight.min.js'),
+    [string] $HighlightThemePath = (Join-Path $PSScriptRoot 'highlight-theme.css')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -179,6 +181,11 @@ try {
         # CSP: block everything by default; allow only your nonce'd inline JS/CSS;
         # allow local/data images (for local md images + favicon); no network.
         # allow remote images if $allowRemoteImages is $true
+        #
+        # SECURITY NOTE: file: in script-src/style-src allows local JS/CSS to load.
+        # This is safe ONLY because Invoke-HtmlSanitization strips ALL <script>,
+        # <link>, and <style> tags from markdown content before HTML generation.
+        # Without sanitization, malicious markdown could reference local scripts.
 
         $img = if ($allowRemoteImages) { "img-src file: data: https:" } else { "img-src file: data:" }
 
@@ -190,8 +197,8 @@ try {
             "form-action 'none'",
             "base-uri file:",
             $img,
-            "style-src 'nonce-$nonce'",
-            "script-src 'nonce-$nonce'"
+            "style-src 'nonce-$nonce' file:",
+            "script-src 'nonce-$nonce' file:"
         ) -join '; '
     }
 
@@ -199,6 +206,16 @@ try {
     $nonceBytes = New-Object byte[] 16
     [System.Security.Cryptography.RandomNumberGenerator]::Fill($nonceBytes)
     $nonce = [Convert]::ToBase64String($nonceBytes)
+
+    # Generate highlight.js asset URLs (only if both files exist)
+    $highlightThemeLink = ''
+    $highlightScript = ''
+    if ((Test-Path -LiteralPath $HighlightJsPath) -and (Test-Path -LiteralPath $HighlightThemePath)) {
+        $highlightJsUri = ([Uri]::new($HighlightJsPath)).AbsoluteUri
+        $highlightThemeUri = ([Uri]::new($HighlightThemePath)).AbsoluteUri
+        $highlightThemeLink = "<link rel=`"stylesheet`" href=`"$highlightThemeUri`">"
+        $highlightScript = "<script src=`"$highlightJsUri`" defer></script>"
+    }
 
     
     function Write-Doc([string]$outPath, [bool]$allowRemoteImages, [bool]$hasRemoteImages) {
@@ -230,10 +247,12 @@ $favicon
 <style nonce="$nonce">
 $css
 </style>
+$highlightThemeLink
 </head>
 <body>
 <button id="mvTheme" type="button">Theme</button>
 $imgButton
+$highlightScript
 <script nonce="$nonce">
 $js2
 </script>
