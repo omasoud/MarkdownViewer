@@ -55,7 +55,7 @@ Note: This is not a standalone executable app. Instead, it leverages Windows' bu
 
 This tool includes several security measures for viewing Markdown files safely:
 
-- **Content Security Policy (CSP):** The rendered HTML uses a strict CSP with a cryptographic nonce. Only the app's own scripts and styles execute; any scripts embedded in the Markdown (malicious or otherwise) are blocked by the browser.
+- **Content Security Policy (CSP):** The rendered HTML uses a strict CSP with a cryptographic nonce. Only the app's own scripts and styles execute; any scripts embedded in the Markdown (malicious or otherwise) are blocked by the browser. The CSP allows loading local files (`file:` scheme) for syntax highlighting assets, but HTML sanitization (below) ensures no unauthorized file references exist in the rendered output.
 
 - **HTML Sanitization:** Before rendering, the app strips dangerous HTML elements and attributes from the Markdown output:
   - Removes `<script>`, `<iframe>`, `<object>`, `<embed>`, `<meta>`, `<base>`, `<link>`, `<style>` tags
@@ -63,7 +63,7 @@ This tool includes several security measures for viewing Markdown files safely:
   - Neutralizes `javascript:` URIs in links and sources
   - Blocks `data:` URIs in links (but allows them in images)
   
-  This is defense-in-depth behind the CSP.
+  This sanitization is the primary security barrier. The CSP provides defense-in-depth, blocking execution even if sanitization were bypassed.
 
 - **Mark-of-the-Web (MOTW) detection:** Files downloaded from the internet are flagged by Windows with a Zone Identifier. When you open such a file, the app displays a warning dialog with options to:
   - **Open** — view this time (will warn again next time)
@@ -98,3 +98,5 @@ If you discover a security vulnerability, please open an issue on GitHub.
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+This project includes third-party software (highlight.js) under separate licenses - see [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) for details.

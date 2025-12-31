@@ -293,6 +293,7 @@ MarkdownViewer/
 ├── uninstall.vbs            # Silent uninstall launcher
 ├── README.md                # User documentation
 ├── LICENSE                  # MIT License
+├── THIRD-PARTY-LICENSES.md  # Third-party license attributions (highlight.js)
 ├── PSScriptAnalyzerSettings.psd1  # Linter config
 │
 ├── payload/                 # Files copied during installation

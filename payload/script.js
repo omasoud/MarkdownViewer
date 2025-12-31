@@ -395,12 +395,6 @@
 
     // ===== GUARDS =====
 
-    // Guard: highlight.js not loaded
-    if (typeof hljs === 'undefined') {
-        console.warn('Markdown Viewer: highlight.js not loaded, syntax highlighting disabled');
-        return;
-    }
-
     // Guard: prevent double execution
     let highlighted = false;
 
@@ -493,6 +487,12 @@
         // Prevent re-execution
         if (highlighted) return;
         highlighted = true;
+
+        // Guard: highlight.js not loaded (deferred script may not have executed yet)
+        if (typeof hljs === 'undefined') {
+            console.warn('Markdown Viewer: highlight.js not loaded, syntax highlighting disabled');
+            return;
+        }
 
         // Select only <pre><code> blocks with language classes
         const selector = 'pre code[class*="language-"], pre code[class*="lang-"]';
