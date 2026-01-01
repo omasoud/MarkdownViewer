@@ -23,32 +23,31 @@ Install-Module -Name Pester -Force -SkipPublisherCheck -Scope CurrentUser
 ```
 
 ## Project Structure
-
 ```
 MarkdownViewer/
-??? MarkdownViewer.sln           # Visual Studio solution
-??? src/
-?   ??? core/                    # Cross-platform engine + assets
-?   ?   ??? Open-Markdown.ps1    # Main PowerShell engine
-?   ?   ??? script.js            # Client-side JavaScript
-?   ?   ??? style.css            # Client-side CSS
-?   ?   ??? highlight.min.js     # Syntax highlighting
-?   ?   ??? highlight-theme.css  # Highlight.js theme
-?   ?   ??? icons/               # Application icons
-?   ??? win/                     # Windows-specific files
-?   ?   ??? MarkdownViewer.psm1  # Shared PowerShell module
-?   ?   ??? viewmd.vbs           # VBScript launcher (ad-hoc)
-?   ?   ??? uninstall.vbs        # Silent uninstall helper
-?   ??? host/                    # MSIX Host EXE
-?       ??? MarkdownViewerHost/  # .NET 10 project
-??? installers/
-?   ??? win-adhoc/               # Per-user ad-hoc installer
-?   ??? win-msix/                # MSIX packaging
-??? tests/
-?   ??? MarkdownViewer.Tests.ps1 # Pester tests (PowerShell)
-?   ??? MarkdownViewerHost.Tests/# xUnit tests (C#)
-??? dev/
-    ??? docs/                    # Developer documentation
+├── MarkdownViewer.sln           # Visual Studio solution
+├── src/
+│   ├── core/                    # Cross-platform engine + assets
+│   │   ├── Open-Markdown.ps1    # Main PowerShell engine
+│   │   ├── script.js            # Client-side JavaScript
+│   │   ├── style.css            # Client-side CSS
+│   │   ├── highlight.min.js     # Syntax highlighting
+│   │   ├── highlight-theme.css  # Highlight.js theme
+│   │   └── icons/               # Application icons
+│   ├── win/                     # Windows-specific files
+│   │   ├── MarkdownViewer.psm1  # Shared PowerShell module
+│   │   ├── viewmd.vbs           # VBScript launcher (ad-hoc)
+│   │   └── uninstall.vbs        # Silent uninstall helper
+│   └── host/                    # MSIX Host EXE
+│       └── MarkdownViewerHost/  # .NET 10 project
+├── installers/
+│   ├── win-adhoc/               # Per-user ad-hoc installer
+│   └── win-msix/                # MSIX packaging
+├── tests/
+│   ├── MarkdownViewer.Tests.ps1 # Pester tests (PowerShell)
+│   └── MarkdownViewerHost.Tests/# xUnit tests (C#)
+└── dev/
+    └── docs/                    # Developer documentation
 ```
 
 ## Building
