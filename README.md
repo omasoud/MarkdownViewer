@@ -15,7 +15,7 @@ Note: This is not a standalone executable app. Instead, it leverages Windows' bu
 ## Installation
 
 1. Download or clone this repository.
-2. Run `INSTALL.cmd` (or `install.ps1` directly) as a user (no admin required for per-user installation).
+2. Run `INSTALL.cmd` (or `install.ps1` directly) as a user (no admin required for per-user installation). The installer is located under `installers\win-adhoc`.
 3. The installer will:
    - Copy files to `%LOCALAPPDATA%\Programs\MarkdownViewer`.
    - Register file associations for `.md` and `.markdown` files.

@@ -7,13 +7,37 @@ param(
     [string] $ScriptPath = (Join-Path $PSScriptRoot 'script.js'),
     [string] $IconPath = (Join-Path $PSScriptRoot 'markdown.ico'),
     [string] $HighlightJsPath = (Join-Path $PSScriptRoot 'highlight.min.js'),
-    [string] $HighlightThemePath = (Join-Path $PSScriptRoot 'highlight-theme.css')
+    [string] $HighlightThemePath = (Join-Path $PSScriptRoot 'highlight-theme.css'),
+    [string] $ModulePath = ''
 )
 
 $ErrorActionPreference = 'Stop'
 
 # Import the shared module
-Import-Module (Join-Path $PSScriptRoot 'MarkdownViewer.psm1') -Force
+# The module can be co-located with this script (ad-hoc/MSIX install) or in a sibling directory (development)
+if (-not $ModulePath) {
+    $ModulePath = Join-Path $PSScriptRoot 'MarkdownViewer.psm1'
+}
+
+if (Test-Path $ModulePath) {
+    Import-Module $ModulePath -Force
+} else {
+    # Fallback: look for module relative to repo structure (for development from src/core)
+    $devModulePath = Join-Path (Split-Path -Parent $PSScriptRoot) 'win\MarkdownViewer.psm1'
+    if (Test-Path $devModulePath) {
+        Import-Module $devModulePath -Force
+    } else {
+        throw "Cannot find MarkdownViewer.psm1 module at '$ModulePath' or '$devModulePath'"
+    }
+}
+
+# Also check for icon in icons subdirectory (development structure)
+if (-not (Test-Path $IconPath)) {
+    $devIconPath = Join-Path $PSScriptRoot 'icons\markdown.ico'
+    if (Test-Path $devIconPath) {
+        $IconPath = $devIconPath
+    }
+}
 
 Add-Type -AssemblyName System.Windows.Forms | Out-Null
 [System.Windows.Forms.Application]::EnableVisualStyles() # Required for TaskDialog

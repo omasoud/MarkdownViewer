@@ -1,4 +1,6 @@
 # uninstall.ps1
+param([switch]$NoWait)
+
 $ErrorActionPreference = "Stop"
 
 $AppName    = "Markdown Viewer"

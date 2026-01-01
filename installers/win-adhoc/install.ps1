@@ -21,10 +21,14 @@ $AppName    = "Markdown Viewer"
 $AppId      = "MarkdownViewer"
 $InstallDir = Join-Path $env:LOCALAPPDATA "Programs\MarkdownViewer"
 
-# The source icon file to use
-$SourceIconFileName = "markdown-mark-solid-win10-light.ico"
+# Source directories (relative to installer location)
+$RepoRoot = Split-Path -Parent (Split-Path -Parent $ScriptRoot)  # Go up from installers/win-adhoc to repo root
+$CoreDir = Join-Path $RepoRoot "src\core"
+$WinDir = Join-Path $RepoRoot "src\win"
+$IconsDir = Join-Path $CoreDir "icons"
 
-$PayloadDir = Join-Path $ScriptRoot "payload"
+# The source icon file to use
+$SourceIconPath = Join-Path $IconsDir "markdown-mark-solid-win10-light.ico"
 
 # The icon file path after installation
 $InstalledIconPath = Join-Path $InstallDir "markdown.ico"
@@ -62,16 +66,22 @@ function Ensure-Pwsh {
 
 function Copy-Payload {
   New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-  Copy-Item -Force (Join-Path $PayloadDir "viewmd.vbs")    $InstallDir
-  Copy-Item -Force (Join-Path $PayloadDir "Open-Markdown.ps1") $InstallDir
-  Copy-Item -Force (Join-Path $PayloadDir "MarkdownViewer.psm1") $InstallDir
-  Copy-Item -Force (Join-Path $PayloadDir "style.css") $InstallDir
-  Copy-Item -Force (Join-Path $PayloadDir "script.js") $InstallDir
-  Copy-Item -Force (Join-Path $PayloadDir "highlight.min.js") $InstallDir
-  Copy-Item -Force (Join-Path $PayloadDir "highlight-theme.css") $InstallDir
-  Copy-Item -Force (Join-Path $PayloadDir $SourceIconFileName) $InstalledIconPath
+  
+  # Core engine files (from src/core)
+  Copy-Item -Force (Join-Path $CoreDir "Open-Markdown.ps1") $InstallDir
+  Copy-Item -Force (Join-Path $CoreDir "script.js") $InstallDir
+  Copy-Item -Force (Join-Path $CoreDir "style.css") $InstallDir
+  Copy-Item -Force (Join-Path $CoreDir "highlight.min.js") $InstallDir
+  Copy-Item -Force (Join-Path $CoreDir "highlight-theme.css") $InstallDir
+  Copy-Item -Force $SourceIconPath $InstalledIconPath
+  
+  # Windows-specific files (from src/win)
+  Copy-Item -Force (Join-Path $WinDir "viewmd.vbs") $InstallDir
+  Copy-Item -Force (Join-Path $WinDir "MarkdownViewer.psm1") $InstallDir
+  Copy-Item -Force (Join-Path $WinDir "uninstall.vbs") $InstallDir
+  
+  # Uninstaller script (from same directory as installer)
   Copy-Item -Force (Join-Path $ScriptRoot "uninstall.ps1") $InstallDir
-  Copy-Item -Force (Join-Path $ScriptRoot "uninstall.vbs") $InstallDir
 }
 
 function Set-ReadOnlyAcl {

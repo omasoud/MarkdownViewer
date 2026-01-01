@@ -77,7 +77,7 @@ CreateObject("WScript.Shell").Run cmd, 0, False
 
 **Purpose:** Main orchestration script that handles the full conversion pipeline.
 
-**Location:** `payload/Open-Markdown.ps1`
+**Location:** `src/core/Open-Markdown.ps1`
 
 **Key Responsibilities:**
 
@@ -98,7 +98,7 @@ CreateObject("WScript.Shell").Run cmd, 0, False
 
 **Purpose:** Reusable functions extracted for testability.
 
-**Location:** `payload/MarkdownViewer.psm1`
+**Location:** `src/win/MarkdownViewer.psm1`
 
 **Exported Functions:**
 
@@ -113,7 +113,7 @@ CreateObject("WScript.Shell").Run cmd, 0, False
 
 **Purpose:** Provides visual styling for rendered Markdown.
 
-**Location:** `payload/style.css`
+**Location:** `src/core/style.css`
 
 **Features:**
 - CSS custom properties (variables) for theming
@@ -136,7 +136,7 @@ CreateObject("WScript.Shell").Run cmd, 0, False
 
 **Purpose:** Interactive behavior in the rendered HTML.
 
-**Location:** `payload/script.js`
+**Location:** `src/core/script.js`
 
 **IIFE Modules:**
 
@@ -160,7 +160,7 @@ CreateObject("WScript.Shell").Run cmd, 0, False
 
 **Purpose:** Provides syntax highlighting for fenced code blocks with language tags.
 
-**Location:** `payload/highlight.min.js`, `payload/highlight-theme.css`
+**Location:** `src/core/highlight.min.js`, `src/core/highlight-theme.css`
 
 **Architecture:**
 - **highlight.min.js:** Full highlight.js UMD bundle (~1MB) with all 190+ languages
@@ -286,25 +286,33 @@ Input: C:\docs\README.md
 
 ```
 MarkdownViewer/
-├── INSTALL.cmd              # Batch wrapper for install.ps1
-├── install.ps1              # Per-user installer
-├── UNINSTALL.cmd            # Batch wrapper for uninstall.ps1
-├── uninstall.ps1            # Per-user uninstaller
-├── uninstall.vbs            # Silent uninstall launcher
 ├── README.md                # User documentation
 ├── LICENSE                  # MIT License
 ├── THIRD-PARTY-LICENSES.md  # Third-party license attributions (highlight.js)
 ├── PSScriptAnalyzerSettings.psd1  # Linter config
 │
-├── payload/                 # Files copied during installation
-│   ├── viewmd.vbs           # Entry point (VBScript)
-│   ├── Open-Markdown.ps1    # Main PowerShell script
-│   ├── MarkdownViewer.psm1  # Shared module (testable functions)
-│   ├── script.js            # Client-side JavaScript
-│   ├── style.css            # Client-side CSS
-│   ├── highlight.min.js     # highlight.js UMD bundle (all languages)
-│   ├── highlight-theme.css  # Combined Tomorrow/Tomorrow Night theme
-│   └── markdown-mark-solid-win10-light.ico  # App icon
+├── src/
+│   ├── core/                        # Cross-platform engine + assets
+│   │   ├── Open-Markdown.ps1        # Main PowerShell script
+│   │   ├── script.js                # Client-side JavaScript
+│   │   ├── style.css                # Client-side CSS
+│   │   ├── highlight.min.js         # highlight.js MD bundle (all languages)
+│   │   ├── highlight-theme.css      # Combined Tomorrow/Tomorrow Night theme
+│   │   └── icons/
+│   │       ├── markdown-mark-solid-win10-light.ico  # App icon
+│   │       └── markdown-mark-solid-win10-filled.ico # dark-filled icon, unused
+│   │
+│   └── win/                         # Windows-specific
+│       ├── MarkdownViewer.psm1      # Shared module
+│       ├── viewmd.vbs               # Ad-hoc launcher
+│       └── uninstall.vbs            # Silent uninstall helper
+
+├── installers/
+│   └── win-adhoc/                   # Per-user ad-hoc installer
+│       ├── INSTALL.cmd
+│       ├── UNINSTALL.cmd
+│       ├── install.ps1
+│       └── uninstall.ps1
 │
 ├── tests/                   # Pester unit tests
 │   └── MarkdownViewer.Tests.ps1
@@ -316,6 +324,9 @@ MarkdownViewer/
     └── docs/                # Development documentation
         ├── markdown-viewer-architecture.md (this file)
         ├── markdown-viewer-implementation-plan.md
+        ├── msix-activation-matrix.md
+        ├── msix-packaging-and-host-launcher-specification.md
+		
         └── sanitization-bug-fix-plan.md
 ```
 

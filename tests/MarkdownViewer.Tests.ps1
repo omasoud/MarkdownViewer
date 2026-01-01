@@ -6,7 +6,8 @@ $ErrorActionPreference = 'Stop'
 
 BeforeAll {
     Import-Module Pester -RequiredVersion 5.7.1 -Force
-    $modulePath = Join-Path $PSScriptRoot '..\payload\MarkdownViewer.psm1'
+    # Module is now in src/win directory
+    $modulePath = Join-Path $PSScriptRoot '..\src\win\MarkdownViewer.psm1'
     Import-Module $modulePath -Force -Global
 }
 
@@ -612,7 +613,8 @@ Describe 'Test-Motw' {
 
 Describe 'Theme Variation Feature - CSS' {
     BeforeAll {
-        $cssPath = Join-Path $PSScriptRoot '..\payload\style.css'
+        # CSS is now in src/core directory
+        $cssPath = Join-Path $PSScriptRoot '..\src\core\style.css'
         $cssContent = Get-Content -Raw -LiteralPath $cssPath
     }
 
@@ -713,7 +715,8 @@ Describe 'Theme Variation Feature - CSS' {
 
 Describe 'Theme Variation Feature - JavaScript' {
     BeforeAll {
-        $jsPath = Join-Path $PSScriptRoot '..\payload\script.js'
+        # JavaScript is now in src/core directory
+        $jsPath = Join-Path $PSScriptRoot '..\src\core\script.js'
         $jsContent = Get-Content -Raw -LiteralPath $jsPath
     }
 
@@ -822,23 +825,24 @@ Describe 'Theme Variation Feature - JavaScript' {
 
 Describe 'Syntax Highlighting Feature - Asset Files' {
     BeforeAll {
-        $payloadDir = Join-Path $PSScriptRoot '..\payload'
+        # Assets are now in src/core directory
+        $coreDir = Join-Path $PSScriptRoot '..\src\core'
     }
 
     Context 'highlight.js bundle' {
-        It 'highlight.min.js exists in payload directory' {
-            $path = Join-Path $payloadDir 'highlight.min.js'
+        It 'highlight.min.js exists in core directory' {
+            $path = Join-Path $coreDir 'highlight.min.js'
             Test-Path -LiteralPath $path | Should -BeTrue
         }
     }
 
     Context 'highlight-theme.css' {
         BeforeAll {
-            $themePath = Join-Path $PSScriptRoot '..\payload\highlight-theme.css'
+            $themePath = Join-Path $PSScriptRoot '..\src\core\highlight-theme.css'
             $themeContent = Get-Content -Raw -LiteralPath $themePath
         }
 
-        It 'highlight-theme.css exists in payload directory' {
+        It 'highlight-theme.css exists in core directory' {
             Test-Path -LiteralPath $themePath | Should -BeTrue
         }
 
@@ -866,7 +870,7 @@ Describe 'Syntax Highlighting Feature - Asset Files' {
 
 Describe 'Syntax Highlighting Feature - JavaScript Module' {
     BeforeAll {
-        $jsPath = Join-Path $PSScriptRoot '..\payload\script.js'
+        $jsPath = Join-Path $PSScriptRoot '..\src\core\script.js'
         $jsContent = Get-Content -Raw -LiteralPath $jsPath
     }
 
@@ -1025,7 +1029,8 @@ Describe 'Syntax Highlighting Feature - JavaScript Module' {
 
 Describe 'Syntax Highlighting Feature - CSP' {
     BeforeAll {
-        $scriptPath = Join-Path $PSScriptRoot '..\payload\Open-Markdown.ps1'
+        # PowerShell script is now in src/core directory
+        $scriptPath = Join-Path $PSScriptRoot '..\src\core\Open-Markdown.ps1'
         $scriptContent = Get-Content -Raw -LiteralPath $scriptPath
     }
 
@@ -1063,7 +1068,8 @@ Describe 'Syntax Highlighting Feature - CSP' {
 
 Describe 'Syntax Highlighting Feature - HTML Template' {
     BeforeAll {
-        $scriptPath = Join-Path $PSScriptRoot '..\payload\Open-Markdown.ps1'
+        # PowerShell script is now in src/core directory
+        $scriptPath = Join-Path $PSScriptRoot '..\src\core\Open-Markdown.ps1'
         $scriptContent = Get-Content -Raw -LiteralPath $scriptPath
     }
 
@@ -1094,7 +1100,8 @@ Describe 'Syntax Highlighting Feature - HTML Template' {
 
 Describe 'Syntax Highlighting Feature - Installer' {
     BeforeAll {
-        $installerPath = Join-Path $PSScriptRoot '..\install.ps1'
+        # Installer is now in installers/win-adhoc directory
+        $installerPath = Join-Path $PSScriptRoot '..\installers\win-adhoc\install.ps1'
         $installerContent = Get-Content -Raw -LiteralPath $installerPath
     }
 
@@ -1150,7 +1157,7 @@ Describe 'ConvertFrom-Markdown Anchor ID Mismatch' {
 
     Context 'script.js includes anchor fixup code' {
         BeforeAll {
-            $jsPath = Join-Path $PSScriptRoot '..\payload\script.js'
+            $jsPath = Join-Path $PSScriptRoot '..\src\core\script.js'		
             $jsContent = Get-Content -Raw -LiteralPath $jsPath
         }
 
