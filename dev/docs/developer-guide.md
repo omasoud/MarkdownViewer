@@ -63,7 +63,7 @@ MarkdownViewer/
 
 ```powershell
 # Build entire solution
-dotnet build MarkdownViewer.sln
+dotnet build MarkdownViewer.slnx
 
 # Build specific project
 dotnet build src/host/MarkdownViewerHost/MarkdownViewerHost.csproj
@@ -102,7 +102,7 @@ Tests for the Host EXE:
 
 ```powershell
 # Run via dotnet CLI
-dotnet test MarkdownViewer.sln
+dotnet test MarkdownViewer.slnx
 
 # Or run specific test project
 dotnet test tests\MarkdownViewerHost.Tests\MarkdownViewerHost.Tests.csproj

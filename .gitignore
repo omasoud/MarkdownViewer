@@ -6,3 +6,4 @@ all.txt
 .VSCodeCounter
 **/obj/**
 **/bin/**
+**/output/**
