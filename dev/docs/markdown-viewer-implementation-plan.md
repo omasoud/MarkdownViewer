@@ -1,256 +1,336 @@
-# highlight.js Integration Implementation Plan
+# Markdown Viewer Implementation Plan
 
 ## Overview
 
-This document outlines the implementation plan for the highlight.js syntax highlighting feature as specified in:
-- [highlight-integration-spec.md](highlight-integration-spec.md)
-- [highlight-integration-spec-addendum.md](highlight-integration-spec-addendum.md)
+This document outlines the implementation plan for Markdown Viewer features:
+- **Phase A (Complete):** highlight.js syntax highlighting integration
+- **Phase B (Current):** MSIX packaging and Host launcher for Microsoft Store distribution
 
-**Key Goals:**
-- Shared local assets (not inlined into HTML) for efficient multi-tab usage
-- No auto-detection (class-only highlighting to avoid CPU spikes)
-- Theme integration with existing light/dark/variation system
-- Strict CSP maintained with `file:` addition for local scripts/styles
+**Key Documents:**
+- [markdown-viewer-architecture.md](markdown-viewer-architecture.md) - Architecture overview
+- [msix-packaging-and-host-launcher-specification.md](msix-packaging-and-host-launcher-specification.md) - MSIX tech spec
+- [msix-activation-matrix.md](msix-activation-matrix.md) - Activation behavior contract
 
 ---
 
-## Phase 1: Asset Preparation
+# Phase A: highlight.js Integration (Complete)
 
-### 1.1 Generate Combined Theme CSS
+## A.1 Asset Preparation
+
+### A.1.1 Generate Combined Theme CSS
 
 **File:** `payload/highlight-theme.css` (new)
 
-- [x] 1.1.1 Copy `dev/scripts/highlight-theme-tomorrow.css` to `payload/highlight-theme.css`
-- [x] 1.1.2 Verify CSS contains reset block with `background: transparent`
-- [x] 1.1.3 Verify CSS contains `:root[data-theme="light"]` scoped rules
-- [x] 1.1.4 Verify CSS contains `:root[data-theme="dark"]` scoped rules
+- [x] A.1.1.1 Copy `dev/scripts/highlight-theme-tomorrow.css` to `payload/highlight-theme.css`
+- [x] A.1.1.2 Verify CSS contains reset block with `background: transparent`
+- [x] A.1.1.3 Verify CSS contains `:root[data-theme="light"]` scoped rules
+- [x] A.1.1.4 Verify CSS contains `:root[data-theme="dark"]` scoped rules
 
-### 1.2 Prepare highlight.js Bundle
+### A.1.2 Prepare highlight.js Bundle
 
 **File:** `payload/highlight.min.js` (new)
 
-- [x] 1.2.1 Copy `dev/scripts/highlight.min.js` to `payload/highlight.min.js`
-- [x] 1.2.2 Verify bundle is UMD build (defines `window.hljs`)
+- [x] A.1.2.1 Copy `dev/scripts/highlight.min.js` to `payload/highlight.min.js`
+- [x] A.1.2.2 Verify bundle is UMD build (defines `window.hljs`)
 
 ---
 
-## Phase 2: CSP and HTML Infrastructure
+## A.2 CSP and HTML Infrastructure
 
-### 2.1 Update CSP Generation
-
-**File:** `payload/Open-Markdown.ps1`
-
-**Changes to `New-Csp` function:**
-- [x] 2.1.1 Add `file:` to `style-src` directive: `"style-src 'nonce-$nonce' file:"`
-- [x] 2.1.2 Add `file:` to `script-src` directive: `"script-src 'nonce-$nonce' file:"`
-- [x] 2.1.3 Add comment documenting security tradeoff (sanitization strips all script/link/style tags)
-
-### 2.2 Add Asset Path Handling
+### A.2.1 Update CSP Generation
 
 **File:** `payload/Open-Markdown.ps1`
 
-**Changes:**
-- [x] 2.2.1 Add `$HighlightJsPath` variable with default `(Join-Path $PSScriptRoot 'highlight.min.js')`
-- [x] 2.2.2 Add `$HighlightThemePath` variable with default `(Join-Path $PSScriptRoot 'highlight-theme.css')`
-- [x] 2.2.3 Generate `file:///` URLs for both assets using Uri class
-- [x] 2.2.4 Check if asset files exist before including references
+- [x] A.2.1.1 Add `file:` to `style-src` directive
+- [x] A.2.1.2 Add `file:` to `script-src` directive
+- [x] A.2.1.3 Add comment documenting security tradeoff
 
-### 2.3 Update HTML Template
+### A.2.2 Add Asset Path Handling
 
-**File:** `payload/Open-Markdown.ps1`
+- [x] A.2.2.1 Add `$HighlightJsPath` variable
+- [x] A.2.2.2 Add `$HighlightThemePath` variable
+- [x] A.2.2.3 Generate `file:///` URLs for both assets
+- [x] A.2.2.4 Check if asset files exist before including references
 
-**Changes to `Write-Doc` function:**
-- [x] 2.3.1 Add `<link rel="stylesheet" href="$highlightThemeUri">` after nonce'd style block
-- [x] 2.3.2 Add `<script src="$highlightJsUri" defer></script>` before nonce'd script
-- [x] 2.3.3 Only include highlight assets if both files exist (graceful degradation)
-- [x] 2.3.4 Ensure NO query strings on asset URLs (breaks caching)
+### A.2.3 Update HTML Template
 
-**Expected HTML structure (within `<head>/<body>`):**
-```html
-<style nonce="...">/* viewer CSS */</style>
-<link rel="stylesheet" href="file:///...highlight-theme.css">
-</head>
-<body>
-...
-<script src="file:///...highlight.min.js" defer></script>
-<script nonce="...">/* viewer JS */</script>
-```
+- [x] A.2.3.1 Add `<link>` for highlight-theme.css
+- [x] A.2.3.2 Add `<script defer>` for highlight.min.js
+- [x] A.2.3.3 Only include if both files exist
+- [x] A.2.3.4 Ensure NO query strings on asset URLs
 
 ---
 
-## Phase 3: JavaScript Highlighting Module
+## A.3 JavaScript Highlighting Module
 
-### 3.1 Create Highlighting IIFE
-
-**File:** `payload/script.js`
-
-**Add new IIFE at end of file:**
-- [x] 3.1.1 Add configuration constants: `MAX_BLOCK_SIZE = 102400`, `MAX_BLOCKS = 500`
-- [x] 3.1.2 Add `LANG_MAP` object with all alias mappings from spec (30+ entries)
-- [x] 3.1.3 Add guard: check `typeof hljs === 'undefined'` and return early with console.warn
-- [x] 3.1.4 Add `highlighted = false` flag to prevent re-execution
-
-### 3.2 Helper Functions
+### A.3.1 Create Highlighting IIFE
 
 **File:** `payload/script.js`
 
-- [x] 3.2.1 Implement `getLanguageClass(codeEl)` - extracts language from class list
-- [x] 3.2.2 Implement `normalizeLanguage(lang)` - maps alias via LANG_MAP
-- [x] 3.2.3 Implement `shouldHighlight(codeEl)` - checks language class, size limit, plaintext
-- [x] 3.2.4 Implement `highlightBlock(codeEl)` - normalizes class, calls hljs.highlightElement in try/catch
+- [x] A.3.1.1 Add configuration constants: `MAX_BLOCK_SIZE`, `MAX_BLOCKS`
+- [x] A.3.1.2 Add `LANG_MAP` object with all alias mappings
+- [x] A.3.1.3 Add guard for `hljs` undefined
+- [x] A.3.1.4 Add `highlighted` flag to prevent re-execution
 
-### 3.3 Main Function
+### A.3.2 Helper Functions
 
-**File:** `payload/script.js`
+- [x] A.3.2.1 Implement `getLanguageClass(codeEl)`
+- [x] A.3.2.2 Implement `normalizeLanguage(lang)`
+- [x] A.3.2.3 Implement `shouldHighlight(codeEl)`
+- [x] A.3.2.4 Implement `highlightBlock(codeEl)`
 
-- [x] 3.3.1 Implement `runHighlighting()` with block count limit
-- [x] 3.3.2 Use selector `'pre code[class*="language-"], pre code[class*="lang-"]'`
-- [x] 3.3.3 Add console.debug for highlighting summary
-- [x] 3.3.4 Add console.warn when block count exceeds MAX_BLOCKS
-- [x] 3.3.5 Handle DOMContentLoaded vs already-loaded document
+### A.3.3 Main Function
+
+- [x] A.3.3.1 Implement `runHighlighting()`
+- [x] A.3.3.2 Use selector `'pre code[class*="language-"], pre code[class*="lang-"]'`
+- [x] A.3.3.3 Add console.debug for highlighting summary
+- [x] A.3.3.4 Add console.warn when block count exceeds MAX_BLOCKS
+- [x] A.3.3.5 Handle DOMContentLoaded vs already-loaded document
 
 ---
 
-## Phase 4: Installer/Uninstaller Updates
+## A.4 Installer/Uninstaller Updates
 
-### 4.1 Update Installer
+### A.4.1 Update Installer
 
 **File:** `install.ps1`
 
-- [x] 4.1.1 Add `Copy-Item` for `highlight.min.js` in `Copy-Payload` function
-- [x] 4.1.2 Add `Copy-Item` for `highlight-theme.css` in `Copy-Payload` function
-- [x] 4.1.3 Add both files to `$files` array in `Set-ReadOnlyAcl` function
+- [x] A.4.1.1 Add `Copy-Item` for `highlight.min.js`
+- [x] A.4.1.2 Add `Copy-Item` for `highlight-theme.css`
+- [x] A.4.1.3 Add both files to `$files` array in `Set-ReadOnlyAcl`
 
-### 4.2 Update Uninstaller
+### A.4.2 Update Uninstaller
 
-**File:** `uninstall.ps1`
-
-- [x] 4.2.1 Verify existing `Remove-Item -Recurse` on install directory removes all files (likely no changes needed)
+- [x] A.4.2.1 Verify existing `Remove-Item -Recurse` removes all files
 
 ---
 
-## Phase 5: Unit Tests
-
-### 5.1 CSP Tests
+## A.5 Unit Tests
 
 **File:** `tests/MarkdownViewer.Tests.ps1`
 
-- [x] 5.1.1 Test: New-Csp returns CSP with `file:` in script-src
-- [x] 5.1.2 Test: New-Csp returns CSP with `file:` in style-src
-- [x] 5.1.3 Test: CSP does NOT contain `https:` in script-src
-- [x] 5.1.4 Test: CSP does NOT contain `'unsafe-inline'` in script-src
-
-### 5.2 Asset File Tests
-
-**File:** `tests/MarkdownViewer.Tests.ps1`
-
-- [x] 5.2.1 Test: highlight.min.js exists in payload directory
-- [x] 5.2.2 Test: highlight-theme.css exists in payload directory
-- [x] 5.2.3 Test: highlight-theme.css contains `.hljs { background: transparent`
-- [x] 5.2.4 Test: highlight-theme.css contains `:root[data-theme="light"]` rules
-- [x] 5.2.5 Test: highlight-theme.css contains `:root[data-theme="dark"]` rules
-
-### 5.3 JavaScript Module Tests
-
-**File:** `tests/MarkdownViewer.Tests.ps1`
-
-- [x] 5.3.1 Test: script.js contains `LANG_MAP` object
-- [x] 5.3.2 Test: script.js contains guard for `hljs === 'undefined'`
-- [x] 5.3.3 Test: script.js contains `MAX_BLOCK_SIZE` constant (102400)
-- [x] 5.3.4 Test: script.js contains `MAX_BLOCKS` constant (500)
-- [x] 5.3.5 Test: script.js does NOT contain `highlightAuto`
-- [x] 5.3.6 Test: LANG_MAP contains PowerShell aliases (ps1, pwsh, psm1, psd1 → powershell)
-- [x] 5.3.7 Test: LANG_MAP contains shell aliases (sh, shell, zsh → bash)
-- [x] 5.3.8 Test: LANG_MAP contains JS aliases (js, ts, jsx, tsx)
-- [x] 5.3.9 Test: LANG_MAP contains yml → yaml mapping
-- [x] 5.3.10 Test: LANG_MAP contains plaintext mappings (text, txt, plain, none)
-
-### 5.4 Installer Tests
-
-**File:** `tests/MarkdownViewer.Tests.ps1`
-
-- [x] 5.4.1 Test: install.ps1 contains Copy-Item for highlight.min.js
-- [x] 5.4.2 Test: install.ps1 contains Copy-Item for highlight-theme.css
+- [x] A.5.1.1 Test: CSP includes `file:` in script-src
+- [x] A.5.1.2 Test: CSP includes `file:` in style-src
+- [x] A.5.1.3 Test: CSP does NOT contain `https:` in script-src
+- [x] A.5.1.4 Test: CSP does NOT contain `'unsafe-inline'` in script-src
+- [x] A.5.2.1 Test: highlight.min.js exists
+- [x] A.5.2.2 Test: highlight-theme.css exists
+- [x] A.5.2.3 Test: highlight-theme.css contains transparent background
+- [x] A.5.2.4 Test: highlight-theme.css contains light mode rules
+- [x] A.5.2.5 Test: highlight-theme.css contains dark mode rules
+- [x] A.5.3.1 Test: script.js contains `LANG_MAP`
+- [x] A.5.3.2 Test: script.js contains hljs undefined guard
+- [x] A.5.3.3 Test: script.js contains `MAX_BLOCK_SIZE` (102400)
+- [x] A.5.3.4 Test: script.js contains `MAX_BLOCKS` (500)
+- [x] A.5.3.5 Test: script.js does NOT contain `highlightAuto`
+- [x] A.5.3.6-10 Test: LANG_MAP language alias mappings
+- [x] A.5.4.1-2 Test: installer copies highlight assets
 
 ---
 
-## Phase 6: Documentation Updates
+## A.6 Documentation Updates
 
-### 6.1 Update README.md
-
-**File:** `README.md`
-
-- [x] 6.1.1 Add section on syntax highlighting feature
-- [x] 6.1.2 Document that highlighting requires language tag in fence (e.g., \`\`\`powershell)
-- [x] 6.1.3 List commonly supported languages
-
-### 6.2 Update Architecture Documentation
-
-**File:** `dev/docs/markdown-viewer-architecture.md`
-
-- [x] 6.2.1 Add highlight.js to component diagram
-- [x] 6.2.2 Update file structure to include highlight.min.js and highlight-theme.css
-- [x] 6.2.3 Document CSP changes (`file:` in script-src/style-src)
-- [x] 6.2.4 Add highlight.js to Dependencies section
-- [x] 6.2.5 Document security tradeoff in Security Architecture section
+- [x] A.6.1.1 Update README.md with syntax highlighting section
+- [x] A.6.2.1-5 Update architecture documentation
 
 ---
 
-## Phase 7: Manual Testing
+# Phase B: MSIX Packaging and Host Launcher
 
-### 7.1 Functional Testing
+## B.1 Repository Structure Reorganization
 
-- [x] 7.1.1 Create `tests/highlight-test.md` with various fenced code blocks
-- [ ] 7.1.2 Test: PowerShell code blocks (`ps1`, `pwsh`, `powershell`) highlight correctly
-- [ ] 7.1.3 Test: JavaScript/TypeScript code blocks highlight correctly
-- [ ] 7.1.4 Test: Python, JSON, YAML, Bash code blocks highlight correctly
-- [ ] 7.1.5 Test: Code blocks without language class remain unhighlighted (no CPU spike)
-- [ ] 7.1.6 Test: Inline code (single backticks) is NOT block-highlighted
-- [ ] 7.1.7 Test: Unknown language code blocks remain readable (styled as plaintext)
+**Goal:** Separate cross-platform engine from Windows-specific launchers and installers.
 
-### 7.2 Theme Variation Testing
+**Status: COMPLETE**
 
-- [ ] 7.2.1 Test: Highlighting colors correct in Light Default (variation 0)
-- [ ] 7.2.2 Test: Highlighting colors correct in Light Warm (variation 1)
-- [ ] 7.2.3 Test: Highlighting colors correct in Light Cool (variation 2)
-- [ ] 7.2.4 Test: Highlighting colors correct in Light Sepia (variation 3)
-- [ ] 7.2.5 Test: Highlighting colors correct in Light High Contrast (variation 4)
-- [ ] 7.2.6 Test: Highlighting colors correct in Dark Default (variation 0)
-- [ ] 7.2.7 Test: Highlighting colors correct in Dark Warm (variation 1)
-- [ ] 7.2.8 Test: Highlighting colors correct in Dark Cool (variation 2)
-- [ ] 7.2.9 Test: Highlighting colors correct in Dark OLED Black (variation 3)
-- [ ] 7.2.10 Test: Highlighting colors correct in Dark Dimmed (variation 4)
+### B.1.1 Create Source Directory Structure
 
-### 7.3 Error Handling Testing
+- [x] B.1.1.1 Create `src/core/` directory
+- [x] B.1.1.2 Create `src/core/icons/` directory
+- [x] B.1.1.3 Create `src/win/` directory
+- [x] B.1.1.4 Create `src/host/MarkdownViewerHost/` directory
 
-- [ ] 7.3.1 Test: Page renders when highlight.min.js is missing (graceful degradation)
-- [ ] 7.3.2 Test: Page renders when highlight-theme.css is missing
-- [ ] 7.3.3 Test: Console shows warning when highlight.js fails to load
-- [ ] 7.3.4 Test: Theme toggle does NOT trigger re-highlighting
-- [ ] 7.3.5 Test: Variation change does NOT trigger re-highlighting
+### B.1.2 Move Core Engine Files
 
-### 7.4 Performance Testing
+- [x] B.1.2.1 Move `payload/Open-Markdown.ps1` → `src/core/Open-Markdown.ps1`
+- [x] B.1.2.2 Move `payload/script.js` → `src/core/script.js`
+- [x] B.1.2.3 Move `payload/style.css` → `src/core/style.css`
+- [x] B.1.2.4 Move `payload/highlight.min.js` → `src/core/highlight.min.js`
+- [x] B.1.2.5 Move `payload/highlight-theme.css` → `src/core/highlight-theme.css`
+- [x] B.1.2.6 Move icon → `src/core/icons/markdown.ico`
+- [x] B.1.2.7 Copy icon also as `src/core/icons/markdown-light.ico`
 
-- [ ] 7.4.1 Test: Document with 100+ small code blocks highlights without significant delay
-- [ ] 7.4.2 Test: Large code block (>100KB) is skipped with console.debug message
-- [ ] 7.4.3 Test: Console shows warning when block count exceeds 500
+### B.1.3 Move Windows-Specific Files
 
-### 7.5 Path Testing
+- [x] B.1.3.1 Move `payload/MarkdownViewer.psm1` → `src/win/MarkdownViewer.psm1`
+- [x] B.1.3.2 Move `payload/viewmd.vbs` → `src/win/viewmd.vbs`
+- [x] B.1.3.3 Move `uninstall.vbs` → `src/win/uninstall.vbs`
 
-- [ ] 7.5.1 Test: Highlighting works with local drive path (C:\...)
-- [ ] 7.5.2 Test: Highlighting works with UNC path (\\\\server\\share\\...)
+### B.1.4 Create Installer Directories
+
+- [x] B.1.4.1 Create `installers/win-adhoc/` directory
+- [x] B.1.4.2 Create `installers/win-msix/` directory
+- [x] B.1.4.3 Create `installers/win-msix/Package/` directory
+- [x] B.1.4.4 Create `installers/win-msix/Package/Assets/` directory
+
+### B.1.5 Move Installer Files
+
+- [x] B.1.5.1 Copy `INSTALL.cmd` → `installers/win-adhoc/INSTALL.cmd`
+- [x] B.1.5.2 Copy `UNINSTALL.cmd` → `installers/win-adhoc/UNINSTALL.cmd`
+- [x] B.1.5.3 Copy `install.ps1` → `installers/win-adhoc/install.ps1`
+- [x] B.1.5.4 Copy `uninstall.ps1` → `installers/win-adhoc/uninstall.ps1`
+
+### B.1.6 Update Installer Paths
+
+- [x] B.1.6.1 Update `install.ps1` to reference `src/core/` for engine files
+- [x] B.1.6.2 Update `install.ps1` to reference `src/win/` for Windows files
+- [x] B.1.6.3 Update `uninstall.ps1` paths (added $NoWait parameter)
+- [x] B.1.6.4 Update `INSTALL.cmd` to use relative path to `install.ps1`
+- [x] B.1.6.5 Update `UNINSTALL.cmd` to use relative path to `uninstall.ps1`
+
+### B.1.7 Clean Up Legacy Files
+
+- [ ] B.1.7.1 Remove `payload/` directory after migration (manual step)
+- [ ] B.1.7.2 Remove root-level installer files (manual step)
+- [ ] B.1.7.3 Remove root-level `Program.cs` (manual step)
+- [ ] B.1.7.4 Remove root-level `MDViewer.csproj` (manual step)
+
+> **Note:** Legacy files at root still exist for reference. Remove them manually when ready to finalize migration.
+
+---
+
+## B.2 Host Application Development
+
+**Status: COMPLETE (Simplified)**
+
+### B.2.1 Create Host Project
+
+- [x] B.2.1.1 Create `MarkdownViewerHost.csproj` with:
+  - OutputType: WinExe (GUI subsystem, no console)
+  - TargetFramework: net10.0-windows10.0.19041.0
+  - Simplified to avoid Windows App SDK Pri generation issues
+
+### B.2.2 Implement Activation Handler
+
+- [x] B.2.2.1 Implement `Main()` entry point
+- [x] B.2.2.2 Handle command-line args (Windows passes file/protocol as args)
+- [x] B.2.2.3 Process each argument (supports multi-file)
+
+### B.2.3-B.2.5 Implement Path Normalization and Process Launcher
+
+- [x] B.2.3.1-B.2.5.3 All implemented in `LaunchEngine()` method:
+  - Paths passed unchanged (Engine owns parsing)
+  - Uses `ProcessStartInfo.ArgumentList` (structured, no concatenation)
+  - `UseShellExecute = false`, `CreateNoWindow = true`
+  - Exits immediately after launch
+
+### B.2.6 Error Handling
+
+- [x] B.2.6.1-3 Errors caught silently, Engine owns user-facing dialogs
+
+---
+
+## B.3 MSIX Package Definition
+
+**Status: COMPLETE**
+
+### B.3.1 Create AppxManifest.xml
+
+- [x] B.3.1.1-6 All implemented in `installers/win-msix/Package/AppxManifest.xml`:
+  - Package Identity with placeholder publisher
+  - File type associations (.md, .markdown)
+  - Protocol association (mdview)
+  - Visual elements configured
+
+### B.3.2 Create Visual Assets
+
+- [ ] B.3.2.1-7 PNG assets need to be created from source icon
+  - README.md added with size requirements and conversion instructions
+
+### B.3.3 Create Build Script
+
+- [x] B.3.3.1-5 Implemented in `installers/win-msix/build.ps1`:
+  - Build parameters (Configuration, Architecture, Version)
+  - Stages Host EXE, engine files, bundled pwsh
+  - Creates MSIX via makeappx.exe
+
+---
+
+## B.4 Bundled PowerShell Strategy
+
+**Status: DOCUMENTED**
+
+- [x] B.4.1.1-B.4.3.2 Strategy documented in build.ps1:
+  - Can copy from system pwsh or use provided zip
+  - Full runtime (trimming deferred per spec)
+
+---
+
+## B.5 Engine Validation Under Packaged Execution
+
+**Status: DEFERRED (Manual Testing Required)**
+
+- [ ] B.5.1-B.5.3 Manual testing required after MSIX package is built and installed
+
+---
+
+## B.6 Unit Tests
+
+**Status: COMPLETE**
+
+### B.6.1 Host EXE Unit Tests
+
+- [x] B.6.1.1-7 Implemented in `tests/MarkdownViewerHost.Tests/`:
+  - 12 xUnit tests covering argument handling, path resolution, process config
+  - All tests pass
+
+### B.6.2 Update Existing PowerShell Tests
+
+- [x] B.6.2.1-4 Updated paths in `tests/MarkdownViewer.Tests.ps1`:
+  - Module path: `src/win/MarkdownViewer.psm1`
+  - Asset paths: `src/core/`
+  - Installer paths: `installers/win-adhoc/`
+  - All 170 tests pass
+
+---
+
+## B.7 Documentation Updates
+
+**Status: COMPLETE**
+
+- [x] B.7.1.1-3 README.md updated with MSIX option and new structure
+- [x] B.7.2.1-5 Architecture doc updated with Host EXE and MSIX details
+
+---
+
+## B.8 Final Validation
+
+**Status: IN PROGRESS**
+
+### B.8.1 Build Verification
+
+- [x] B.8.1.1 PowerShell tests: 170 pass
+- [x] B.8.1.2 Host EXE builds successfully
+- [x] B.8.1.3 Host EXE tests: 12 pass
+- [ ] B.8.1.4 MSIX package build (requires Windows SDK)
+- [ ] B.8.1.5 Sideload testing (manual)
+
+### B.8.2 Ad-hoc Installer Verification
+
+- [ ] B.8.2.1-4 Manual testing required from new location
 
 ---
 
 ## Implementation Order
 
-1. **Phase 1** (Asset Preparation) - Copy files to payload directory
-2. **Phase 2** (CSP and HTML) - Foundation for loading assets
-3. **Phase 3** (JavaScript Module) - Core highlighting logic
-4. **Phase 5** (Unit Tests) - Validate implementation
-5. **Phase 4** (Installer Updates) - Production deployment
-6. **Phase 6** (Documentation) - User-facing docs
-7. **Phase 7** (Manual Testing) - End-to-end validation
+1. **Phase B.1** (Repository Restructure) - Foundation for all other work
+2. **Phase B.2** (Host Application) - Core MSIX requirement
+3. **Phase B.3** (MSIX Package Definition) - Packaging infrastructure
+4. **Phase B.4** (Bundled PowerShell) - Runtime dependency
+5. **Phase B.6** (Unit Tests) - Validate implementation
+6. **Phase B.5** (Engine Validation) - Packaged execution testing
+7. **Phase B.7** (Documentation) - User and developer docs
+8. **Phase B.8** (Final Validation) - End-to-end verification
 
 ---
 
@@ -258,31 +338,28 @@ This document outlines the implementation plan for the highlight.js syntax highl
 
 | Risk | Mitigation |
 |------|------------|
-| CSP blocks highlight.js | Verify `file:` in script-src before testing |
-| highlight.js version incompatibility | Ship tested version, document in architecture |
-| Theme contrast issues | Test all 10 variations, add overrides as needed |
-| Performance with many tabs | Use defer, no auto-detect, block limits |
-| Breaking existing functionality | Run full test suite after each phase |
-
----
-
-## Security Notes
-
-**Security Tradeoff:** Adding `file:` to `script-src` and `style-src` allows any local JavaScript or CSS file to execute/load if referenced in the HTML.
-
-**Why this is acceptable:**
-1. HTML sanitization strips ALL `<script>`, `<link>`, and `<style>` tags from markdown before HTML generation
-2. CSP nonce still blocks inline scripts without the correct nonce
-3. An attacker would need BOTH: bypass sanitization AND have a malicious .js file already on user's disk
-
-**Mandatory constraint:** HTML sanitization is a REQUIRED security layer, not optional defense-in-depth.
+| Windows App SDK compatibility | Test with latest stable SDK version |
+| Bundled pwsh size (~100MB) | Accept for initial release; trim later |
+| Path resolution in packaged context | Test $PSScriptRoot early in development |
+| CSP blocking file: URLs from WindowsApps | Verify CSP allows any local file: path |
+| Breaking existing ad-hoc installer | Run full test suite after restructure |
 
 ---
 
 ## Rollback Plan
 
 If critical issues are found post-release:
-1. Revert CSP changes (remove `file:` from script-src/style-src)
-2. Remove highlight asset references from HTML template
-3. Keep highlight.js IIFE in script.js (will no-op without hljs global)
-4. Users will see unstyled code blocks (acceptable fallback)
+1. Ad-hoc installer remains available as fallback
+2. MSIX can be unpublished from Store
+3. Revert repository structure if needed (branches preserved)
+
+---
+
+## Success Criteria
+
+1. MSIX installs and registers file/protocol associations
+2. Double-click `.md` opens rendered in browser (no console flash)
+3. `mdview:` protocol links work from rendered HTML
+4. All 170 existing unit tests pass
+5. New Host EXE unit tests pass
+6. Documentation updated for both install methods

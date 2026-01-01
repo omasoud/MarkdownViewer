@@ -4,24 +4,34 @@ A simple tool to view Markdown files rendered in your browser on Windows.
 
 ## Description
 
-This project provides a way to open `.md` and `.markdown` files directly in your default web browser, rendered as HTML using PowerShell's built-in Markdown conversion. It uses a VBScript wrapper to execute PowerShell commands seamlessly.
+This project provides a way to open `.md` and `.markdown` files directly in your default web browser, rendered as HTML using PowerShell's built-in Markdown conversion.
 
 ## How It Works
 
-When you open a Markdown file, the app uses PowerShell's `ConvertFrom-Markdown` cmdlet to transform the Markdown into HTML. To ensure the output doesn't look like it's 1995, it adds some basic CSS styling. The result is then saved as a temporary HTML file and opened in your default web browser. A VBScript wrapper handles the execution to avoid console flashes and ensure smooth operation. The browser tab will display the app's icon and the actual Markdown filename as the title.
-
-Note: This is not a standalone executable app. Instead, it leverages Windows' built-in Windows Script Host (wscript.exe, located in System32) to run the VBScript, which in turn executes the PowerShell command.
+When you open a Markdown file, the app uses PowerShell's `ConvertFrom-Markdown` cmdlet to transform the Markdown into HTML. To ensure the output doesn't look like it's 1995, it adds some basic CSS styling. The result is then saved as a temporary HTML file and opened in your default web browser. The browser tab will display the app's icon and the actual Markdown filename as the title.
 
 ## Installation
 
+### Option 1: Microsoft Store (MSIX) — Coming Soon
+
+PowerShell 7 is bundled in the package—no separate installation required.
+
+1. Install from the Microsoft Store (link coming soon)
+2. The app automatically registers as a handler for `.md` and `.markdown` files
+
+### Option 2: Ad-hoc Installer (Per-User)
+
+For manual installation without the Store:
+
 1. Download or clone this repository.
-2. Run `INSTALL.cmd` (or `install.ps1` directly) as a user (no admin required for per-user installation). The installer is located under `installers\win-adhoc`.
-3. The installer will:
+2. Navigate to `installers/win-adhoc/`
+3. Run `INSTALL.cmd` (or `install.ps1` directly) as a user (no admin required).
+4. The installer will:
    - Copy files to `%LOCALAPPDATA%\Programs\MarkdownViewer`.
    - Register file associations for `.md` and `.markdown` files.
    - Optionally add a "View Markdown" context menu item.
    - Optionally open Default Apps settings to set this as the default handler.
-4. If PowerShell 7 (pwsh) is not installed, the installer will prompt you to install it.
+5. If PowerShell 7 (pwsh) is not installed, the installer will prompt you to install it.
 
 ## Usage
 
@@ -44,13 +54,19 @@ Note: This is not a standalone executable app. Instead, it leverages Windows' bu
 
 ## Uninstallation
 
-- Run `UNINSTALL.cmd` (or `uninstall.ps1` directly).
-- Alternatively, uninstall via Windows Settings > Apps > Apps & features (search for "Markdown Viewer").
+### MSIX Version
+- Uninstall via Windows Settings > Apps > Installed apps (search for "Markdown Viewer")
+
+### Ad-hoc Version
+- Navigate to `installers/win-adhoc/` and run `UNINSTALL.cmd` (or `uninstall.ps1` directly)
+- Alternatively, uninstall via Windows Settings > Apps > Apps & features (search for "Markdown Viewer")
 
 ## Requirements
 
-- Windows 10 or later
-- PowerShell 7 (pwsh) - automatically installed if missing
+- Windows 10 (version 2004/19041) or later
+- PowerShell 7 (pwsh)
+  - **MSIX:** Bundled in the package
+  - **Ad-hoc:** Automatically installed if missing
 
 ## Security
 
@@ -88,13 +104,41 @@ This tool includes several security measures for viewing Markdown files safely:
 If you discover a security vulnerability, please open an issue on GitHub.
 
 
-## Files
+## Project Structure
 
-- `INSTALL.cmd` / `install.ps1`: Installation scripts
-- `UNINSTALL.cmd` / `uninstall.ps1` / `uninstall.vbs`: Uninstallation scripts
-- `payload/viewmd.vbs`: The main viewer script
-- `payload/markdown-mark-solid-win10-light.ico` (used) / `payload/markdown-mark-solid-win10-filled.ico` (not used): Application icon (modified from the public domain Markdown Mark: https://github.com/dcurtis/markdown-mark)
-- `payload/viewmd-experimental-not-used.reg`: Unused registry file (legacy)
+```
+MarkdownViewer/
+├── src/
+│   ├── core/                    # Cross-platform engine + assets
+│   │   ├── Open-Markdown.ps1    # Main PowerShell engine
+│   │   ├── script.js            # Client-side JavaScript
+│   │   ├── style.css            # Client-side CSS
+│   │   ├── highlight.min.js     # Syntax highlighting (highlight.js)
+│   │   ├── highlight-theme.css  # Highlight.js theme
+│   │   └── icons/               # Application icons
+│   ├── win/                     # Windows-specific files
+│   │   ├── MarkdownViewer.psm1  # Shared PowerShell module
+│   │   ├── viewmd.vbs           # VBScript launcher (ad-hoc)
+│   │   └── uninstall.vbs        # Silent uninstall helper
+│   └── host/                    # Windows Host EXE (MSIX)
+│       └── MarkdownViewerHost/  # .NET project
+├── installers/
+│   ├── win-adhoc/               # Per-user ad-hoc installer
+│   │   ├── INSTALL.cmd
+│   │   ├── UNINSTALL.cmd
+│   │   ├── install.ps1
+│   │   └── uninstall.ps1
+│   └── win-msix/                # MSIX packaging
+│       ├── Package/
+│       │   ├── AppxManifest.xml
+│       │   └── Assets/
+│       └── build.ps1
+├── tests/
+│   ├── MarkdownViewer.Tests.ps1 # PowerShell Pester tests
+│   └── MarkdownViewerHost.Tests/# C# xUnit tests
+└── dev/
+    └── docs/                    # Development documentation
+```
 
 ## License
 

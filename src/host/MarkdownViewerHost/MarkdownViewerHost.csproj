@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Windows GUI subsystem app (no console window) -->
+    <OutputType>WinExe</OutputType>
+    
+    <!-- Target Windows 10 19041 or later -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    
+    <!-- Enable nullable reference types -->
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    
+    <!-- Assembly info -->
+    <AssemblyName>MarkdownViewerHost</AssemblyName>
+    <RootNamespace>MarkdownViewerHost</RootNamespace>
+    <Version>1.0.0</Version>
+    <FileVersion>1.0.0.0</FileVersion>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <Product>Markdown Viewer</Product>
+    <Company></Company>
+    <Copyright>MIT License</Copyright>
+    <Description>Host application for Markdown Viewer MSIX package</Description>
+  </PropertyGroup>
+
+</Project>

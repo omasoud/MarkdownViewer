@@ -2,7 +2,7 @@
 
 ## Overview
 
-Markdown Viewer is a Windows application that renders Markdown files as styled HTML in the user's default web browser. It is designed as a lightweight, per-user installable tool that requires no administrator privileges.
+Markdown Viewer is a Windows application that renders Markdown files as styled HTML in the user's default web browser. It is designed as a lightweight tool supporting both per-user ad-hoc installation and MSIX packaging for Microsoft Store distribution.
 
 ## High-Level Architecture
 
@@ -10,19 +10,23 @@ Markdown Viewer is a Windows application that renders Markdown files as styled H
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            User Interaction                                  │
 │  (Double-click .md file, Context menu, or mdview: protocol link)            │
-└──────────────────────────────────┬──────────────────────────────────────────┘
-                                   │
-                                   ▼
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+                    ┌──────────────────┴──────────────────┐
+                    │                                      │
+                    ▼                                      ▼
+┌─────────────────────────────────┐    ┌─────────────────────────────────────┐
+│     Ad-hoc: viewmd.vbs          │    │     MSIX: MarkdownViewerHost.exe    │
+│  - Windows Script Host wrapper  │    │  - .NET 10 GUI subsystem app        │
+│  - Launches pwsh silently       │    │  - Receives file/protocol activation│
+│  - Uses system pwsh             │    │  - Launches bundled pwsh            │
+└─────────────────┬───────────────┘    └─────────────────┬───────────────────┘
+                  │                                      │
+                  └──────────────────┬───────────────────┘
+                                     │
+                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         viewmd.vbs (Entry Point)                            │
-│  - Windows Script Host wrapper                                              │
-│  - Launches pwsh silently (no console flash)                                │
-│  - Passes markdown file path to PowerShell                                  │
-└──────────────────────────────────┬──────────────────────────────────────────┘
-                                   │
-                                   ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                       Open-Markdown.ps1 (Core Logic)                        │
+│                       Open-Markdown.ps1 (Core Engine)                       │
 │  - Parses input path (file:, mdview: protocols, fragments)                  │
 │  - MOTW security check + user prompts                                       │
 │  - Converts Markdown → HTML via ConvertFrom-Markdown                        │
@@ -57,11 +61,13 @@ Markdown Viewer is a Windows application that renders Markdown files as styled H
 
 ## Component Details
 
-### 1. Entry Point: viewmd.vbs
+### 1. Entry Points
+
+#### Ad-hoc: viewmd.vbs
 
 **Purpose:** Silent launcher that avoids console window flashes.
 
-**Location:** `payload/viewmd.vbs`
+**Location:** `src/win/viewmd.vbs`
 
 **Flow:**
 1. Receives markdown file path as command-line argument
@@ -73,7 +79,25 @@ cmd = "pwsh -NoProfile -ExecutionPolicy Bypass -File ""...\Open-Markdown.ps1"" -
 CreateObject("WScript.Shell").Run cmd, 0, False
 ```
 
-### 2. Core Logic: Open-Markdown.ps1
+#### MSIX: MarkdownViewerHost.exe
+
+**Purpose:** .NET 10 host application for MSIX activation handling.
+
+**Location:** `src/host/MarkdownViewerHost/`
+
+**Responsibilities:**
+- Receives file and protocol activation from Windows
+- Passes activation arguments to bundled pwsh
+- Uses structured argument passing (no string concatenation)
+- Hides console window (WinExe subsystem)
+- Exits immediately after launching pwsh (stateless)
+
+**Key Properties:**
+- OutputType: WinExe (no console flash)
+- Target: net10.0-windows10.0.19041.0
+- No WPF/WinForms dependency
+
+### 2. Core Engine: Open-Markdown.ps1
 
 **Purpose:** Main orchestration script that handles the full conversion pipeline.
 
@@ -190,7 +214,7 @@ const LANG_MAP = {
 4. Call `hljs.highlightElement()` for each valid block
 5. Set `highlighted` flag to prevent re-execution on theme toggle
 
-### 6. Installation: install.ps1
+### 7. Ad-hoc Mode Installation: install.ps1
 
 **Purpose:** Per-user installation without admin privileges.
 
@@ -205,6 +229,40 @@ const LANG_MAP = {
 6. Registers `mdview:` protocol handler
 7. Creates uninstall entry in Add/Remove Programs
 8. Calls `SHChangeNotify` to refresh shell associations
+## MSIX Packaging
+
+### Package Structure
+
+```
+<MSIX Package>/
+├── MarkdownViewerHost.exe     # Host EXE (entry point)
+├── MarkdownViewerHost.dll     # Host assembly
+├── *.runtimeconfig.json       # .NET configuration
+├── app/                       # Engine payload
+│   ├── Open-Markdown.ps1
+│   ├── MarkdownViewer.psm1
+│   ├── script.js
+│   ├── style.css
+│   ├── highlight.min.js
+│   ├── highlight-theme.css
+│   └── markdown.ico
+├── pwsh/                      # Bundled PowerShell 7
+│   ├── pwsh.exe
+│   └── ...
+└── Assets/                    # MSIX visual assets
+    ├── Square44x44Logo.png
+    ├── Square150x150Logo.png
+    └── ...
+```
+
+### Activation Flow (MSIX)
+
+1. User double-clicks `.md` file or clicks `mdview:` link
+2. Windows activates `MarkdownViewerHost.exe` with arguments
+3. Host resolves bundled pwsh and engine paths
+4. Host launches: `pwsh.exe -NoProfile -ExecutionPolicy Bypass -File app/Open-Markdown.ps1 -Path <input>`
+5. Host exits immediately
+6. Engine processes markdown and opens browser
 
 ## Security Architecture
 
@@ -296,26 +354,40 @@ MarkdownViewer/
 │   │   ├── Open-Markdown.ps1        # Main PowerShell script
 │   │   ├── script.js                # Client-side JavaScript
 │   │   ├── style.css                # Client-side CSS
-│   │   ├── highlight.min.js         # highlight.js MD bundle (all languages)
-│   │   ├── highlight-theme.css      # Combined Tomorrow/Tomorrow Night theme
+│   │   ├── highlight.min.js         # highlight.js bundle
+│   │   ├── highlight-theme.css      # highlight.js theme
 │   │   └── icons/
-│   │       ├── markdown-mark-solid-win10-light.ico  # App icon
-│   │       └── markdown-mark-solid-win10-filled.ico # dark-filled icon, unused
+│   │       ├── markdown.ico
+│   │       └── markdown-light.ico
 │   │
-│   └── win/                         # Windows-specific
-│       ├── MarkdownViewer.psm1      # Shared module
-│       ├── viewmd.vbs               # Ad-hoc launcher
-│       └── uninstall.vbs            # Silent uninstall helper
-
-├── installers/
-│   └── win-adhoc/                   # Per-user ad-hoc installer
-│       ├── INSTALL.cmd
-│       ├── UNINSTALL.cmd
-│       ├── install.ps1
-│       └── uninstall.ps1
+│   ├── win/                         # Windows-specific
+│   │   ├── MarkdownViewer.psm1      # Shared module
+│   │   ├── viewmd.vbs               # Ad-hoc launcher
+│   │   └── uninstall.vbs            # Silent uninstall helper
+│   │
+│   └── host/                        # MSIX Host EXE
+│       └── MarkdownViewerHost/
+│           ├── MarkdownViewerHost.csproj
+│           └── Program.cs
 │
-├── tests/                   # Pester unit tests
-│   └── MarkdownViewer.Tests.ps1
+├── installers/
+│   ├── win-adhoc/                   # Per-user ad-hoc installer
+│   │   ├── INSTALL.cmd
+│   │   ├── UNINSTALL.cmd
+│   │   ├── install.ps1
+│   │   └── uninstall.ps1
+│   │
+│   └── win-msix/                    # MSIX packaging
+│       ├── Package/
+│       │   ├── AppxManifest.xml
+│       │   └── Assets/
+│       └── build.ps1
+│
+├── tests/
+│   ├── MarkdownViewer.Tests.ps1     # Pester tests
+│   ├── MarkdownViewerHost.Tests/    # xUnit tests
+│   ├── highlight-test.md
+│   └── theme-variation-test.md
 │
 └── dev/
     ├── scripts/             # Build/dev scripts
@@ -325,14 +397,14 @@ MarkdownViewer/
         ├── markdown-viewer-architecture.md (this file)
         ├── markdown-viewer-implementation-plan.md
         ├── msix-activation-matrix.md
-        ├── msix-packaging-and-host-launcher-specification.md
-		
-        └── sanitization-bug-fix-plan.md
+        └── msix-packaging-and-host-launcher-specification.md
 ```
 
 ## Testing
 
-Unit tests use Pester 5.x and are located in `tests/MarkdownViewer.Tests.ps1`.
+### PowerShell Tests (Pester 5.x)
+
+Located in `tests/MarkdownViewer.Tests.ps1`.
 
 **Test Coverage:**
 - HTML sanitization (dangerous tags, event handlers, URIs)
@@ -348,6 +420,14 @@ Import-Module Pester -RequiredVersion 5.7.1 -Force
 Invoke-Pester "tests\MarkdownViewer.Tests.ps1" -Output Minimal
 ```
 
+### C# Tests (xUnit)
+
+Located in `tests/MarkdownViewerHost.Tests/`.
+
+```powershell
+dotnet test "tests\MarkdownViewerHost.Tests"
+```
+
 ## Configuration
 
 The application uses localStorage in the browser for user preferences:
@@ -360,7 +440,9 @@ The application uses localStorage in the browser for user preferences:
 
 ## Dependencies
 
-- **PowerShell 7 (pwsh):** Required for `ConvertFrom-Markdown` cmdlet
-- **Windows Script Host:** Built into Windows, runs VBScript
+- **PowerShell 7 (pwsh):**
+  - Ad-hoc: System installation (auto-prompted)
+  - MSIX: Bundled in package
+- **Windows Script Host:** Built into Windows (ad-hoc only)
 - **Default Web Browser:** Chrome, Edge, Firefox, etc.
 - **highlight.js:** Bundled (~1MB UMD build) for syntax highlighting

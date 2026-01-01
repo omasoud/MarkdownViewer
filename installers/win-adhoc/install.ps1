@@ -28,7 +28,7 @@ $WinDir = Join-Path $RepoRoot "src\win"
 $IconsDir = Join-Path $CoreDir "icons"
 
 # The source icon file to use
-$SourceIconPath = Join-Path $IconsDir "markdown-mark-solid-win10-light.ico"
+$SourceIconPath = Join-Path $IconsDir "markdown.ico"
 
 # The icon file path after installation
 $InstalledIconPath = Join-Path $InstallDir "markdown.ico"

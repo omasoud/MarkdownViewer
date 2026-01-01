@@ -4,3 +4,5 @@ PSScriptAnalyzerSettings.psd1
 all.txt
 .github/
 .VSCodeCounter
+**/obj/**
+**/bin/**
