@@ -1118,3 +1118,53 @@ Describe 'Syntax Highlighting Feature - Installer' {
         }
     }
 }
+
+Describe 'ConvertFrom-Markdown Anchor ID Mismatch' {
+    # ConvertFrom-Markdown generates mismatched anchor IDs:
+    # - TOC links: href="#3-design-goals"
+    # - Heading IDs: id="design-goals" (number prefix stripped)
+    # Our script.js must fix this mismatch for TOC navigation to work
+
+    Context 'ConvertFrom-Markdown produces mismatched IDs' {
+        It 'produces TOC link with number prefix' {
+            $md = @"
+- [Design Goals](#3-design-goals)
+
+## 3. Design Goals
+"@
+            $html = (ConvertFrom-Markdown -InputObject $md).Html
+            $html | Should -Match 'href="#3-design-goals"'
+        }
+
+        It 'produces heading ID without number prefix' {
+            $md = @"
+- [Design Goals](#3-design-goals)
+
+## 3. Design Goals
+"@
+            $html = (ConvertFrom-Markdown -InputObject $md).Html
+            $html | Should -Match 'id="design-goals"'
+            $html | Should -Not -Match 'id="3-design-goals"'
+        }
+    }
+
+    Context 'script.js includes anchor fixup code' {
+        BeforeAll {
+            $jsPath = Join-Path $PSScriptRoot '..\payload\script.js'
+            $jsContent = Get-Content -Raw -LiteralPath $jsPath
+        }
+
+        It 'defines fixMismatchedAnchors function' {
+            $jsContent | Should -Match 'function fixMismatchedAnchors'
+        }
+
+        It 'queries elements with id attribute' {
+            $jsContent | Should -Match 'querySelectorAll\(\s*["''].*\[id\]'
+        }
+
+        It 'handles mismatched anchor hrefs' {
+            # Should look for anchor links and try to find matching IDs
+            $jsContent | Should -Match 'getElementById|querySelector.*id'
+        }
+    }
+}

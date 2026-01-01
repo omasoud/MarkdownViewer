@@ -234,6 +234,67 @@
 })();
 
 (function () {
+    /**
+     * Fix mismatched anchor links created by ConvertFrom-Markdown.
+     * 
+     * Problem: ConvertFrom-Markdown generates inconsistent IDs:
+     *   - TOC link: href="#3-design-goals"
+     *   - Heading ID: id="design-goals" (number prefix stripped)
+     * 
+     * Solution: For each broken anchor, try to find a matching element
+     * by progressively stripping leading number prefixes from the target.
+     * 
+     * This can be removed once ConvertFrom-Markdown generates consistent 
+     * IDs. So as of now, this code:
+     * @"
+     * - [Design Goals](#3-design-goals)
+     * - [Other Goals](#other-goals)
+     * ## 3. Design Goals
+     * ## 4. Other Goals
+     * "@ | ConvertFrom-Markdown | Select-Object -ExpandProperty Html
+     * Generates the following HTML:
+     * <ul>
+     *     <li><a href="#3-design-goals">Design Goals</a></li>
+     *     <li><a href="#other-goals">Other Goals</a></li>
+     * </ul>
+     * <h2 id="design-goals">3. Design Goals</h2>
+     * <h2 id="other-goals">4. Other Goals</h2>
+     * 
+     * Making the first link not work and the second link work, the 
+     * opposite of the expected behavior.
+     * Expected behavior is: id="3-design-goals" and id="4-other-goals"
+     */
+    function fixMismatchedAnchors() {
+        // Build a set of all IDs in the document for fast lookup
+        const allIds = new Set();
+        document.querySelectorAll('[id]').forEach(el => {
+            allIds.add(el.id);
+        });
+
+        // Process all in-page anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(a => {
+            const href = a.getAttribute('href');
+            if (!href || href === '#') return;
+
+            const targetId = href.slice(1); // Remove leading #
+
+            // If the target already exists, no fix needed
+            if (allIds.has(targetId)) return;
+
+            // Try stripping leading number patterns: "3-", "3.1-", "3.1.2-", etc.
+            // Pattern: digits followed by optional (.digits)* followed by separator (- or .)
+            const match = targetId.match(/^[\d.]+[-.](.+)$/);
+            if (match) {
+                const strippedId = match[1];
+                if (allIds.has(strippedId)) {
+                    // Found the actual element - fix the href
+                    a.setAttribute('href', '#' + strippedId);
+                    console.debug('Markdown Viewer: Fixed anchor', targetId, '->', strippedId);
+                }
+            }
+        });
+    }
+
     function rewriteInPageAnchors() {
         const page = window.location.href.split("#")[0];
 
@@ -256,8 +317,12 @@
     }
 
     if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", rewriteInPageAnchors);
+        document.addEventListener("DOMContentLoaded", function () {
+            fixMismatchedAnchors();
+            rewriteInPageAnchors();
+        });
     } else {
+        fixMismatchedAnchors();
         rewriteInPageAnchors();
     }
 })();
