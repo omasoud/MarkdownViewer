@@ -25,7 +25,7 @@ Install-Module -Name Pester -Force -SkipPublisherCheck -Scope CurrentUser
 ## Project Structure
 ```
 MarkdownViewer/
-├── MarkdownViewer.sln           # Visual Studio solution
+├── MarkdownViewer.slnx          # Visual Studio solution
 ├── src/
 │   ├── core/                    # Cross-platform engine + assets
 │   │   ├── Open-Markdown.ps1    # Main PowerShell engine
@@ -54,7 +54,7 @@ MarkdownViewer/
 
 ### Option 1: Visual Studio
 
-1. Open `MarkdownViewer.sln` in Visual Studio 2022
+1. Open `MarkdownViewer.slnx` in Visual Studio 2026
 2. Select Build > Build Solution (Ctrl+Shift+B)
 3. Projects build to their respective `bin/Debug/` directories
 
@@ -68,7 +68,7 @@ dotnet build MarkdownViewer.slnx
 dotnet build src/host/MarkdownViewerHost/MarkdownViewerHost.csproj
 
 # Build for release
-dotnet build MarkdownViewer.sln -c Release
+dotnet build MarkdownViewer.slnx -c Release
 ```
 
 ### Build Outputs
