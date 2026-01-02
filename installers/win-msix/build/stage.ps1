@@ -134,7 +134,8 @@ function New-AssetFromIco {
     }
     
     $size = "${Width}x${Height}"
-    & magick $IcoPath -resize $size -background transparent -gravity center -extent $size $DestPath 2>$null
+    # Use [0] to select only the first (largest) frame from the ICO to avoid multiple output files
+    & magick "${IcoPath}[0]" -resize $size -background transparent -gravity center -extent $size $DestPath 2>$null
     return ($LASTEXITCODE -eq 0)
 }
 

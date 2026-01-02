@@ -170,9 +170,62 @@ The ad-hoc installer copies files to `%LOCALAPPDATA%\Programs\MarkdownViewer` an
 
 ### MSIX Package
 
-The MSIX package bundles the Host EXE, PowerShell runtime, and engine files.
+The MSIX package bundles the Host EXE, PowerShell runtime, and engine files. There are two build methods:
 
-#### Basic Build
+#### Method 1: WAP Project (MSBuild) - Recommended
+
+This is the preferred method using the Windows Application Packaging (WAP) project:
+
+```powershell
+# Prerequisites: Visual Studio 2026 with Desktop Bridge workload
+# Launch Developer PowerShell first:
+$vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+. "$vsPath\Common7\Tools\Launch-VsDevShell.ps1" -SkipAutomaticLocation
+# If the latest is Visual Studio 2026, this is equivalent to:
+# . '<Drive>:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\Launch-VsDevShell.ps1' -SkipAutomaticLocation
+
+# Build x64 Release
+msbuild .\installers\win-msix\MarkdownViewer.wapproj /p:Platform=x64 /p:Configuration=Release
+
+# Build ARM64 Release  
+msbuild .\installers\win-msix\MarkdownViewer.wapproj /p:Platform=ARM64 /p:Configuration=Release
+
+# Build with signing enabled
+msbuild .\installers\win-msix\MarkdownViewer.wapproj /p:Platform=x64 /p:Configuration=Release /p:SignMsix=true
+
+# Skip bundling pwsh (for faster dev builds)
+msbuild .\installers\win-msix\MarkdownViewer.wapproj /p:Platform=x64 /p:Configuration=Release /p:SkipPwsh=true
+
+# Force regenerate assets from ICO
+msbuild .\installers\win-msix\MarkdownViewer.wapproj /p:Platform=x64 /p:Configuration=Release /p:ForceRegenAssets=true
+```
+
+**WAP Build Flow:**
+1. MSBuild builds `MarkdownViewerHost.csproj` via project reference
+2. `Directory.Build.targets` invokes `stage.ps1` to compose the payload
+3. `stage.ps1` downloads pwsh (if not cached), copies engine files, generates assets
+4. WAP packages the staged content into MSIX
+
+**MSBuild Properties:**
+
+| Property | Description |
+|----------|-------------|
+| `/p:Platform=x64|ARM64` | Target architecture (required) |
+| `/p:Configuration=Debug|Release` | Build configuration (default: Debug) |
+| `/p:SkipPwsh=true` | Skip bundling PowerShell runtime |
+| `/p:ForceRegenAssets=true` | Force regenerate PNG assets from ICO |
+| `/p:SignMsix=true` | Sign package after build |
+
+**Output:** `installers\win-msix\AppPackages\MarkdownViewer_<version>_<arch>_Test\MarkdownViewer_<version>_<arch>.msix`
+
+**Prerequisites for WAP Build:**
+- Visual Studio 2026 with "Windows Application Packaging Project" workload
+- .NET 10 SDK
+- ImageMagick (optional, for asset generation from ICO - falls back to solid-color placeholders)
+
+#### Method 2: build.ps1 (Legacy)
+
+The standalone PowerShell script for environments without Visual Studio:
 
 ```powershell
 # Build MSIX package (single architecture, uses system pwsh)

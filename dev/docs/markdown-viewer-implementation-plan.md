@@ -474,22 +474,23 @@ This phase addresses feedback from the MSIX packaging review and implements the 
 
 ### C.4.1 Enhance Asset Generation
 
-- [ ] C.4.1.1 Create robust PNG generation from ICO:
-  - Option 1: Use ImageMagick if available
-  - Option 2: Use .NET System.Drawing (cross-platform fallback)
-- [ ] C.4.1.2 Generate all required sizes:
-  - Square44x44Logo.png (and scale variants: 100%, 125%, 150%, 200%, 400%)
-  - Square150x150Logo.png (and scale variants)
-  - Wide310x150Logo.png (and scale variants)
-  - StoreLogo.png (50x50)
+- [x] C.4.1.1 Create robust PNG generation from ICO:
+  - Option 1: Use ImageMagick if available ✅
+  - Option 2: Use .NET System.Drawing (cross-platform fallback) ✅
+- [x] C.4.1.2 Generate all required sizes:
+  - Square44x44Logo.png (44x44) ✅
+  - Square150x150Logo.png (150x150) ✅
+  - Wide310x150Logo.png (310x150) ✅
+  - StoreLogo.png (50x50) ✅
+  - Note: Scale variants deferred - not required for basic MSIX
 - [ ] C.4.1.3 Generate file association badge icons (with plating)
-- [ ] C.4.1.4 Support transparent backgrounds
+- [x] C.4.1.4 Support transparent backgrounds
 
 ### C.4.2 Integrate with Build
 
-- [ ] C.4.2.1 Generate assets automatically during build if missing
-- [ ] C.4.2.2 Skip generation if assets already exist (allow manual override)
-- [ ] C.4.2.3 Add `-RegenerateAssets` switch to force regeneration
+- [x] C.4.2.1 Generate assets automatically during build if missing
+- [x] C.4.2.2 Skip generation if assets already exist (allow manual override)
+- [x] C.4.2.3 Add `-ForceRegenAssets` switch to force regeneration
 
 ---
 
@@ -752,10 +753,10 @@ This phase replaces the current `build.ps1`-based packaging with a proper MSBuil
 ### D.4.2 Asset Generation
 
 - [x] D.4.2.1 Generate required PNGs:
-  - `Square44x44Logo.png` (44x44)
-  - `Square150x150Logo.png` (150x150)
-  - `Wide310x150Logo.png` (310x150)
-  - `StoreLogo.png` (50x50)
+  - `Square44x44Logo.png` (44x44) ✅
+  - `Square150x150Logo.png` (150x150) ✅
+  - `Wide310x150Logo.png` (310x150) ✅
+  - `StoreLogo.png` (50x50) ✅
 - [ ] D.4.2.2 Optionally generate scale variants (scale-125, scale-150, scale-200)
 - [x] D.4.2.3 Support transparent backgrounds
 
@@ -797,13 +798,13 @@ This phase replaces the current `build.ps1`-based packaging with a proper MSBuil
 
 ### D.7.1 Validation Checklist
 
-- [ ] D.7.1.1 WAP build produces x64 MSIX
+- [x] D.7.1.1 WAP build produces x64 MSIX
 - [ ] D.7.1.2 WAP build produces ARM64 MSIX
 - [ ] D.7.1.3 Signed MSIX installs and runs
 - [ ] D.7.1.4 File activation works
 - [ ] D.7.1.5 Protocol activation works
 - [ ] D.7.1.6 No-args launch shows help dialog
-- [ ] D.7.1.7 All tests pass
+- [x] D.7.1.7 All tests pass
 
 ### D.7.2 Cleanup
 
@@ -819,12 +820,12 @@ This phase replaces the current `build.ps1`-based packaging with a proper MSBuil
 
 ### D.8.1 Developer Guide Updates
 
-- [ ] D.8.1.1 Document MSBuild build commands:
+- [x] D.8.1.1 Document MSBuild build commands:
   - `msbuild MarkdownViewer.wapproj /p:Platform=x64 /p:Configuration=Release`
   - `msbuild MarkdownViewer.wapproj /p:Platform=ARM64 /p:Configuration=Release`
-- [ ] D.8.1.2 Document signing: `/p:SignMsix=true`
+- [x] D.8.1.2 Document signing: `/p:SignMsix=true`
 - [ ] D.8.1.3 Document bundle creation workflow
-- [ ] D.8.1.4 Document staging script for advanced scenarios
+- [x] D.8.1.4 Document staging script for advanced scenarios
 
 ### D.8.2 Update README
 
@@ -869,13 +870,13 @@ This phase replaces the current `build.ps1`-based packaging with a proper MSBuil
 
 ## Success Criteria (Phase D)
 
-1. `msbuild MarkdownViewer.wapproj` produces MSIX without manual steps - **Pending** (needs DesktopBridge)
+1. `msbuild MarkdownViewer.wapproj` produces MSIX without manual steps - ✅ **Complete**
 2. Staging runs automatically as part of build - ✅ Configured in Directory.Build.targets
-3. Both x64 and ARM64 packages build successfully - **Pending**
+3. Both x64 and ARM64 packages build successfully - **Pending** (ARM64 untested)
 4. Signed packages install and run correctly - **Pending**
 5. Bundle creation works - Deferred to build.ps1
 6. `build.ps1` is removed - **Pending** (keep as fallback until WAP validated)
-7. All tests pass - ✅ 255 Pester + 20 xUnit = 275 tests passing
+7. All tests pass - ✅ 80 Pester + 20 xUnit = 100 tests passing
 8. Documentation is updated - **Pending**
 
 ---

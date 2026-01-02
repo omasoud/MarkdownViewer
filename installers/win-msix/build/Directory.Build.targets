@@ -73,10 +73,17 @@
     
     <!-- Bundled pwsh in pwsh\ -->
     <Content Include="$(StagingOutputDir)pwsh\**\*" Link="pwsh\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(StagingOutputDir)pwsh\')" />
-    
-    <!-- Generated assets -->
-    <Content Include="$(StagingOutputDir)Assets\**\*" Link="Assets\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  
+  <!-- Generated assets must be included dynamically after staging -->
+  <Target Name="IncludeStagedAssets" AfterTargets="StagePayload" BeforeTargets="_GenerateAppxPackageFile">
+    <ItemGroup>
+      <Content Include="$(StagingOutputDir)Assets\StoreLogo.png" Link="Assets\StoreLogo.png" CopyToOutputDirectory="PreserveNewest" />
+      <Content Include="$(StagingOutputDir)Assets\Square44x44Logo.png" Link="Assets\Square44x44Logo.png" CopyToOutputDirectory="PreserveNewest" />
+      <Content Include="$(StagingOutputDir)Assets\Square150x150Logo.png" Link="Assets\Square150x150Logo.png" CopyToOutputDirectory="PreserveNewest" />
+      <Content Include="$(StagingOutputDir)Assets\Wide310x150Logo.png" Link="Assets\Wide310x150Logo.png" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
 
   <!-- Optional: Sign MSIX after build -->
   <Target Name="SignMsixPackage" AfterTargets="Build" Condition="'$(SignMsix)' == 'true'">

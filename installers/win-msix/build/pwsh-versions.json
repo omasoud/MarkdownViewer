@@ -1,15 +1,15 @@
 {
     "comment": "Pinned PowerShell version for MSIX packaging. Update this file to use a different version.",
-    "version": "7.5.1",
-    "releaseDate": "2025-04-24",
+    "version": "7.5.4",
+    "releaseDate": "2025-10-20",
     "archives": {
         "x64": {
-            "url": "https://github.com/PowerShell/PowerShell/releases/download/v7.5.1/PowerShell-7.5.1-win-x64.zip",
-            "sha256": "4D3028DA81170F8D1CD226614582F0A95D3DD5592127CF87A09E3A3568E51A08"
+            "url": "https://github.com/PowerShell/PowerShell/releases/download/v7.5.4/PowerShell-7.5.4-win-x64.zip",
+            "sha256": "B40D192AE95BA6CCC4CC362FF4E1B18CA6FB5055BEBBCD3920684E12701FA8F6"
         },
         "arm64": {
-            "url": "https://github.com/PowerShell/PowerShell/releases/download/v7.5.1/PowerShell-7.5.1-win-arm64.zip",
-            "sha256": "78E78FD6A9D0A837778F6490D697B0DF3AC09A3FA94655B0D049F236B7F428E9"
+            "url": "https://github.com/PowerShell/PowerShell/releases/download/v7.5.4/PowerShell-7.5.4-win-arm64.zip",
+            "sha256": "0C0B2BF04E853917508280531CD49BBA8B3049837E3C805EBC042E2741CA52B3"
         }
     },
     "notes": [

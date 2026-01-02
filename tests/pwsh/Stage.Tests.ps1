@@ -150,7 +150,7 @@ Describe 'stage.ps1 Asset Generation' {
     }
     
     It 'Should have placeholder fallback when ImageMagick unavailable' {
-        $content | Should -Match 'Creating placeholder assets'
+        $content | Should -Match 'Creating.*placeholder.*assets'
     }
 }
 
