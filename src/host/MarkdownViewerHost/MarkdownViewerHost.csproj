@@ -24,6 +24,11 @@
     <Company></Company>
     <Copyright>MIT License</Copyright>
     <Description>Host application for Markdown Viewer MSIX package</Description>
+	<ApplicationIcon>..\..\core\icons\markdown.ico</ApplicationIcon>
   </PropertyGroup>
-
+  <ItemGroup>
+      <EmbeddedResource Include="..\..\core\icons\markdown.ico">
+          <LogicalName>AppIconResource</LogicalName>
+      </EmbeddedResource>
+  </ItemGroup>
 </Project>

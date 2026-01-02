@@ -8,7 +8,7 @@
 // - No activation: Shows help dialog
 
 using System.Diagnostics;
-using System.Windows.Forms;
+using System.Reflection;
 using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
 
@@ -26,12 +26,12 @@ internal static class Program
         // Enable visual styles for TaskDialog
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        
+
         try
         {
             // Try to get activation data from AppInstance API (packaged apps)
             var activationHandled = TryHandlePackagedActivation();
-            
+
             if (!activationHandled)
             {
                 // Fallback to command-line args (unpackaged/dev scenario)
@@ -52,10 +52,12 @@ internal static class Program
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
             // Exit silently on any error - Engine owns error presentation
             // Host must not show duplicate dialogs
+            // copy exception to clipboard for debugging
+            // Clipboard.SetText(ex.ToString());
         }
     }
 
@@ -78,15 +80,15 @@ internal static class Program
             {
                 case ActivationKind.File:
                     return HandleFileActivation((FileActivatedEventArgs)activatedArgs);
-                    
+
                 case ActivationKind.Protocol:
                     return HandleProtocolActivation((ProtocolActivatedEventArgs)activatedArgs);
-                    
+
                 case ActivationKind.Launch:
                     // Launched without specific activation (e.g., from Start Menu)
                     // Return false to show help dialog via the args.Length == 0 path
                     return false;
-                    
+
                 default:
                     return false;
             }
@@ -140,43 +142,122 @@ internal static class Program
     /// <summary>
     /// Show a help dialog when the app is launched without any file/protocol activation.
     /// This guides the user to set Markdown Viewer as the default app for .md files.
-    /// Uses TaskDialog for a modern, visually appealing UI.
+    /// Uses Windows Forms for a modern, visually appealing UI.
     /// </summary>
     private static void ShowHelpDialog()
-    {
-        // Create owner form for proper dialog positioning
-        using var owner = new Form { TopMost = true };
+{
+    using var form = new Form();
+    form.Text = "Markdown Viewer";
+    form.Size = new Size(600, 400);
+    form.BackColor = Color.AliceBlue;
+    form.FormBorderStyle = FormBorderStyle.FixedDialog;
+    form.MaximizeBox = false;
+    form.MinimizeBox = false;
+    form.StartPosition = FormStartPosition.CenterScreen;
 
-        var page = new TaskDialogPage
+    // --- ICON LOGIC START ---
+    var assembly = Assembly.GetExecutingAssembly();
+    using var stream = assembly.GetManifestResourceStream("AppIconResource"); // Ensure name matches .csproj
+
+    if (stream != null)
+    {
+        // 1. Set the Window Icon (Taskbar/Titlebar)
+        // The standard Icon constructor is fine for small sizes
+        form.Icon = new Icon(stream);
+        form.ShowIcon = true;
+
+        // 2. Get the High-Quality Image for the UI
+        // We ask for 64, but your helper will likely find the 256px version 
+        // and downscale it nicely, or return the 256px one directly.
+        using var bestBitmap = IconHelper.GetIconBySize(stream, 64);
+
+        if (bestBitmap != null)
         {
-            Caption = "Markdown Viewer",
-            Heading = "Welcome to Markdown Viewer",
-            Text = "This app renders Markdown files (.md, .markdown) in your browser.\n\n" +
+            var iconBox = new PictureBox();
+            
+            // If the bitmap is huge (256px), we scale it down to 64px for the UI
+            if (bestBitmap.Width > 64)
+            {
+                var scaled = new Bitmap(64, 64);
+                using (var g = Graphics.FromImage(scaled))
+                {
+                    g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                    g.DrawImage(bestBitmap, 0, 0, 64, 64);
+                }
+                iconBox.Image = scaled;
+            }
+            else
+            {
+                iconBox.Image = (Image)bestBitmap.Clone();
+            }
+
+            iconBox.Size = new Size(64, 64);
+            iconBox.SizeMode = PictureBoxSizeMode.CenterImage;
+            iconBox.Location = new Point(30, 25);
+            iconBox.BackColor = Color.Transparent; // Clean transparency
+            iconBox.BorderStyle = BorderStyle.None;
+            form.Controls.Add(iconBox);
+        }
+    }
+    // --- ICON LOGIC END ---
+
+    // The rest of your UI setup...
+    var headerFont = new Font("Segoe UI", 18, FontStyle.Regular);
+    var bodyFont = new Font("Segoe UI", 11, FontStyle.Regular);
+    var buttonFont = new Font("Segoe UI", 10, FontStyle.Regular);
+
+    var lblHeading = new Label();
+    lblHeading.Text = "Welcome to Markdown Viewer";
+    lblHeading.Font = headerFont;
+    lblHeading.ForeColor = Color.FromArgb(0, 51, 153);
+    lblHeading.Location = new Point(110, 30);
+    lblHeading.AutoSize = true;
+    form.Controls.Add(lblHeading);
+
+    var lblBody = new Label();
+    lblBody.Text = "This app renders Markdown files (.md) in your browser.\n\n" +
                    "To view a Markdown file:\n" +
                    "• Right-click a .md file → Open with → Markdown Viewer\n" +
-                   "• Or set Markdown Viewer as the default app for .md files",
-            Icon = TaskDialogIcon.Information,
-            AllowCancel = true  // Allow closing with X button
-        };
+                   "• Or double-click a .md file after you have set Markdown\n" +
+                   "   Viewer as the default app below.";
+    lblBody.Font = bodyFont;
+    lblBody.ForeColor = Color.FromArgb(64, 64, 64);
+    lblBody.Location = new Point(110, 80);
+    lblBody.Size = new Size(500, 150);
+    form.Controls.Add(lblBody);
 
-        // Add button to open Default Apps settings
-        var btnDefaultApps = new TaskDialogCommandLinkButton("Open Default Apps Settings")
-        {
-            DescriptionText = "Set Markdown Viewer as the default app for .md and .markdown files"
-        };
-        btnDefaultApps.Click += (s, e) =>
-        {
-            OpenDefaultAppsSettings();
-        };
-        page.Buttons.Add(btnDefaultApps);
+    var btnSettings = new Button();
+    btnSettings.Text = "Open Default Apps Settings";
+    btnSettings.Font = buttonFont;
+    btnSettings.Size = new Size(250, 45);
+    btnSettings.Location = new Point(110, 240);
+    btnSettings.FlatStyle = FlatStyle.Flat;
+    btnSettings.BackColor = Color.FromArgb(0, 120, 215);
+    btnSettings.ForeColor = Color.White;
+    btnSettings.Cursor = Cursors.Hand;
+    btnSettings.FlatAppearance.BorderSize = 0;
+    btnSettings.Click += (s, e) => 
+    {
+        OpenDefaultAppsSettings();
+        form.Close();
+    };
+    form.Controls.Add(btnSettings);
 
-        // Add Close button
-        page.Buttons.Add(TaskDialogButton.Close);
+    var btnClose = new Button();
+    btnClose.Text = "Close";
+    btnClose.Font = buttonFont;
+    btnClose.Size = new Size(100, 45);
+    btnClose.Location = new Point(370, 240);
+    btnClose.FlatStyle = FlatStyle.Flat;
+    btnClose.BackColor = Color.FromArgb(240, 240, 240);
+    btnClose.ForeColor = Color.Black;
+    btnClose.FlatAppearance.BorderSize = 0;
+    btnClose.Click += (s, e) => form.Close();
+    form.Controls.Add(btnClose);
 
-        // Show the dialog
-        TaskDialog.ShowDialog(owner.Handle, page);
-    }
-
+    form.ShowDialog();
+} 
+     
     /// <summary>
     /// Open Windows Settings to the Default Apps page.
     /// </summary>
@@ -205,20 +286,20 @@ internal static class Program
     {
         // Resolve paths relative to the host executable (package install location)
         var hostDir = AppContext.BaseDirectory;
-        
+
         // In packaged deployment:
         // - pwsh is at: <package>/pwsh/pwsh.exe
         // - engine is at: <package>/app/Open-Markdown.ps1
         var pwshPath = Path.Combine(hostDir, "pwsh", "pwsh.exe");
         var enginePath = Path.Combine(hostDir, "app", "Open-Markdown.ps1");
-        
+
         // Fallback for development/unpackaged scenarios
         if (!File.Exists(pwshPath))
         {
             // Try system pwsh
             pwshPath = "pwsh";
         }
-        
+
         if (!File.Exists(enginePath))
         {
             // Try relative to host in dev layout (bin/Debug/.../win-x64 -> src/core)
