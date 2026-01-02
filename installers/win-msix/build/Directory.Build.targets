@@ -85,14 +85,22 @@
     </ItemGroup>
   </Target>
 
+  <!-- Clean staging and output directories -->
+  <Target Name="CleanStagingAndOutput" AfterTargets="Clean">
+    <Message Text="Cleaning staging and output directories..." Importance="high" />
+    <RemoveDir Directories="$(MSBuildProjectDirectory)\obj\Staging" Condition="Exists('$(MSBuildProjectDirectory)\obj\Staging')" />
+    <RemoveDir Directories="$(MSBuildProjectDirectory)\output" Condition="Exists('$(MSBuildProjectDirectory)\output')" />
+  </Target>
+
   <!-- Optional: Sign MSIX after build -->
   <Target Name="SignMsixPackage" AfterTargets="Build" Condition="'$(SignMsix)' == 'true'">
     <PropertyGroup>
       <SignScriptPath>$(MSBuildProjectDirectory)\sign.ps1</SignScriptPath>
-      <MsixOutputPath>$(OutDir)$(PackageName)_$(PackageVersion)_$(Platform).msix</MsixOutputPath>
+      <!-- MSIX output path matches AppxPackageDir setting in wapproj -->
+      <MsixOutputPath>$(MSBuildProjectDirectory)\output\$(PackageName)_$(PackageVersion)_$(Platform).msix</MsixOutputPath>
     </PropertyGroup>
     
-    <Message Text="Signing MSIX package..." Importance="high" />
+    <Message Text="Signing MSIX package at $(MsixOutputPath)..." Importance="high" />
     <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(SignScriptPath)&quot; -Sign -MsixPath &quot;$(MsixOutputPath)&quot;"
           WorkingDirectory="$(MSBuildProjectDirectory)"
           ConsoleToMsBuild="true"

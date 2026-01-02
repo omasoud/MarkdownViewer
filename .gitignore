@@ -10,3 +10,5 @@ all.txt
 src/core/icons/markdown - Copy*.ico
 **/AppPackages/**
 **/BundleArtifacts/**
+installers - Copy/*
+preprocessed.xml

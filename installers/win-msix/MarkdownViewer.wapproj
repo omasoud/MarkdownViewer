@@ -1,11 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  WAP (Windows Application Packaging) project.
+  IMPORTANT: This project requires Visual Studio MSBuild with the DesktopBridge SDK.
+  It will NOT build with 'dotnet build' - use 'msbuild' from VS Developer PowerShell.
+-->
 <Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 
   <PropertyGroup Condition="'$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '15.0'">
     <VisualStudioVersion>15.0</VisualStudioVersion>
   </PropertyGroup>
 
-  <ItemGroup Label="ProjectConfigurations">
+  <!-- Detect if we're running under dotnet CLI (MSBuildRuntimeType=Core) vs VS MSBuild -->
+  <PropertyGroup>
+    <WapProjPath Condition="'$(WapProjPath)'==''">$(MSBuildExtensionsPath)\Microsoft\DesktopBridge\</WapProjPath>
+    <_DesktopBridgePropsExists>false</_DesktopBridgePropsExists>
+    <_DesktopBridgePropsExists Condition="Exists('$(WapProjPath)Microsoft.DesktopBridge.props')">true</_DesktopBridgePropsExists>
+    
+    <!-- Set output directory BEFORE importing DesktopBridge props to prevent _Test suffix -->
+    <AppxPackageDir Condition="'$(_DesktopBridgePropsExists)' == 'true'">$(MSBuildProjectDirectory)\output\</AppxPackageDir>
+    <!-- Set to non-empty value to disable _Test suffix in output path -->
+    <AppxPackageTestDir Condition="'$(_DesktopBridgePropsExists)' == 'true'">$(AppxPackageDir)</AppxPackageTestDir>
+  </PropertyGroup>
+
+  <!-- When DesktopBridge SDK is not available, provide stub targets and exit gracefully -->
+  <Target Name="Build" Condition="'$(_DesktopBridgePropsExists)' != 'true'">
+    <Warning Text="WAP project skipped - DesktopBridge SDK not found. Build with Visual Studio MSBuild: msbuild MarkdownViewer.wapproj /p:Platform=x64 /p:Configuration=Release" />
+  </Target>
+  <Target Name="Rebuild" Condition="'$(_DesktopBridgePropsExists)' != 'true'" />
+  <Target Name="Clean" Condition="'$(_DesktopBridgePropsExists)' != 'true'" />
+  <Target Name="Restore" Condition="'$(_DesktopBridgePropsExists)' != 'true'" />
+
+  <!-- Only import DesktopBridge SDK and define real project when SDK is available -->
+  <Import Project="$(WapProjPath)\Microsoft.DesktopBridge.props" Condition="'$(_DesktopBridgePropsExists)' == 'true'" />
+
+  <ItemGroup Label="ProjectConfigurations" Condition="'$(_DesktopBridgePropsExists)' == 'true'">
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
@@ -24,13 +52,7 @@
     </ProjectConfiguration>
   </ItemGroup>
 
-  <PropertyGroup>
-    <WapProjPath Condition="'$(WapProjPath)'==''">$(MSBuildExtensionsPath)\Microsoft\DesktopBridge\</WapProjPath>
-  </PropertyGroup>
-
-  <Import Project="$(WapProjPath)\Microsoft.DesktopBridge.props" />
-
-  <PropertyGroup>
+  <PropertyGroup Condition="'$(_DesktopBridgePropsExists)' == 'true'">
     <ProjectGuid>f05a6ab0-6789-462f-9ca7-3ee5009cf0d3</ProjectGuid>
     <TargetPlatformVersion>10.0.26100.0</TargetPlatformVersion>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
@@ -38,6 +60,10 @@
     
     <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
     <NoWarn>$(NoWarn);NU1702</NoWarn>
+    
+    <!-- Configure package output -->
+    <AppxBundle>Never</AppxBundle>
+    <UapAppxPackageBuildMode>SideloadOnly</UapAppxPackageBuildMode>
     
     <!-- Package identity -->
     <PackageName>MarkdownViewer</PackageName>
@@ -48,17 +74,16 @@
   </PropertyGroup>
 
   <!-- Import staging targets (builds host, stages payload, generates assets) -->
-  <Import Project="build\Directory.Build.targets" />
+  <Import Project="build\Directory.Build.targets" Condition="'$(_DesktopBridgePropsExists)' == 'true'" />
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(_DesktopBridgePropsExists)' == 'true'">
     <AppxManifest Include="Package.appxmanifest">
       <SubType>Designer</SubType>
     </AppxManifest>
   </ItemGroup>
 
   <!-- Reference the host project as the application entry point -->
-  <!-- Properties tell WAP this is the entry point application -->
-  <ItemGroup>
+  <ItemGroup Condition="'$(_DesktopBridgePropsExists)' == 'true'">
     <ProjectReference Include="..\..\src\host\MarkdownViewerHost\MarkdownViewerHost.csproj">
       <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
       <Properties>EnableMsixTooling=true</Properties>
@@ -70,9 +95,9 @@
     Do NOT add static asset references here - they will conflict with staged assets.
   -->
 
-  <Import Project="$(WapProjPath)\Microsoft.DesktopBridge.targets" />
+  <Import Project="$(WapProjPath)\Microsoft.DesktopBridge.targets" Condition="'$(_DesktopBridgePropsExists)' == 'true'" />
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(_DesktopBridgePropsExists)' == 'true'">
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.1742" PrivateAssets="all" />
   </ItemGroup>
 

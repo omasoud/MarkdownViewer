@@ -6,6 +6,9 @@
 
     <!-- Target Windows 10 19041 or later -->
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    
+    <!-- Runtime identifiers for MSIX packaging (enables proper restore for publish) -->
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
 
     <!-- Enable Windows Forms for TaskDialog support -->
     <UseWindowsForms>true</UseWindowsForms>
