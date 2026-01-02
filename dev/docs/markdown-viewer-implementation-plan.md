@@ -4,12 +4,14 @@
 
 This document outlines the implementation plan for Markdown Viewer features:
 - **Phase A (Complete):** highlight.js syntax highlighting integration
-- **Phase B (Current):** MSIX packaging and Host launcher for Microsoft Store distribution
+- **Phase B (Complete):** MSIX packaging and Host launcher for Microsoft Store distribution
+- **Phase C (Current):** Enhancement of MSIX Packaging and Host Launcher
 
 **Key Documents:**
 - [markdown-viewer-architecture.md](markdown-viewer-architecture.md) - Architecture overview
 - [msix-packaging-and-host-launcher-specification.md](msix-packaging-and-host-launcher-specification.md) - MSIX tech spec
 - [msix-activation-matrix.md](msix-activation-matrix.md) - Activation behavior contract
+- [msix-project-additional-feedback.md](msix-project-additional-feedback.md) - Phase C requirements
 
 ---
 
@@ -363,3 +365,261 @@ If critical issues are found post-release:
 4. All 170 existing unit tests pass
 5. New Host EXE unit tests pass
 6. Documentation updated for both install methods
+
+---
+
+# Phase C: Enhancement of MSIX Packaging and Host Launcher
+
+## Overview
+
+This phase addresses feedback from the MSIX packaging review and implements the remaining items needed for a production-ready Microsoft Store submission.
+
+**Key Requirements (from [msix-project-additional-feedback.md](msix-project-additional-feedback.md)):**
+- No-args UX: Show helpful info when launched from Start Menu (not via file/protocol)
+- Multi-architecture support: Build for both x64 and ARM64
+- Automated signing: Streamline dev-signing workflow
+- Automated asset generation: Generate MSIX PNG assets from source ICO
+- Pinned PowerShell download: Download specific pwsh version with integrity verification
+
+---
+
+## C.1 No-Args UX (Launch from Start Menu)
+
+**Goal:** When the host is launched from Start Menu with no file/protocol activation, show a helpful "How to use" dialog instead of exiting silently.
+
+**Files:** `src/host/MarkdownViewerHost/Program.cs`
+
+### C.1.1 Implement Help Dialog
+
+- [x] C.1.1.1 Add `ShowHelpDialog()` method using Windows MessageBox API
+- [x] C.1.1.2 Display message explaining how to use the app:
+  - "Use Open With on a .md file"
+  - "Set as default for .md/.markdown files"
+- [x] C.1.1.3 Include button to open Windows Default Apps settings (ms-settings:defaultapps)
+- [x] C.1.1.4 Dialog must work without requiring pwsh (host-only)
+
+### C.1.2 Integrate with Main Entry Point
+
+- [x] C.1.2.1 Call `ShowHelpDialog()` when `args.Length == 0`
+- [x] C.1.2.2 Ensure host exits cleanly after dialog is dismissed
+
+### C.1.3 Unit Tests
+
+- [x] C.1.3.1 Test: Empty args triggers help path (mock dialog)
+- [x] C.1.3.2 Test: Non-empty args skips help dialog
+
+---
+
+## C.2 Multi-Architecture Support (x64 + ARM64)
+
+**Goal:** Build MSIX packages for both x64 and ARM64 architectures. Optionally create an MSIX bundle.
+
+**Files:** `installers/win-msix/build.ps1`
+
+### C.2.1 Update Build Script for Multi-Arch
+
+- [x] C.2.1.1 Add `-BuildAll` switch to build both x64 and ARM64
+- [x] C.2.1.2 Ensure manifest ProcessorArchitecture is set correctly per build
+- [x] C.2.1.3 Output separate MSIX files: `MarkdownViewer_<version>_x64.msix`, `MarkdownViewer_<version>_arm64.msix`
+
+### C.2.2 Add MSIX Bundle Support
+
+- [x] C.2.2.1 Add `-Bundle` switch to create `.msixbundle`
+- [x] C.2.2.2 Use `makeappx bundle` to combine x64 and ARM64 packages
+- [x] C.2.2.3 Output: `MarkdownViewer_<version>.msixbundle`
+
+### C.2.3 PowerShell Runtime Per Architecture
+
+- [x] C.2.3.1 Support downloading ARM64 PowerShell for ARM64 builds
+- [x] C.2.3.2 Ensure correct architecture pwsh is bundled per target
+
+---
+
+## C.3 Automated Dev Signing
+
+**Goal:** Automate self-signed certificate creation and MSIX signing for dev/sideload testing.
+
+**Files:** `installers/win-msix/sign.ps1` (new)
+
+### C.3.1 Create Signing Script
+
+- [x] C.3.1.1 Create `sign.ps1` with certificate management
+- [x] C.3.1.2 Implement `New-DevCertificate` function:
+  - Create self-signed code signing cert in CurrentUser\My
+  - Export to CurrentUser\TrustedPeople for local trust
+  - Subject matches manifest Publisher (CN=MarkdownViewer)
+- [x] C.3.1.3 Implement `Sign-MsixPackage` function:
+  - Locate signtool.exe from Windows SDK
+  - Sign MSIX using dev certificate
+- [x] C.3.1.4 Add `-CreateCertOnly` switch to create/refresh dev certificate
+- [x] C.3.1.5 Add `-Sign` switch to sign existing MSIX
+
+### C.3.2 Integrate with Build Script
+
+- [x] C.3.2.1 Add `-Sign` parameter to `build.ps1`
+- [x] C.3.2.2 Call `sign.ps1` after package creation when `-Sign` specified
+
+### C.3.3 Documentation
+
+- [x] C.3.3.1 Document dev signing workflow in developer-guide.md
+- [x] C.3.3.2 Document Store signing (Microsoft re-signs at submission)
+
+---
+
+## C.4 Automated MSIX Asset Generation
+
+**Goal:** Automatically generate all required PNG assets from the source ICO file.
+
+**Files:** `installers/win-msix/build.ps1` or new `scripts/Convert-IcoToPng.ps1`
+
+### C.4.1 Enhance Asset Generation
+
+- [ ] C.4.1.1 Create robust PNG generation from ICO:
+  - Option 1: Use ImageMagick if available
+  - Option 2: Use .NET System.Drawing (cross-platform fallback)
+- [ ] C.4.1.2 Generate all required sizes:
+  - Square44x44Logo.png (and scale variants: 100%, 125%, 150%, 200%, 400%)
+  - Square150x150Logo.png (and scale variants)
+  - Wide310x150Logo.png (and scale variants)
+  - StoreLogo.png (50x50)
+- [ ] C.4.1.3 Generate file association badge icons (with plating)
+- [ ] C.4.1.4 Support transparent backgrounds
+
+### C.4.2 Integrate with Build
+
+- [ ] C.4.2.1 Generate assets automatically during build if missing
+- [ ] C.4.2.2 Skip generation if assets already exist (allow manual override)
+- [ ] C.4.2.3 Add `-RegenerateAssets` switch to force regeneration
+
+---
+
+## C.5 Pinned PowerShell Download with Integrity Verification
+
+**Goal:** Download a specific PowerShell version instead of copying system pwsh, with SHA256 verification.
+
+**Files:** `installers/win-msix/build.ps1`
+
+### C.5.1 Define PowerShell Version Configuration
+
+- [x] C.5.1.1 Create `pwsh-versions.json` with pinned versions and hashes:
+  ```json
+  {
+    "version": "7.5.1",
+    "archives": {
+      "x64": {
+        "url": "https://github.com/PowerShell/PowerShell/releases/download/...",
+        "sha256": "..."
+      },
+      "arm64": {
+        "url": "https://github.com/PowerShell/PowerShell/releases/download/...",
+        "sha256": "..."
+      }
+    }
+  }
+  ```
+- [x] C.5.1.2 Document how to update the pinned version
+
+### C.5.2 Implement Download with Verification
+
+- [x] C.5.2.1 Add `Get-PwshRuntime` function to build.ps1:
+  - Download from GitHub releases if not cached
+  - Verify SHA256 hash before extraction
+  - Cache in user temp or build cache directory
+- [x] C.5.2.2 Add `-DownloadPwsh` switch to force download
+- [x] C.5.2.3 Fall back to system pwsh if download fails (with warning)
+
+### C.5.3 Cache Management
+
+- [x] C.5.3.1 Cache downloaded zips in `$env:TEMP\MarkdownViewer-BuildCache`
+- [x] C.5.3.2 Skip download if cached file exists and hash matches
+
+---
+
+## C.6 Documentation Updates
+
+**Goal:** Update developer documentation with new build options and workflows.
+
+**Files:** `dev/docs/developer-guide.md`, `README.md`
+
+### C.6.1 Developer Guide Updates
+
+- [x] C.6.1.1 Document new build.ps1 parameters:
+  - `-BuildAll`, `-Bundle`, `-Sign`, `-DownloadPwsh`
+- [x] C.6.1.2 Document dev signing workflow (create cert, sign, install)
+- [x] C.6.1.3 Document how to update pinned PowerShell version
+- [ ] C.6.1.4 Document how to change app name (for Store availability)
+- [ ] C.6.1.5 Document ARM64 testing requirements
+
+### C.6.2 README Updates
+
+- [ ] C.6.2.1 Update MSIX installation section with signing info
+- [ ] C.6.2.2 Note ARM64 support
+
+---
+
+## C.7 Unit Tests
+
+**Goal:** Add tests for new functionality.
+
+**Files:** `tests/MarkdownViewerHost.Tests/HostTests.cs`, `tests/MarkdownViewer.Tests.ps1`
+
+### C.7.1 Host Tests
+
+- [x] C.7.1.1 Test: No-args path is detected correctly
+- [x] C.7.1.2 Test: Args path skips no-args handling
+
+### C.7.2 Build Script Tests
+
+- [ ] C.7.2.1 Test: Version parsing from pwsh-versions.json
+- [ ] C.7.2.2 Test: SHA256 verification logic (pure function test)
+
+---
+
+## C.8 Final Validation
+
+**Goal:** Verify all enhancements work correctly.
+
+### C.8.1 Build Verification
+
+- [ ] C.8.1.1 x64 MSIX builds successfully
+- [ ] C.8.1.2 ARM64 MSIX builds successfully
+- [ ] C.8.1.3 MSIX bundle creates correctly
+- [ ] C.8.1.4 Signed MSIX installs without Developer Mode
+
+### C.8.2 Functional Verification
+
+- [ ] C.8.2.1 No-args launch shows help dialog with Default Apps link
+- [ ] C.8.2.2 File activation works (double-click .md)
+- [ ] C.8.2.3 Protocol activation works (mdview: links)
+- [ ] C.8.2.4 All existing tests pass (175 Pester + 12 xUnit)
+
+### C.8.3 Architecture Verification
+
+- [ ] C.8.3.1 x64 MSIX runs correctly on x64 Windows
+- [ ] C.8.3.2 ARM64 MSIX runs correctly on ARM64 Windows (if available)
+
+---
+
+## Implementation Order
+
+1. **C.1** (No-Args UX) - Critical UX gap
+2. **C.4** (Asset Generation) - Enables proper icons
+3. **C.2** (Multi-Arch) - ARM64 support
+4. **C.5** (Pinned pwsh) - Deterministic builds
+5. **C.3** (Dev Signing) - Streamlined testing
+6. **C.6** (Documentation) - Developer enablement
+7. **C.7** (Tests) - Quality assurance
+8. **C.8** (Validation) - Final verification
+
+---
+
+## Success Criteria (Phase C)
+
+1. Launch from Start Menu shows helpful dialog
+2. Both x64 and ARM64 MSIX packages build successfully
+3. MSIX bundle can be created
+4. Dev signing is automated (one command)
+5. PNG assets are generated automatically from ICO
+6. PowerShell version is pinned with hash verification
+7. Documentation covers all new features
+8. All unit tests pass

@@ -172,8 +172,10 @@ The ad-hoc installer copies files to `%LOCALAPPDATA%\Programs\MarkdownViewer` an
 
 The MSIX package bundles the Host EXE, PowerShell runtime, and engine files.
 
+#### Basic Build
+
 ```powershell
-# Build MSIX package (builds everything)
+# Build MSIX package (single architecture, uses system pwsh)
 .\installers\win-msix\build.ps1
 
 # Build with specific options
@@ -186,7 +188,55 @@ The MSIX package bundles the Host EXE, PowerShell runtime, and engine files.
 .\installers\win-msix\build.ps1 -SkipPwsh
 ```
 
-**Output:** `installers/win-msix/output/MarkdownViewer_1.0.0.0_x64.msix`
+#### Multi-Architecture Builds
+
+```powershell
+# Build both x64 and ARM64 packages
+.\installers\win-msix\build.ps1 -BuildAll
+
+# Build both architectures and create bundle (.msixbundle)
+.\installers\win-msix\build.ps1 -Bundle
+
+# Build with downloaded pinned PowerShell version (recommended for production)
+.\installers\win-msix\build.ps1 -BuildAll -DownloadPwsh
+
+# Full production build: both architectures, bundle, pinned pwsh, signed
+.\installers\win-msix\build.ps1 -Bundle -DownloadPwsh -Sign
+```
+
+#### Build Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `-Configuration` | `Debug` or `Release` (default: Release) |
+| `-Architecture` | `x64` or `arm64` (default: x64, ignored with -BuildAll) |
+| `-Version` | Package version (default: 1.0.0.0) |
+| `-PwshZipPath` | Path to PowerShell zip (optional, overrides download) |
+| `-SkipBuild` | Don't rebuild Host EXE |
+| `-SkipPwsh` | Don't bundle PowerShell runtime |
+| `-BuildAll` | Build both x64 and ARM64 packages |
+| `-Bundle` | Create .msixbundle (implies -BuildAll) |
+| `-Sign` | Sign package(s) after build using sign.ps1 |
+| `-DownloadPwsh` | Download pinned PowerShell version instead of using system pwsh |
+
+**Output files:**
+- Single arch: `installers/win-msix/output/MarkdownViewer_<version>_<arch>.msix`
+- Bundle: `installers/win-msix/output/MarkdownViewer_<version>.msixbundle`
+
+#### Pinned PowerShell Download
+
+The `-DownloadPwsh` switch downloads a specific, pinned version of PowerShell from GitHub releases with SHA256 verification. This ensures:
+- Reproducible builds across machines
+- Correct architecture-specific runtime for each package
+- Known-good PowerShell version
+
+The pinned version is configured in `installers/win-msix/pwsh-versions.json`. To update the pinned version:
+
+1. Edit `pwsh-versions.json` with new version and URLs
+2. Get SHA256 hashes from the GitHub release page
+3. Update the `sha256` values in the config file
+
+Downloads are cached in `%TEMP%\MarkdownViewer-BuildCache`.
 
 **Prerequisites for MSIX:**
 - Windows 10 SDK installed (provides `makeappx.exe`)
@@ -194,20 +244,69 @@ The MSIX package bundles the Host EXE, PowerShell runtime, and engine files.
   - Create PNG assets in `installers/win-msix/Package/Assets/`
   - Or install ImageMagick (the script will generate assets from the ICO)
 
+### Signing MSIX Packages
+
+The MSIX is unsigned by default, so you need to sign it for installation outside Developer Mode.
+
+#### Using sign.ps1 (Recommended)
+
+The `sign.ps1` script automates certificate creation and signing:
+
+```powershell
+# Create certificate and sign a package (interactive, will prompt)
+.\installers\win-msix\sign.ps1 -MsixPath ".\output\MarkdownViewer_1.0.0.0_x64.msix" -Sign
+
+# Use existing certificate
+.\installers\win-msix\sign.ps1 -MsixPath ".\output\MarkdownViewer_1.0.0.0_x64.msix" -Sign -CertSubject "CN=MyExisting"
+
+# Create certificate only (to be used later)
+.\installers\win-msix\sign.ps1 -CreateCertOnly
+```
+
+The script will:
+1. Check for existing certificate or create a new self-signed one
+2. Add the certificate to Trusted People store (requires elevation on first run)
+3. Sign the MSIX package
+
+#### sign.ps1 Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `-MsixPath` | Path to MSIX file to sign |
+| `-Sign` | Actually perform signing |
+| `-CertSubject` | Certificate subject (default: CN=MarkdownViewerDev) |
+| `-CreateCertOnly` | Only create certificate, don't sign |
+
+#### Manual Signing
+
+If you prefer manual control:
+
+```powershell
+# Create self-signed cert
+$cert = New-SelfSignedCertificate -Type Custom -Subject "CN=MarkdownViewer" -KeyUsage DigitalSignature -FriendlyName "MarkdownViewer Dev" -CertStoreLocation "Cert:\CurrentUser\My"
+
+# Export and trust (one-time)
+$pwd = ConvertTo-SecureString -String "temp123" -Force -AsPlainText
+Export-PfxCertificate -Cert $cert -FilePath "dev.pfx" -Password $pwd
+Import-PfxCertificate -FilePath "dev.pfx" -CertStoreLocation Cert:\LocalMachine\TrustedPeople -Password $pwd
+
+# Sign the package
+& "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /fd SHA256 /sha1 $cert.Thumbprint "installers\win-msix\output\MarkdownViewer_1.0.0.0_x64.msix"
+```
+
 ### Installing the MSIX (Sideload)
 
-The MSIX is unsigned, so you need either:
+The MSIX is unsigned by default, so you need either:
 
 1. **Developer Mode** (Settings > For Developers > Developer Mode)
    - Then double-click the .msix file
 
-2. **Self-signed certificate** (for testing):
+2. **Signed package** using sign.ps1:
    ```powershell
-   # Create self-signed cert
-   $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=MarkdownViewer" -KeyUsage DigitalSignature -FriendlyName "MarkdownViewer Dev" -CertStoreLocation "Cert:\CurrentUser\My"
+   # Build and sign in one step
+   .\installers\win-msix\build.ps1 -Sign
    
-   # Sign the package
-   & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /fd SHA256 /a /f cert.pfx /p password "installers\win-msix\output\MarkdownViewer_1.0.0.0_x64.msix"
+   # Then double-click the .msix file
    ```
 
 ## Debugging

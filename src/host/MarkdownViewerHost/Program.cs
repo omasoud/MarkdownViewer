@@ -7,6 +7,7 @@
 // - Protocol activation: The full protocol URI (mdview:file:///...)
 
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace MarkdownViewerHost;
 
@@ -16,6 +17,17 @@ namespace MarkdownViewerHost;
 /// </summary>
 internal static class Program
 {
+    // P/Invoke for MessageBox (Windows GUI without WinForms/WPF dependency)
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern int MessageBoxW(IntPtr hWnd, string text, string caption, uint type);
+
+    // MessageBox constants
+    private const uint MB_OK = 0x00000000;
+    private const uint MB_OKCANCEL = 0x00000001;
+    private const uint MB_ICONINFORMATION = 0x00000040;
+    private const int IDOK = 1;
+    private const int IDCANCEL = 2;
+
     [STAThread]
     static void Main(string[] args)
     {
@@ -34,12 +46,61 @@ internal static class Program
                     }
                 }
             }
-            // No arguments - nothing to do, exit silently
+            else
+            {
+                // No arguments - launched from Start Menu or shortcut
+                // Show help dialog explaining how to use the app
+                ShowHelpDialog();
+            }
         }
         catch
         {
             // Exit silently on any error - Engine owns error presentation
             // Host must not show duplicate dialogs
+        }
+    }
+
+    /// <summary>
+    /// Show a help dialog when the app is launched without any file/protocol activation.
+    /// This guides the user to set Markdown Viewer as the default app for .md files.
+    /// </summary>
+    private static void ShowHelpDialog()
+    {
+        const string message = 
+            "Markdown Viewer renders .md and .markdown files in your browser.\n\n" +
+            "To use Markdown Viewer:\n" +
+            "• Right-click a .md file → Open with → Markdown Viewer\n" +
+            "• Set as default: Click OK to open Default Apps settings\n\n" +
+            "Once set as default, double-click any Markdown file to view it.";
+
+        const string caption = "Markdown Viewer";
+
+        int result = MessageBoxW(IntPtr.Zero, message, caption, MB_OKCANCEL | MB_ICONINFORMATION);
+
+        if (result == IDOK)
+        {
+            // Open Windows Default Apps settings
+            OpenDefaultAppsSettings();
+        }
+    }
+
+    /// <summary>
+    /// Open Windows Settings to the Default Apps page.
+    /// </summary>
+    private static void OpenDefaultAppsSettings()
+    {
+        try
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "ms-settings:defaultapps",
+                UseShellExecute = true
+            };
+            Process.Start(startInfo);
+        }
+        catch
+        {
+            // If settings fails to open, just exit silently
         }
     }
 

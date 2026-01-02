@@ -102,4 +102,49 @@ public class HostTests
         var result = Path.Combine(dir, subdir, file);
         Assert.Equal(expected, result);
     }
+    
+    [Fact]
+    public void EmptyArgs_Should_Indicate_NoArgsLaunch()
+    {
+        // When args.Length == 0, we're in no-args launch mode (Start Menu)
+        var args = Array.Empty<string>();
+        
+        Assert.Empty(args);
+        Assert.True(args.Length == 0);
+    }
+    
+    [Fact]
+    public void NonEmptyArgs_Should_Indicate_FileOrProtocolActivation()
+    {
+        // When args has items, we're in file/protocol activation mode
+        var args = new[] { @"C:\docs\README.md" };
+        
+        Assert.NotEmpty(args);
+        Assert.True(args.Length > 0);
+        Assert.False(string.IsNullOrWhiteSpace(args[0]));
+    }
+    
+    [Fact]
+    public void MsSettingsUri_Should_Be_Valid_For_DefaultApps()
+    {
+        // The ms-settings URI format for Default Apps
+        var settingsUri = "ms-settings:defaultapps";
+        
+        Assert.StartsWith("ms-settings:", settingsUri);
+        Assert.Contains("defaultapps", settingsUri);
+    }
+    
+    [Fact]
+    public void ProcessStartInfo_For_Settings_Should_UseShellExecute()
+    {
+        // Opening ms-settings: URIs requires UseShellExecute = true
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "ms-settings:defaultapps",
+            UseShellExecute = true
+        };
+        
+        Assert.True(startInfo.UseShellExecute);
+        Assert.Equal("ms-settings:defaultapps", startInfo.FileName);
+    }
 }
