@@ -623,3 +623,271 @@ This phase addresses feedback from the MSIX packaging review and implements the 
 6. PowerShell version is pinned with hash verification
 7. Documentation covers all new features
 8. All unit tests pass
+
+---
+
+# Phase D: MSBuild-Driven WAP Packaging Pipeline
+
+## Overview
+
+This phase replaces the current `build.ps1`-based packaging with a proper MSBuild-driven pipeline using a Windows Application Packaging Project (WAP). The WAP project becomes the authoritative packager, with a `stage.ps1` script handling file composition.
+
+**Key Documents:**
+- [msix-staging-wap-msbuild-packaging.md](msix-staging-wap-msbuild-packaging.md) - Detailed design specification
+
+**Goals:**
+1. Single build entrypoint: `msbuild MarkdownViewer.wapproj` produces MSIX
+2. No manual staging: MSBuild invokes `stage.ps1` automatically
+3. Deterministic layout: Host EXE + engine + pwsh + assets always in correct locations
+4. Deterministic runtime: Pinned pwsh downloaded and verified
+5. Deterministic assets: Generated from ICO and satisfy manifest references
+6. Automated signing: Dev build can produce signed MSIX
+
+---
+
+## D.1 Repository Structure Updates
+
+**Goal:** Reorganize `installers/win-msix/` to match the target layout.
+
+### D.1.1 Rename and Reorganize Files
+
+- [x] D.1.1.1 Rename `WapProjTemplate1.wapproj` → `MarkdownViewer.wapproj`
+- [x] D.1.1.2 Create `build/` subdirectory for staging infrastructure
+- [x] D.1.1.3 Move pwsh download logic to `build/stage.ps1`
+- [x] D.1.1.4 Move `pwsh-versions.json` to `build/pwsh-versions.json`
+- [x] D.1.1.5 Rename `Images/` → `Assets/` to match manifest references
+- [x] D.1.1.6 Update manifest to reference `Assets\` instead of `Images\`
+
+### D.1.2 Update Solution File
+
+- [x] D.1.2.1 Add WAP project to `MarkdownViewer.slnx` with correct Type GUID
+- [x] D.1.2.2 Ensure solution builds host EXE before WAP project
+
+---
+
+## D.2 Create Staging Script
+
+**Goal:** Create `build/stage.ps1` as the authoritative file composition script.
+
+**File:** `installers/win-msix/build/stage.ps1`
+
+### D.2.1 Script Parameters
+
+- [x] D.2.1.1 `-Configuration` (Debug/Release)
+- [x] D.2.1.2 `-Platform` (x64/ARM64)
+- [x] D.2.1.3 `-HostOutputDir` (path to host build output)
+- [x] D.2.1.4 `-CoreDir` (path to src/core)
+- [x] D.2.1.5 `-StagingDir` (output directory for staged files)
+- [x] D.2.1.6 `-SkipPwsh` (skip pwsh bundling for dev)
+
+### D.2.2 Staging Operations
+
+- [x] D.2.2.1 **Clean staging directory** - Remove stale files
+- [x] D.2.2.2 **Copy host output** - `MarkdownViewerHost.exe` + deps to staging root
+- [x] D.2.2.3 **Copy engine payload** to `app\`:
+  - `Open-Markdown.ps1`
+  - `script.js`
+  - `style.css`
+  - `highlight.min.js`
+  - `highlight-theme.css`
+  - `icons/` directory
+- [x] D.2.2.4 **Download/unpack pwsh** to `pwsh\`:
+  - Use pinned version from `pwsh-versions.json`
+  - Verify SHA256 hash
+  - Skip if `-SkipPwsh` specified
+- [x] D.2.2.5 **Generate MSIX assets** to `Assets\`:
+  - Use ImageMagick if available
+  - Generate all required PNG sizes from ICO
+  - Skip generation if assets already exist (unless forced)
+
+### D.2.3 Validation
+
+- [x] D.2.3.1 Verify `MarkdownViewerHost.exe` exists in staging root
+- [x] D.2.3.2 Verify `app\Open-Markdown.ps1` exists
+- [x] D.2.3.3 Verify `pwsh\pwsh.exe` exists (unless `-SkipPwsh`)
+- [x] D.2.3.4 Verify all manifest-referenced assets exist
+- [x] D.2.3.5 Fail build if any required file is missing
+
+---
+
+## D.3 Create MSBuild Integration
+
+**Goal:** Wire `stage.ps1` into the WAP build via MSBuild targets.
+
+### D.3.1 Create Directory.Build.targets
+
+**File:** `installers/win-msix/build/Directory.Build.targets`
+
+- [x] D.3.1.1 Define `<StagingOutputDir>` property (e.g., `$(IntermediateOutputPath)Staging\`)
+- [x] D.3.1.2 Define `<StagePayload>` target that runs before packaging
+- [x] D.3.1.3 Invoke `pwsh -File stage.ps1` with correct parameters:
+  - Pass `$(Configuration)`, `$(Platform)`
+  - Pass host output directory
+  - Pass core payload directory
+  - Pass staging output directory
+- [x] D.3.1.4 Set target dependencies so staging runs after host build
+
+### D.3.2 Update WAP Project
+
+**File:** `installers/win-msix/MarkdownViewer.wapproj`
+
+- [x] D.3.2.1 Add project reference to `MarkdownViewerHost.csproj`
+- [x] D.3.2.2 Configure to package from staging directory
+- [x] D.3.2.3 Import `build/Directory.Build.targets`
+- [x] D.3.2.4 Remove hardcoded asset `<Content>` items (will come from staging)
+- [x] D.3.2.5 Add dynamic `<Content>` items from staged payload
+
+---
+
+## D.4 Update Manifest and Assets
+
+**Goal:** Ensure manifest correctly references staged assets and host executable.
+
+### D.4.1 Update Package.appxmanifest
+
+- [x] D.4.1.1 Verify `Executable="MarkdownViewerHost.exe"` is correct
+- [x] D.4.1.2 Update asset references to use `Assets\` (not `Images\`)
+- [x] D.4.1.3 Ensure `ProcessorArchitecture` is handled per-build (or use neutral)
+
+### D.4.2 Asset Generation
+
+- [x] D.4.2.1 Generate required PNGs:
+  - `Square44x44Logo.png` (44x44)
+  - `Square150x150Logo.png` (150x150)
+  - `Wide310x150Logo.png` (310x150)
+  - `StoreLogo.png` (50x50)
+- [ ] D.4.2.2 Optionally generate scale variants (scale-125, scale-150, scale-200)
+- [x] D.4.2.3 Support transparent backgrounds
+
+---
+
+## D.5 Signing Integration
+
+**Goal:** Integrate dev signing into the WAP build.
+
+### D.5.1 Add Post-Build Signing Target
+
+- [x] D.5.1.1 Add `<SignPackage>` target that runs after packaging
+- [x] D.5.1.2 Invoke `sign.ps1` to sign produced MSIX
+- [x] D.5.1.3 Make signing conditional on `$(SignMsix)` property
+- [ ] D.5.1.4 Document how to build signed: `msbuild /p:SignMsix=true`
+
+---
+
+## D.6 Bundle Support
+
+**Goal:** Support creating MSIX bundle from x64 + ARM64 packages.
+
+### D.6.1 Add Bundle Target
+
+- [ ] D.6.1.1 Add `<CreateBundle>` target that runs after both arch builds
+- [ ] D.6.1.2 Use `makeappx bundle` to combine packages
+- [ ] D.6.1.3 Output to `output/MarkdownViewer_<version>.msixbundle`
+- [ ] D.6.1.4 Document bundle build workflow
+
+> **Note:** Bundle creation deferred - can be done manually or via build.ps1 until WAP-native bundle support is added.
+
+---
+
+## D.7 Remove Legacy build.ps1
+
+**Goal:** Remove `build.ps1` once the new pipeline is validated.
+
+**Prerequisite:** Visual Studio with "Windows Application Packaging Project" workload installed (provides DesktopBridge SDK).
+
+### D.7.1 Validation Checklist
+
+- [ ] D.7.1.1 WAP build produces x64 MSIX
+- [ ] D.7.1.2 WAP build produces ARM64 MSIX
+- [ ] D.7.1.3 Signed MSIX installs and runs
+- [ ] D.7.1.4 File activation works
+- [ ] D.7.1.5 Protocol activation works
+- [ ] D.7.1.6 No-args launch shows help dialog
+- [ ] D.7.1.7 All tests pass
+
+### D.7.2 Cleanup
+
+- [ ] D.7.2.1 Delete `build.ps1` from `installers/win-msix/`
+- [ ] D.7.2.2 Update documentation to reference WAP build
+- [ ] D.7.2.3 Update CI/CD scripts if any
+
+---
+
+## D.8 Documentation Updates
+
+**Goal:** Document the new build pipeline.
+
+### D.8.1 Developer Guide Updates
+
+- [ ] D.8.1.1 Document MSBuild build commands:
+  - `msbuild MarkdownViewer.wapproj /p:Platform=x64 /p:Configuration=Release`
+  - `msbuild MarkdownViewer.wapproj /p:Platform=ARM64 /p:Configuration=Release`
+- [ ] D.8.1.2 Document signing: `/p:SignMsix=true`
+- [ ] D.8.1.3 Document bundle creation workflow
+- [ ] D.8.1.4 Document staging script for advanced scenarios
+
+### D.8.2 Update README
+
+- [ ] D.8.2.1 Update MSIX build instructions for WAP project
+- [ ] D.8.2.2 Remove references to build.ps1
+
+---
+
+## D.9 Unit Tests
+
+**Goal:** Test the staging script.
+
+### D.9.1 Staging Script Tests
+
+**File:** `tests/pwsh/Stage.Tests.ps1`
+
+- [x] D.9.1.1 Test: Staging creates correct directory structure
+- [x] D.9.1.2 Test: Host EXE is copied to staging root
+- [x] D.9.1.3 Test: Engine files are copied to `app\`
+- [x] D.9.1.4 Test: Pwsh is downloaded and extracted to `pwsh\`
+- [x] D.9.1.5 Test: SHA256 verification rejects bad hashes
+- [x] D.9.1.6 Test: Validation fails if required files missing
+- [x] D.9.1.7 Test: `-SkipPwsh` skips pwsh bundling
+
+> **Note:** 52 tests created in Stage.Tests.ps1 covering script structure, parameters, functions, staging logic, asset generation, validation, and Directory.Build.targets.
+
+---
+
+## Implementation Order
+
+1. **D.1** (Repo Structure) - ✅ Complete
+2. **D.2** (Staging Script) - ✅ Complete
+3. **D.3** (MSBuild Integration) - ✅ Complete
+4. **D.4** (Manifest/Assets) - ✅ Complete
+5. **D.5** (Signing) - ✅ Complete
+6. **D.6** (Bundle) - Deferred (use build.ps1 for now)
+7. **D.9** (Tests) - ✅ Complete (52 tests)
+8. **D.7** (Remove build.ps1) - Pending (needs DesktopBridge workload)
+9. **D.8** (Documentation) - Pending
+
+---
+
+## Success Criteria (Phase D)
+
+1. `msbuild MarkdownViewer.wapproj` produces MSIX without manual steps - **Pending** (needs DesktopBridge)
+2. Staging runs automatically as part of build - ✅ Configured in Directory.Build.targets
+3. Both x64 and ARM64 packages build successfully - **Pending**
+4. Signed packages install and run correctly - **Pending**
+5. Bundle creation works - Deferred to build.ps1
+6. `build.ps1` is removed - **Pending** (keep as fallback until WAP validated)
+7. All tests pass - ✅ 255 Pester + 20 xUnit = 275 tests passing
+8. Documentation is updated - **Pending**
+
+---
+
+## Prerequisites for WAP Build
+
+To build the WAP project, you need Visual Studio with the **Windows Application Packaging Project** workload installed:
+
+1. Open Visual Studio Installer
+2. Select "Modify" on your VS installation
+3. Under "Individual components", search for and install:
+   - "MSIX Packaging Tools" (or "Windows 10 SDK" with Desktop Bridge)
+   - The DesktopBridge SDK provides `Microsoft.DesktopBridge.props` and `.targets`
+
+Alternatively, use `build.ps1` which uses `makeappx.exe` directly without requiring the WAP SDK.

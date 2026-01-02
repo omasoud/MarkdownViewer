@@ -1,8 +1,7 @@
 <Solution>
   <Configurations>
-    <Platform Name="Any CPU" />
     <Platform Name="x64" />
-    <Platform Name="x86" />
+    <Platform Name="ARM64" />
   </Configurations>
   <Folder Name="/src/" />
   <Folder Name="/src/host/">
@@ -10,5 +9,13 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/MarkdownViewerHost.Tests/MarkdownViewerHost.Tests.csproj" />
+  </Folder>
+  <Folder Name="/installers/">
+    <Project Path="installers/win-msix/MarkdownViewer.wapproj" Type="c7167f0d-bc9f-4e6e-afe1-012c56b48db5" Id="f05a6ab0-6789-462f-9ca7-3ee5009cf0d3">
+      <Deploy />
+    </Project>
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="src/core/icons/markdown.ico" />
   </Folder>
 </Solution>

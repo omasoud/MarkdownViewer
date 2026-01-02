@@ -140,6 +140,12 @@ function Sign-MsixPackage {
     Write-Host "  Using signtool: $signtool"
     
     # Sign with SHA256
+    Write-Host "  Signing with SHA256..." -ForegroundColor Yellow
+    Write-Host "  File: $PackagePath" -ForegroundColor Yellow
+    Write-Host "  Certificate Thumbprint: $($Certificate.Thumbprint)" -ForegroundColor Yellow
+    Write-Host "  Signing tool: $signtool" -ForegroundColor Yellow
+    Write-Host "  Command: & $signtool sign /fd SHA256 /sha1 $($Certificate.Thumbprint) /td SHA256 $PackagePath" -ForegroundColor Yellow
+    Write-Host "  Executing command..." -ForegroundColor Yellow
     & $signtool sign /fd SHA256 /sha1 $Certificate.Thumbprint /td SHA256 $PackagePath
     
     if ($LASTEXITCODE -eq 0) {

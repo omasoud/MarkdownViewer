@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Directory.Build.targets - Wires stage.ps1 into the WAP build -->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!-- Define staging paths -->
+  <PropertyGroup>
+    <StagingOutputDir>$(MSBuildProjectDirectory)\obj\Staging\$(Platform)\$(Configuration)\</StagingOutputDir>
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..\'))</RepoRoot>
+    <HostProjectDir>$(RepoRoot)src\host\MarkdownViewerHost\</HostProjectDir>
+    <CoreDir>$(RepoRoot)src\core\</CoreDir>
+    <WinDir>$(RepoRoot)src\win\</WinDir>
+    <StageScriptPath>$(MSBuildProjectDirectory)\build\stage.ps1</StageScriptPath>
+    
+    <!-- Control staging behavior -->
+    <SkipPwsh Condition="'$(SkipPwsh)' == ''">false</SkipPwsh>
+    <ForceRegenAssets Condition="'$(ForceRegenAssets)' == ''">false</ForceRegenAssets>
+  </PropertyGroup>
+
+  <!-- Calculate host output directory based on platform -->
+  <PropertyGroup>
+    <HostRuntimeIdentifier>win-$(Platform.ToLower())</HostRuntimeIdentifier>
+    <HostOutputDir>$(HostProjectDir)bin\$(Configuration)\net10.0-windows10.0.19041.0\$(HostRuntimeIdentifier)\publish\</HostOutputDir>
+  </PropertyGroup>
+
+  <!-- Target: Build the host EXE before staging -->
+  <Target Name="BuildHostProject" BeforeTargets="StagePayload">
+    <Message Text="Building MarkdownViewerHost for $(Platform)..." Importance="high" />
+    <Exec Command="dotnet publish &quot;$(HostProjectDir)MarkdownViewerHost.csproj&quot; -c $(Configuration) -r $(HostRuntimeIdentifier) --self-contained false -o &quot;$(HostOutputDir)&quot;"
+          WorkingDirectory="$(HostProjectDir)"
+          ConsoleToMsBuild="true" />
+  </Target>
+
+  <!-- Target: Stage payload before packaging -->
+  <Target Name="StagePayload" BeforeTargets="PrepareForBuild;_GenerateAppxPackageFile">
+    <Message Text="Staging MSIX payload for $(Platform) $(Configuration)..." Importance="high" />
+    
+    <!-- Strip trailing backslashes from paths to avoid PowerShell escaping issues -->
+    <PropertyGroup>
+      <HostOutputDirClean>$([System.String]::Copy('$(HostOutputDir)').TrimEnd('\'))</HostOutputDirClean>
+      <CoreDirClean>$([System.String]::Copy('$(CoreDir)').TrimEnd('\'))</CoreDirClean>
+      <StagingOutputDirClean>$([System.String]::Copy('$(StagingOutputDir)').TrimEnd('\'))</StagingOutputDirClean>
+      <WinDirClean>$([System.String]::Copy('$(WinDir)').TrimEnd('\'))</WinDirClean>
+    </PropertyGroup>
+    
+    <!-- Build stage.ps1 arguments -->
+    <PropertyGroup>
+      <StageArgs>-Configuration $(Configuration) -Platform $(Platform)</StageArgs>
+      <StageArgs>$(StageArgs) -HostOutputDir "$(HostOutputDirClean)"</StageArgs>
+      <StageArgs>$(StageArgs) -CoreDir "$(CoreDirClean)"</StageArgs>
+      <StageArgs>$(StageArgs) -StagingDir "$(StagingOutputDirClean)"</StageArgs>
+      <StageArgs>$(StageArgs) -WinDir "$(WinDirClean)"</StageArgs>
+      <StageArgs Condition="'$(SkipPwsh)' == 'true'">$(StageArgs) -SkipPwsh</StageArgs>
+      <StageArgs Condition="'$(ForceRegenAssets)' == 'true'">$(StageArgs) -ForceRegenAssets</StageArgs>
+    </PropertyGroup>
+    
+    <Message Text="Running: pwsh -File &quot;$(StageScriptPath)&quot; $(StageArgs)" Importance="normal" />
+    
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(StageScriptPath)&quot; $(StageArgs)"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
+          ConsoleToMsBuild="true" />
+  </Target>
+
+  <!-- Include staged content in the package -->
+  <ItemGroup>
+    <!-- Host EXE and dependencies -->
+    <Content Include="$(StagingOutputDir)MarkdownViewerHost.exe" Link="MarkdownViewerHost.exe" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(StagingOutputDir)MarkdownViewerHost.dll" Link="MarkdownViewerHost.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(StagingOutputDir)MarkdownViewerHost.dll')" />
+    <Content Include="$(StagingOutputDir)MarkdownViewerHost.runtimeconfig.json" Link="MarkdownViewerHost.runtimeconfig.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(StagingOutputDir)MarkdownViewerHost.runtimeconfig.json')" />
+    <Content Include="$(StagingOutputDir)MarkdownViewerHost.deps.json" Link="MarkdownViewerHost.deps.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(StagingOutputDir)MarkdownViewerHost.deps.json')" />
+    
+    <!-- Engine payload in app\ -->
+    <Content Include="$(StagingOutputDir)app\**\*" Link="app\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    
+    <!-- Bundled pwsh in pwsh\ -->
+    <Content Include="$(StagingOutputDir)pwsh\**\*" Link="pwsh\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(StagingOutputDir)pwsh\')" />
+    
+    <!-- Generated assets -->
+    <Content Include="$(StagingOutputDir)Assets\**\*" Link="Assets\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Optional: Sign MSIX after build -->
+  <Target Name="SignMsixPackage" AfterTargets="Build" Condition="'$(SignMsix)' == 'true'">
+    <PropertyGroup>
+      <SignScriptPath>$(MSBuildProjectDirectory)\sign.ps1</SignScriptPath>
+      <MsixOutputPath>$(OutDir)$(PackageName)_$(PackageVersion)_$(Platform).msix</MsixOutputPath>
+    </PropertyGroup>
+    
+    <Message Text="Signing MSIX package..." Importance="high" />
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(SignScriptPath)&quot; -MsixPath &quot;$(MsixOutputPath)&quot;"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
+          ConsoleToMsBuild="true"
+          Condition="Exists('$(SignScriptPath)')" />
+  </Target>
+
+</Project>

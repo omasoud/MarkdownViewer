@@ -6,7 +6,8 @@
 BeforeAll {
     $ScriptRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $MsixDir = Join-Path $ScriptRoot 'installers\win-msix'
-    $PwshVersionsPath = Join-Path $MsixDir 'pwsh-versions.json'
+    $BuildDir = Join-Path $MsixDir 'build'
+    $PwshVersionsPath = Join-Path $BuildDir 'pwsh-versions.json'
 }
 
 Describe 'pwsh-versions.json Configuration' {

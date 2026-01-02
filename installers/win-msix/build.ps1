@@ -38,7 +38,7 @@ $RepoRoot = Split-Path -Parent (Split-Path -Parent $ScriptRoot)
 $HostProjectDir = Join-Path $RepoRoot 'src\host\MarkdownViewerHost'
 $CoreDir = Join-Path $RepoRoot 'src\core'
 $WinDir = Join-Path $RepoRoot 'src\win'
-$PackageDir = Join-Path $ScriptRoot 'Package'
+$ManifestPath = Join-Path $ScriptRoot 'Package.appxmanifest'
 $OutputDir = Join-Path $ScriptRoot 'output'
 
 # Find makeappx.exe
@@ -72,7 +72,7 @@ function Get-PwshRuntime {
         [string]$Arch
     )
     
-    $configPath = Join-Path $ScriptRoot 'pwsh-versions.json'
+    $configPath = Join-Path $ScriptRoot 'build\pwsh-versions.json'
     if (-not (Test-Path $configPath)) {
         Write-Warning "pwsh-versions.json not found at: $configPath"
         return $null
@@ -267,7 +267,7 @@ function Build-SingleArchMsix {
     
     # Copy/generate assets
     Write-Host "Preparing MSIX assets..." -ForegroundColor Yellow
-    $sourceAssets = Join-Path $PackageDir 'Assets'
+    # Assets are generated from ICO on-demand; no pre-made source assets folder needed
     $requiredAssets = @(
         @{ Name = 'StoreLogo.png'; Width = 50; Height = 50 },
         @{ Name = 'Square44x44Logo.png'; Width = 44; Height = 44 },
@@ -275,23 +275,20 @@ function Build-SingleArchMsix {
         @{ Name = 'Wide310x150Logo.png'; Width = 310; Height = 150 }
     )
     
+    # Determine which assets need to be generated
     $assetsToGenerate = @()
     foreach ($asset in $requiredAssets) {
-        $sourcePath = Join-Path $sourceAssets $asset.Name
         $destPath = Join-Path $assetsDir $asset.Name
         
         if ($ForceRegenAssets) {
-            # Force regeneration - add to generation list
+            # Force regeneration
             $assetsToGenerate += $asset
         }
-        elseif (Test-Path $sourcePath) {
-            # Use existing pre-made asset
-            Copy-Item $sourcePath $destPath -Force
-        }
-        else {
-            # Asset missing - add to generation list
+        elseif (-not (Test-Path $destPath)) {
+            # Asset missing in staging directory
             $assetsToGenerate += $asset
         }
+        # else: asset already exists in staging, skip
     }
     
     # Generate assets (missing or forced)
@@ -326,7 +323,7 @@ function Build-SingleArchMsix {
     
     # Prepare manifest
     Write-Host "Preparing AppxManifest.xml..." -ForegroundColor Yellow
-    $manifestSource = Join-Path $PackageDir 'AppxManifest.xml'
+    $manifestSource = $ManifestPath
     $manifestDest = Join-Path $archStageDir 'AppxManifest.xml'
     
     $manifest = Get-Content $manifestSource -Raw
