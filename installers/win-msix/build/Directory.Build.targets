@@ -70,26 +70,40 @@
     
     <!-- Engine payload in app\ -->
     <Content Include="$(StagingOutputDir)app\**\*" Link="app\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    
-    <!-- Bundled pwsh in pwsh\ -->
-    <Content Include="$(StagingOutputDir)pwsh\**\*" Link="pwsh\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(StagingOutputDir)pwsh\')" />
+
+    <!-- NOTE: Assets and pwsh\ content are included dynamically in IncludeStagedAssets target below -->
   </ItemGroup>
   
-  <!-- Generated assets must be included dynamically after staging -->
-  <Target Name="IncludeStagedAssets" AfterTargets="StagePayload" BeforeTargets="_GenerateAppxPackageFile">
+  <!-- Assets and pwsh must be included dynamically after staging since they don't exist initially -->
+  <!-- Use CreateItem to avoid ItemGroup accumulation across multiple target invocations -->
+  <Target Name="IncludeStagedAssets" AfterTargets="StagePayload" BeforeTargets="_GenerateAppxPackageFile"
+          Condition="Exists('$(StagingOutputDir)pwsh\pwsh.exe')">
+    <!-- Assets -->
     <ItemGroup>
-      <Content Include="$(StagingOutputDir)Assets\StoreLogo.png" Link="Assets\StoreLogo.png" CopyToOutputDirectory="PreserveNewest" />
-      <Content Include="$(StagingOutputDir)Assets\Square44x44Logo.png" Link="Assets\Square44x44Logo.png" CopyToOutputDirectory="PreserveNewest" />
-      <Content Include="$(StagingOutputDir)Assets\Square150x150Logo.png" Link="Assets\Square150x150Logo.png" CopyToOutputDirectory="PreserveNewest" />
-      <Content Include="$(StagingOutputDir)Assets\Wide310x150Logo.png" Link="Assets\Wide310x150Logo.png" CopyToOutputDirectory="PreserveNewest" />
+      <_AssetFiles Include="$(StagingOutputDir)Assets\*.png" />
     </ItemGroup>
+    <CreateItem Include="@(_AssetFiles)"
+                AdditionalMetadata="Link=Assets\%(_AssetFiles.Filename)%(_AssetFiles.Extension);CopyToOutputDirectory=PreserveNewest">
+      <Output TaskParameter="Include" ItemName="Content" />
+    </CreateItem>
+    <!-- pwsh -->
+    <ItemGroup>
+      <_PwshFiles Include="$(StagingOutputDir)pwsh\**\*" />
+    </ItemGroup>
+    <CreateItem Include="@(_PwshFiles)"
+                AdditionalMetadata="Link=pwsh\%(_PwshFiles.RecursiveDir)%(_PwshFiles.Filename)%(_PwshFiles.Extension);CopyToOutputDirectory=PreserveNewest">
+      <Output TaskParameter="Include" ItemName="Content" />
+    </CreateItem>
   </Target>
 
-  <!-- Clean staging and output directories -->
-  <Target Name="CleanStagingAndOutput" AfterTargets="Clean">
+  <!-- Clean staging and output directories - runs independently, no host project dependencies -->
+  <Target Name="CleanStagingAndOutput" BeforeTargets="Clean">
     <Message Text="Cleaning staging and output directories..." Importance="high" />
     <RemoveDir Directories="$(MSBuildProjectDirectory)\obj\Staging" Condition="Exists('$(MSBuildProjectDirectory)\obj\Staging')" />
     <RemoveDir Directories="$(MSBuildProjectDirectory)\output" Condition="Exists('$(MSBuildProjectDirectory)\output')" />
+    <RemoveDir Directories="$(MSBuildProjectDirectory)\bin" Condition="Exists('$(MSBuildProjectDirectory)\bin')" />
+    <RemoveDir Directories="$(MSBuildProjectDirectory)\obj\x64" Condition="Exists('$(MSBuildProjectDirectory)\obj\x64')" />
+    <RemoveDir Directories="$(MSBuildProjectDirectory)\obj\ARM64" Condition="Exists('$(MSBuildProjectDirectory)\obj\ARM64')" />
   </Target>
 
   <!-- Optional: Sign MSIX after build -->

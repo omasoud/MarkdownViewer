@@ -1175,3 +1175,138 @@ Describe 'ConvertFrom-Markdown Anchor ID Mismatch' {
         }
     }
 }
+
+Describe 'MSIX Staged Payload Structure' -Tag 'Integration' {
+    # These tests validate the MSIX staging structure without requiring a full build
+    # Run after staging with: Invoke-Pester -Path .\tests\MarkdownViewer.Tests.ps1 -Tag Integration
+    
+    BeforeAll {
+        # Try to find a staging directory from a recent build
+        $repoRoot = Split-Path $PSScriptRoot -Parent
+        $stagingPaths = @(
+            (Join-Path $repoRoot 'installers\win-msix\obj\Staging\x64\Release'),
+            (Join-Path $repoRoot 'installers\win-msix\obj\Staging\ARM64\Release'),
+            (Join-Path $repoRoot 'installers\win-msix\obj\Staging\x64\Debug'),
+            (Join-Path $repoRoot 'installers\win-msix\obj\Staging\ARM64\Debug')
+        )
+        $script:stagingDir = $stagingPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+        $script:hasStagingDir = $null -ne $script:stagingDir
+        
+        # Pre-compute paths only if staging exists
+        if ($script:hasStagingDir) {
+            $script:appDir = Join-Path $script:stagingDir 'app'
+            $script:assetsDir = Join-Path $script:stagingDir 'Assets'
+            $script:pwshDir = Join-Path $script:stagingDir 'pwsh'
+        }
+    }
+    
+    Context 'Staging directory exists' {
+        It 'has a staging directory from a previous build' -Skip:(-not $script:hasStagingDir) {
+            $script:stagingDir | Should -Not -BeNullOrEmpty
+            Test-Path $script:stagingDir | Should -BeTrue
+        }
+    }
+    
+    Context 'Required host files' -Skip:(-not $script:hasStagingDir) {
+        It 'contains MarkdownViewerHost.exe' {
+            Join-Path $script:stagingDir 'MarkdownViewerHost.exe' | Should -Exist
+        }
+        
+        It 'contains MarkdownViewerHost.runtimeconfig.json' {
+            Join-Path $script:stagingDir 'MarkdownViewerHost.runtimeconfig.json' | Should -Exist
+        }
+        
+        It 'contains MarkdownViewerHost.deps.json' {
+            Join-Path $script:stagingDir 'MarkdownViewerHost.deps.json' | Should -Exist
+        }
+    }
+    
+    Context 'Required app directory structure' -Skip:(-not $script:hasStagingDir) {
+        It 'has app subdirectory' {
+            $script:appDir | Should -Exist
+        }
+        
+        It 'contains Open-Markdown.ps1 engine' {
+            Join-Path $script:appDir 'Open-Markdown.ps1' | Should -Exist
+        }
+        
+        It 'contains MarkdownViewer.psm1 module' {
+            Join-Path $script:appDir 'MarkdownViewer.psm1' | Should -Exist
+        }
+        
+        It 'contains script.js' {
+            Join-Path $script:appDir 'script.js' | Should -Exist
+        }
+        
+        It 'contains style.css' {
+            Join-Path $script:appDir 'style.css' | Should -Exist
+        }
+        
+        It 'contains highlight.min.js' {
+            Join-Path $script:appDir 'highlight.min.js' | Should -Exist
+        }
+        
+        It 'contains highlight-theme.css' {
+            Join-Path $script:appDir 'highlight-theme.css' | Should -Exist
+        }
+        
+        It 'contains icons directory' {
+            Join-Path $script:appDir 'icons' | Should -Exist
+        }
+    }
+    
+    Context 'Required Assets directory' -Skip:(-not $script:hasStagingDir) {
+        It 'has Assets subdirectory' {
+            $script:assetsDir | Should -Exist
+        }
+        
+        It 'contains StoreLogo.png' {
+            Join-Path $script:assetsDir 'StoreLogo.png' | Should -Exist
+        }
+        
+        It 'contains Square44x44Logo.png' {
+            Join-Path $script:assetsDir 'Square44x44Logo.png' | Should -Exist
+        }
+        
+        It 'contains Square150x150Logo.png' {
+            Join-Path $script:assetsDir 'Square150x150Logo.png' | Should -Exist
+        }
+        
+        It 'contains Wide310x150Logo.png' {
+            Join-Path $script:assetsDir 'Wide310x150Logo.png' | Should -Exist
+        }
+    }
+    
+    Context 'Engine can be imported' -Skip:(-not $script:hasStagingDir) {
+        It 'module at app\MarkdownViewer.psm1 imports without error' {
+            $modulePath = Join-Path $script:stagingDir 'app\MarkdownViewer.psm1'
+            if (Test-Path $modulePath) {
+                { Import-Module $modulePath -Force -ErrorAction Stop } | Should -Not -Throw
+                Remove-Module MarkdownViewer -Force -ErrorAction SilentlyContinue
+                # Re-import the original for other tests
+                $originalModule = Join-Path $PSScriptRoot '..\src\win\MarkdownViewer.psm1'
+                Import-Module $originalModule -Force -Global
+            }
+        }
+        
+        It 'engine script has valid PowerShell syntax' {
+            $enginePath = Join-Path $script:stagingDir 'app\Open-Markdown.ps1'
+            if (Test-Path $enginePath) {
+                $errors = $null
+                [System.Management.Automation.Language.Parser]::ParseFile($enginePath, [ref]$null, [ref]$errors)
+                $errors.Count | Should -Be 0
+            }
+        }
+    }
+    
+    Context 'Bundled PowerShell (optional)' -Skip:(-not $script:hasStagingDir) {
+        It 'has pwsh directory or test is skipped' -Skip:(-not $script:hasStagingDir -or -not (Test-Path $script:pwshDir)) {
+            $script:pwshDir | Should -Exist
+        }
+        
+        It 'contains pwsh.exe when pwsh directory exists' -Skip:(-not $script:hasStagingDir -or -not (Test-Path $script:pwshDir)) {
+            Join-Path $script:pwshDir 'pwsh.exe' | Should -Exist
+        }
+    }
+}
+

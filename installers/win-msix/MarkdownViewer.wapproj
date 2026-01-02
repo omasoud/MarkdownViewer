@@ -6,6 +6,12 @@
 -->
 <Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 
+  <!-- Default Configuration and Platform when not specified -->
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+  </PropertyGroup>
+
   <PropertyGroup Condition="'$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '15.0'">
     <VisualStudioVersion>15.0</VisualStudioVersion>
   </PropertyGroup>
@@ -61,6 +67,10 @@
     <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
     <NoWarn>$(NoWarn);NU1702</NoWarn>
     
+    <!-- Suppress PRI263 warnings for pwsh satellite assemblies - they're third-party and not used by our app -->
+    <AppxDefaultResourceQualifiers>Language=en-us</AppxDefaultResourceQualifiers>
+    <AppxGeneratePriEnabled>true</AppxGeneratePriEnabled>
+    
     <!-- Configure package output -->
     <AppxBundle>Never</AppxBundle>
     <UapAppxPackageBuildMode>SideloadOnly</UapAppxPackageBuildMode>
@@ -82,11 +92,16 @@
     </AppxManifest>
   </ItemGroup>
 
-  <!-- Reference the host project as the application entry point -->
+  <!-- 
+    Reference the host project as the application entry point.
+    WAP requires this reference for package manifest generation.
+    We use SkipAssetsCheck because we provide all assets via staging.
+  -->
   <ItemGroup Condition="'$(_DesktopBridgePropsExists)' == 'true'">
     <ProjectReference Include="..\..\src\host\MarkdownViewerHost\MarkdownViewerHost.csproj">
       <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
-      <Properties>EnableMsixTooling=true</Properties>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <ExcludeAssets>all</ExcludeAssets>
     </ProjectReference>
   </ItemGroup>
 

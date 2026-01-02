@@ -148,6 +148,20 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "src\core\Open-Markdown.ps1" -Path
 
 CSS and JS changes take effect immediately when you re-run the engine, since they're inlined into the generated HTML. Just run the engine again on any markdown file.
 
+### Testing the Installed MSIX
+
+After building and installing the MSIX package, you can test file activation:
+
+```powershell
+# Open a markdown file via the registered file association
+Start-Process "C:\path\to\your\file.md"
+
+# Or use the protocol handler
+Start-Process "ms-markdown-viewer:file=C:\path\to\your\file.md"
+```
+
+You can also right-click any `.md` file in Explorer and select "Open with > Markdown Viewer".
+
 ## Creating Installers
 
 ### Ad-hoc Installer (Per-User)
@@ -217,6 +231,22 @@ msbuild .\installers\win-msix\MarkdownViewer.wapproj /p:Platform=x64 /p:Configur
 | `/p:SignMsix=true` | Sign package after build |
 
 **Output:** `installers\win-msix\AppPackages\MarkdownViewer_<version>_<arch>_Test\MarkdownViewer_<version>_<arch>.msix`
+
+**Clean Build:**
+To force a complete rebuild from scratch:
+
+```powershell
+# Clean staging and output directories
+msbuild .\installers\win-msix\MarkdownViewer.wapproj /t:Clean /p:Platform=x64 /p:Configuration=Release
+
+# Then rebuild
+msbuild .\installers\win-msix\MarkdownViewer.wapproj /p:Platform=x64 /p:Configuration=Release
+```
+
+The Clean target removes:
+- `installers\win-msix\output\stage\` - Staged payload files
+- `installers\win-msix\output\*.msix` - Built packages
+- `installers\win-msix\build\*.stamp` - Build timestamps
 
 **Prerequisites for WAP Build:**
 - Visual Studio 2026 with "Windows Application Packaging Project" workload

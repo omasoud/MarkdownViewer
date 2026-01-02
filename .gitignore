@@ -12,3 +12,5 @@ src/core/icons/markdown - Copy*.ico
 **/BundleArtifacts/**
 installers - Copy/*
 preprocessed.xml
+dev/docs/installation-folder-content.txt
+dev/docs/stability-issues.md

@@ -15,6 +15,41 @@ using Windows.ApplicationModel.Activation;
 namespace MarkdownViewerHost;
 
 /// <summary>
+/// Simple file logger for debugging WinExe apps where Console.WriteLine doesn't work.
+/// Logs are written to %TEMP%\MarkdownViewerHost.log
+/// </summary>
+internal static class Logger
+{
+    private static readonly string LogPath = Path.Combine(Path.GetTempPath(), "MarkdownViewerHost.log");
+    private static readonly bool EnableLogging = true; // Set to false in release if desired
+    
+    public static void Log(string message)
+    {
+        if (!EnableLogging) return;
+        try
+        {
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            File.AppendAllText(LogPath, $"[{timestamp}] {message}{Environment.NewLine}");
+        }
+        catch
+        {
+            // Ignore logging failures
+        }
+    }
+    
+    public static void LogException(Exception ex, string context = "")
+    {
+        Log($"EXCEPTION {context}: {ex.GetType().Name}: {ex.Message}");
+        Log($"  StackTrace: {ex.StackTrace}");
+    }
+    
+    public static void Clear()
+    {
+        try { File.Delete(LogPath); } catch { }
+    }
+}
+
+/// <summary>
 /// Entry point for the Markdown Viewer host application.
 /// Handles MSIX activation (file associations, protocol) and launches the PowerShell engine.
 /// </summary>
@@ -23,6 +58,10 @@ internal static class Program
     [STAThread]
     static void Main(string[] args)
     {
+        Logger.Log($"=== MarkdownViewerHost started ===");
+        Logger.Log($"  Args: [{string.Join(", ", args.Select(a => $"\"{a}\""))}]");
+        Logger.Log($"  BaseDirectory: {AppContext.BaseDirectory}");
+        
         // Enable visual styles for TaskDialog
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
@@ -31,6 +70,7 @@ internal static class Program
         {
             // Try to get activation data from AppInstance API (packaged apps)
             var activationHandled = TryHandlePackagedActivation();
+            Logger.Log($"  PackagedActivation handled: {activationHandled}");
 
             if (!activationHandled)
             {
@@ -48,17 +88,19 @@ internal static class Program
                 else
                 {
                     // No arguments - launched from Start Menu or shortcut
+                    Logger.Log("  Showing help dialog (no args)");
                     ShowHelpDialog();
                 }
             }
         }
-        catch (Exception /*ex*/)
+        catch (Exception ex)
         {
+            Logger.LogException(ex, "Main");
             // Exit silently on any error - Engine owns error presentation
             // Host must not show duplicate dialogs
-            // copy exception to clipboard for debugging
-            // Clipboard.SetText(ex.ToString());
         }
+        
+        Logger.Log("=== MarkdownViewerHost exiting ===");
     }
 
     /// <summary>
@@ -71,6 +113,8 @@ internal static class Program
         {
             // This will throw if not running as a packaged app
             var activatedArgs = AppInstance.GetActivatedEventArgs();
+            Logger.Log($"  AppInstance.GetActivatedEventArgs(): Kind={activatedArgs?.Kind}");
+            
             if (activatedArgs == null)
             {
                 return false;
@@ -79,22 +123,27 @@ internal static class Program
             switch (activatedArgs.Kind)
             {
                 case ActivationKind.File:
+                    Logger.Log("  Handling File activation");
                     return HandleFileActivation((FileActivatedEventArgs)activatedArgs);
 
                 case ActivationKind.Protocol:
+                    Logger.Log("  Handling Protocol activation");
                     return HandleProtocolActivation((ProtocolActivatedEventArgs)activatedArgs);
 
                 case ActivationKind.Launch:
                     // Launched without specific activation (e.g., from Start Menu)
                     // Return false to show help dialog via the args.Length == 0 path
+                    Logger.Log("  Launch activation (no file/protocol) - will show help");
                     return false;
 
                 default:
+                    Logger.Log($"  Unhandled activation kind: {activatedArgs.Kind}");
                     return false;
             }
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.Log($"  Not running as packaged app: {ex.Message}");
             // Not running as packaged app, or API not available
             return false;
         }
@@ -107,13 +156,16 @@ internal static class Program
     {
         if (args.Files == null || args.Files.Count == 0)
         {
+            Logger.Log("  FileActivation: No files");
             return false;
         }
 
+        Logger.Log($"  FileActivation: {args.Files.Count} file(s)");
         foreach (var file in args.Files)
         {
             // Get the path from the storage item
             var path = file.Path;
+            Logger.Log($"    File: {path}");
             if (!string.IsNullOrWhiteSpace(path))
             {
                 LaunchEngine(path);
@@ -284,18 +336,39 @@ internal static class Program
     /// <param name="pathOrUri">Absolute file path or mdview: URI</param>
     private static void LaunchEngine(string pathOrUri)
     {
+        Logger.Log($"  LaunchEngine: {pathOrUri}");
+        
         // Resolve paths relative to the host executable (package install location)
         var hostDir = AppContext.BaseDirectory;
+        
+        // WAP places the host EXE in a subfolder named after the project (e.g., MarkdownViewerHost\)
+        // but our staged content (pwsh, app) is at the package root.
+        // Detect this by checking if we're in a subfolder and the parent has pwsh\
+        var packageRoot = hostDir;
+        var parentDir = Path.GetDirectoryName(hostDir.TrimEnd(Path.DirectorySeparatorChar));
+        if (parentDir != null)
+        {
+            var parentPwshPath = Path.Combine(parentDir, "pwsh", "pwsh.exe");
+            if (File.Exists(parentPwshPath))
+            {
+                Logger.Log($"    Detected host is in subfolder, using parent as package root");
+                packageRoot = parentDir + Path.DirectorySeparatorChar;
+            }
+        }
 
         // In packaged deployment:
         // - pwsh is at: <package>/pwsh/pwsh.exe
         // - engine is at: <package>/app/Open-Markdown.ps1
-        var pwshPath = Path.Combine(hostDir, "pwsh", "pwsh.exe");
-        var enginePath = Path.Combine(hostDir, "app", "Open-Markdown.ps1");
+        var pwshPath = Path.Combine(packageRoot, "pwsh", "pwsh.exe");
+        var enginePath = Path.Combine(packageRoot, "app", "Open-Markdown.ps1");
+        
+        Logger.Log($"    Looking for pwsh at: {pwshPath}");
+        Logger.Log($"    Looking for engine at: {enginePath}");
 
         // Fallback for development/unpackaged scenarios
         if (!File.Exists(pwshPath))
         {
+            Logger.Log("    pwsh not found in package, using system pwsh");
             // Try system pwsh
             pwshPath = "pwsh";
         }
@@ -305,9 +378,14 @@ internal static class Program
             // Try relative to host in dev layout (bin/Debug/.../win-x64 -> src/core)
             // Go up from bin\Debug\net10.0-windows10.0.19041.0\win-x64 to project root, then to src/core
             var devEnginePath = Path.GetFullPath(Path.Combine(hostDir, "..", "..", "..", "..", "..", "..", "src", "core", "Open-Markdown.ps1"));
+            Logger.Log($"    Engine not found, trying dev path: {devEnginePath}");
             if (File.Exists(devEnginePath))
             {
                 enginePath = devEnginePath;
+            }
+            else
+            {
+                Logger.Log($"    ERROR: Engine not found at either location!");
             }
         }
 
@@ -329,8 +407,18 @@ internal static class Program
         startInfo.ArgumentList.Add("-Path");
         startInfo.ArgumentList.Add(pathOrUri);
 
-        // Start pwsh and exit immediately (stateless host policy)
-        using var process = Process.Start(startInfo);
-        // Do not wait for process - host exits immediately
+        Logger.Log($"    Starting: {pwshPath} -NoProfile -ExecutionPolicy Bypass -File \"{enginePath}\" -Path \"{pathOrUri}\"");
+
+        try
+        {
+            // Start pwsh and exit immediately (stateless host policy)
+            using var process = Process.Start(startInfo);
+            Logger.Log($"    Process started: PID={process?.Id}");
+            // Do not wait for process - host exits immediately
+        }
+        catch (Exception ex)
+        {
+            Logger.LogException(ex, "LaunchEngine");
+        }
     }
 }
