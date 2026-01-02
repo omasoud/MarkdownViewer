@@ -218,6 +218,7 @@ The MSIX package bundles the Host EXE, PowerShell runtime, and engine files.
 | `-Bundle` | Create .msixbundle (implies -BuildAll) |
 | `-Sign` | Sign package(s) after build using sign.ps1 |
 | `-DownloadPwsh` | Download pinned PowerShell version instead of using system pwsh |
+| `-RegenerateAssets` | Force regenerate PNG assets from ICO (requires ImageMagick) |
 
 **Output files:**
 - Single arch: `installers/win-msix/output/MarkdownViewer_<version>_<arch>.msix`
@@ -308,6 +309,62 @@ The MSIX is unsigned by default, so you need either:
    
    # Then double-click the .msix file
    ```
+
+### Changing the App Name (for Store Availability)
+
+The app name displayed in Windows and the Microsoft Store is controlled by the MSIX manifest. If the name "Markdown Viewer" is taken in the Store, you'll need to change it.
+
+**Files to update:**
+
+1. **`installers/win-msix/Package/AppxManifest.xml`**:
+   ```xml
+   <Properties>
+     <DisplayName>Your New App Name</DisplayName>
+     ...
+   </Properties>
+   
+   <Applications>
+     <Application ...>
+       <uap:VisualElements DisplayName="Your New App Name" ...>
+   ```
+
+2. **`src/host/MarkdownViewerHost/MarkdownViewerHost.csproj`** (optional, for assembly info):
+   ```xml
+   <Product>Your New App Name</Product>
+   ```
+
+3. **`src/core/Open-Markdown.ps1`** - Update any user-facing strings:
+   ```powershell
+   $page.Caption = "Your New App Name"
+   ```
+
+4. **`src/host/MarkdownViewerHost/Program.cs`** - Update the TaskDialog:
+   ```csharp
+   Caption = "Your New App Name",
+   ```
+
+**Note:** The Store submission process will re-sign your package with Microsoft's certificate. The Publisher in the manifest will be updated to match your Store developer account.
+
+### ARM64 Testing
+
+To properly test ARM64 builds:
+
+1. **Build for ARM64**:
+   ```powershell
+   .\installers\win-msix\build.ps1 -Architecture arm64 -DownloadPwsh
+   ```
+
+2. **Testing options**:
+   - **ARM64 hardware**: Install the MSIX on a Windows ARM64 device (Surface Pro X, etc.)
+   - **ARM64 VM**: Use Hyper-V with an ARM64 Windows VM (requires ARM64 host)
+   - **Emulation testing**: x64 Windows can't run ARM64 packages natively
+
+3. **Verify architecture**:
+   After installation, check the app runs correctly by opening a .md file.
+
+4. **Common issues**:
+   - ARM64 PowerShell must be bundled (use `-DownloadPwsh`)
+   - System pwsh on x64 won't work in ARM64 packages
 
 ## Debugging
 

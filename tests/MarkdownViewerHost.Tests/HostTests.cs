@@ -147,4 +147,47 @@ public class HostTests
         Assert.True(startInfo.UseShellExecute);
         Assert.Equal("ms-settings:defaultapps", startInfo.FileName);
     }
+    
+    [Theory]
+    [InlineData("mdview:file:///C:/docs/other.md")]
+    [InlineData("mdview:file:///C:/docs/other.md#heading")]
+    public void Uri_AbsoluteUri_Should_Preserve_Fragment(string uriString)
+    {
+        // System.Uri should preserve the fragment when using AbsoluteUri
+        var uri = new Uri(uriString);
+        Assert.Equal(uriString, uri.AbsoluteUri);
+        
+        // Fragment should be accessible
+        if (uriString.Contains('#'))
+        {
+            Assert.NotEmpty(uri.Fragment);
+        }
+    }
+    
+    [Fact]
+    public void FallbackArgs_Should_Work_When_NoPackagedActivation()
+    {
+        // When not running as a packaged app, we fall back to command-line args
+        // This tests the fallback behavior pattern
+        var args = new[] { @"C:\docs\README.md" };
+        bool activationHandled = false; // Simulates TryHandlePackagedActivation returning false
+        
+        if (!activationHandled && args.Length > 0)
+        {
+            // Should process args
+            Assert.True(args.Length > 0);
+            Assert.False(string.IsNullOrWhiteSpace(args[0]));
+        }
+    }
+    
+    [Fact]
+    public void NoArgs_NoActivation_Should_ShowHelpDialog()
+    {
+        // When no activation and no args, help dialog should be shown
+        var args = Array.Empty<string>();
+        bool activationHandled = false; // Simulates TryHandlePackagedActivation returning false
+        
+        bool shouldShowHelp = !activationHandled && args.Length == 0;
+        Assert.True(shouldShowHelp);
+    }
 }

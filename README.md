@@ -19,6 +19,24 @@ PowerShell 7 is bundled in the package—no separate installation required.
 1. Install from the Microsoft Store (link coming soon)
 2. The app automatically registers as a handler for `.md` and `.markdown` files
 
+**Architecture support:** Both x64 and ARM64 packages are available.
+
+### Option 1b: Sideload MSIX (Developer)
+
+For testing or development builds without the Store:
+
+1. Clone this repository
+2. Build the MSIX package:
+   ```powershell
+   cd installers/win-msix
+   .\build.ps1 -Sign  # Creates and signs with dev certificate
+   ```
+3. Double-click the generated `.msix` file in `installers/win-msix/output/`
+
+**Note:** First-time sideloading requires either:
+- Developer Mode enabled in Windows Settings, or
+- A signed package (the `-Sign` flag handles this automatically)
+
 ### Option 2: Ad-hoc Installer (Per-User)
 
 For manual installation without the Store:

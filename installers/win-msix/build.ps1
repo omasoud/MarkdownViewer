@@ -26,7 +26,9 @@ param(
     
     [switch]$Sign,      # Sign the MSIX package(s) using sign.ps1
     
-    [switch]$DownloadPwsh  # Download pinned PowerShell version instead of using system pwsh
+    [switch]$DownloadPwsh,  # Download pinned PowerShell version instead of using system pwsh
+    
+    [switch]$RegenerateAssets  # Force regeneration of MSIX PNG assets from ICO
 )
 
 $ErrorActionPreference = 'Stop'
@@ -155,7 +157,8 @@ function Build-SingleArchMsix {
         [string]$PwshZip,
         [switch]$NoBuild,
         [switch]$NoPwsh,
-        [switch]$UsePinnedPwsh
+        [switch]$UsePinnedPwsh,
+        [switch]$ForceRegenAssets
     )
     
     $archStageDir = Join-Path $OutputDir "stage-$Arch"
@@ -272,30 +275,40 @@ function Build-SingleArchMsix {
         @{ Name = 'Wide310x150Logo.png'; Width = 310; Height = 150 }
     )
     
-    $missingAssets = @()
+    $assetsToGenerate = @()
     foreach ($asset in $requiredAssets) {
         $sourcePath = Join-Path $sourceAssets $asset.Name
         $destPath = Join-Path $assetsDir $asset.Name
         
-        if (Test-Path $sourcePath) {
+        if ($ForceRegenAssets) {
+            # Force regeneration - add to generation list
+            $assetsToGenerate += $asset
+        }
+        elseif (Test-Path $sourcePath) {
+            # Use existing pre-made asset
             Copy-Item $sourcePath $destPath -Force
         }
         else {
-            $missingAssets += $asset
+            # Asset missing - add to generation list
+            $assetsToGenerate += $asset
         }
     }
     
-    # Generate missing assets
-    if ($missingAssets.Count -gt 0) {
+    # Generate assets (missing or forced)
+    if ($assetsToGenerate.Count -gt 0) {
         $magick = Get-Command magick -ErrorAction SilentlyContinue
         $icoPath = Join-Path $CoreDir 'icons\markdown.ico'
         
         if ($magick -and (Test-Path $icoPath)) {
-            Write-Host "  Creating assets from ICO using ImageMagick..." -ForegroundColor Yellow
-            foreach ($asset in $missingAssets) {
+            $action = if ($ForceRegenAssets) { "Regenerating" } else { "Creating missing" }
+            Write-Host "  $action assets from ICO using ImageMagick..." -ForegroundColor Yellow
+            foreach ($asset in $assetsToGenerate) {
                 $destPath = Join-Path $assetsDir $asset.Name
                 $size = "$($asset.Width)x$($asset.Height)"
                 & magick $icoPath -resize $size -background transparent -gravity center -extent $size $destPath 2>$null
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Host "    Generated: $($asset.Name)" -ForegroundColor Gray
+                }
             }
         }
         else {
@@ -303,7 +316,7 @@ function Build-SingleArchMsix {
             $minimalPng = [Convert]::FromBase64String(
                 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
             )
-            foreach ($asset in $missingAssets) {
+            foreach ($asset in $assetsToGenerate) {
                 $destPath = Join-Path $assetsDir $asset.Name
                 [System.IO.File]::WriteAllBytes($destPath, $minimalPng)
             }
@@ -417,8 +430,8 @@ $createdPackages = @()
 
 if ($BuildAll -or $Bundle) {
     # Build both architectures
-    $x64Msix = Build-SingleArchMsix -Arch 'x64' -Config $Configuration -Ver $Version -PwshZip $PwshZipPath -NoBuild:$SkipBuild -NoPwsh:$SkipPwsh -UsePinnedPwsh:$DownloadPwsh
-    $arm64Msix = Build-SingleArchMsix -Arch 'arm64' -Config $Configuration -Ver $Version -PwshZip $PwshZipPath -NoBuild:$SkipBuild -NoPwsh:$SkipPwsh -UsePinnedPwsh:$DownloadPwsh
+    $x64Msix = Build-SingleArchMsix -Arch 'x64' -Config $Configuration -Ver $Version -PwshZip $PwshZipPath -NoBuild:$SkipBuild -NoPwsh:$SkipPwsh -UsePinnedPwsh:$DownloadPwsh -ForceRegenAssets:$RegenerateAssets
+    $arm64Msix = Build-SingleArchMsix -Arch 'arm64' -Config $Configuration -Ver $Version -PwshZip $PwshZipPath -NoBuild:$SkipBuild -NoPwsh:$SkipPwsh -UsePinnedPwsh:$DownloadPwsh -ForceRegenAssets:$RegenerateAssets
     
     if ($x64Msix) { $createdPackages += $x64Msix }
     if ($arm64Msix) { $createdPackages += $arm64Msix }
@@ -540,29 +553,37 @@ else {
         @{ Name = 'Wide310x150Logo.png'; Width = 310; Height = 150 }
     )
     
-    $missingAssets = @()
+    $assetsToGenerate = @()
     foreach ($asset in $requiredAssets) {
         $sourcePath = Join-Path $sourceAssets $asset.Name
         $destPath = Join-Path $AssetsDir $asset.Name
         
-        if (Test-Path $sourcePath) {
+        if ($RegenerateAssets) {
+            # Force regeneration
+            $assetsToGenerate += $asset
+        }
+        elseif (Test-Path $sourcePath) {
             Copy-Item $sourcePath $destPath -Force
         }
         else {
-            $missingAssets += $asset
+            $assetsToGenerate += $asset
         }
     }
     
-    if ($missingAssets.Count -gt 0) {
+    if ($assetsToGenerate.Count -gt 0) {
         $magick = Get-Command magick -ErrorAction SilentlyContinue
         $icoPath = Join-Path $CoreDir 'icons\markdown.ico'
         
         if ($magick -and (Test-Path $icoPath)) {
-            Write-Host "  Creating assets from ICO using ImageMagick..." -ForegroundColor Yellow
-            foreach ($asset in $missingAssets) {
+            $action = if ($RegenerateAssets) { "Regenerating" } else { "Creating missing" }
+            Write-Host "  $action assets from ICO using ImageMagick..." -ForegroundColor Yellow
+            foreach ($asset in $assetsToGenerate) {
                 $destPath = Join-Path $AssetsDir $asset.Name
                 $size = "$($asset.Width)x$($asset.Height)"
                 & magick $icoPath -resize $size -background transparent -gravity center -extent $size $destPath 2>$null
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Host "    Generated: $($asset.Name)" -ForegroundColor Gray
+                }
             }
         }
         else {
@@ -570,7 +591,7 @@ else {
             $minimalPng = [Convert]::FromBase64String(
                 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
             )
-            foreach ($asset in $missingAssets) {
+            foreach ($asset in $assetsToGenerate) {
                 $destPath = Join-Path $AssetsDir $asset.Name
                 [System.IO.File]::WriteAllBytes($destPath, $minimalPng)
             }

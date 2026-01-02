@@ -2,12 +2,15 @@
 // This is a Windows GUI subsystem app that handles file and protocol activation,
 // then launches the bundled PowerShell engine (Open-Markdown.ps1).
 //
-// For MSIX packages, Windows passes activation arguments via command line:
-// - File activation: The full path to the file
-// - Protocol activation: The full protocol URI (mdview:file:///...)
+// Activation handling:
+// - Packaged (MSIX): Uses AppInstance.GetActivatedEventArgs() for proper activation data
+// - Unpackaged (dev): Falls back to command-line args
+// - No activation: Shows help dialog
 
 using System.Diagnostics;
-using System.Runtime.InteropServices;
+using System.Windows.Forms;
+using Windows.ApplicationModel;
+using Windows.ApplicationModel.Activation;
 
 namespace MarkdownViewerHost;
 
@@ -17,40 +20,36 @@ namespace MarkdownViewerHost;
 /// </summary>
 internal static class Program
 {
-    // P/Invoke for MessageBox (Windows GUI without WinForms/WPF dependency)
-    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern int MessageBoxW(IntPtr hWnd, string text, string caption, uint type);
-
-    // MessageBox constants
-    private const uint MB_OK = 0x00000000;
-    private const uint MB_OKCANCEL = 0x00000001;
-    private const uint MB_ICONINFORMATION = 0x00000040;
-    private const int IDOK = 1;
-    private const int IDCANCEL = 2;
-
     [STAThread]
     static void Main(string[] args)
     {
+        // Enable visual styles for TaskDialog
+        Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
+        
         try
         {
-            // Windows passes activation arguments via command line for packaged apps
-            // - File activation: args[0] is the file path
-            // - Protocol activation: args[0] is the full URI (mdview:file:///...)
-            if (args.Length > 0)
+            // Try to get activation data from AppInstance API (packaged apps)
+            var activationHandled = TryHandlePackagedActivation();
+            
+            if (!activationHandled)
             {
-                foreach (var arg in args)
+                // Fallback to command-line args (unpackaged/dev scenario)
+                if (args.Length > 0)
                 {
-                    if (!string.IsNullOrWhiteSpace(arg))
+                    foreach (var arg in args)
                     {
-                        LaunchEngine(arg);
+                        if (!string.IsNullOrWhiteSpace(arg))
+                        {
+                            LaunchEngine(arg);
+                        }
                     }
                 }
-            }
-            else
-            {
-                // No arguments - launched from Start Menu or shortcut
-                // Show help dialog explaining how to use the app
-                ShowHelpDialog();
+                else
+                {
+                    // No arguments - launched from Start Menu or shortcut
+                    ShowHelpDialog();
+                }
             }
         }
         catch
@@ -61,27 +60,121 @@ internal static class Program
     }
 
     /// <summary>
+    /// Try to handle activation using the AppInstance API (for packaged apps).
+    /// </summary>
+    /// <returns>True if activation was handled, false to fall back to args</returns>
+    private static bool TryHandlePackagedActivation()
+    {
+        try
+        {
+            // This will throw if not running as a packaged app
+            var activatedArgs = AppInstance.GetActivatedEventArgs();
+            if (activatedArgs == null)
+            {
+                return false;
+            }
+
+            switch (activatedArgs.Kind)
+            {
+                case ActivationKind.File:
+                    return HandleFileActivation((FileActivatedEventArgs)activatedArgs);
+                    
+                case ActivationKind.Protocol:
+                    return HandleProtocolActivation((ProtocolActivatedEventArgs)activatedArgs);
+                    
+                case ActivationKind.Launch:
+                    // Launched without specific activation (e.g., from Start Menu)
+                    // Return false to show help dialog via the args.Length == 0 path
+                    return false;
+                    
+                default:
+                    return false;
+            }
+        }
+        catch
+        {
+            // Not running as packaged app, or API not available
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Handle file activation (double-click .md file or Open With).
+    /// </summary>
+    private static bool HandleFileActivation(FileActivatedEventArgs args)
+    {
+        if (args.Files == null || args.Files.Count == 0)
+        {
+            return false;
+        }
+
+        foreach (var file in args.Files)
+        {
+            // Get the path from the storage item
+            var path = file.Path;
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                LaunchEngine(path);
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Handle protocol activation (mdview: links).
+    /// </summary>
+    private static bool HandleProtocolActivation(ProtocolActivatedEventArgs args)
+    {
+        var uri = args.Uri;
+        if (uri == null)
+        {
+            return false;
+        }
+
+        // Pass the full URI (including fragment) to the engine
+        LaunchEngine(uri.AbsoluteUri);
+        return true;
+    }
+
+    /// <summary>
     /// Show a help dialog when the app is launched without any file/protocol activation.
     /// This guides the user to set Markdown Viewer as the default app for .md files.
+    /// Uses TaskDialog for a modern, visually appealing UI.
     /// </summary>
     private static void ShowHelpDialog()
     {
-        const string message = 
-            "Markdown Viewer renders .md and .markdown files in your browser.\n\n" +
-            "To use Markdown Viewer:\n" +
-            "• Right-click a .md file → Open with → Markdown Viewer\n" +
-            "• Set as default: Click OK to open Default Apps settings\n\n" +
-            "Once set as default, double-click any Markdown file to view it.";
+        // Create owner form for proper dialog positioning
+        using var owner = new Form { TopMost = true };
 
-        const string caption = "Markdown Viewer";
-
-        int result = MessageBoxW(IntPtr.Zero, message, caption, MB_OKCANCEL | MB_ICONINFORMATION);
-
-        if (result == IDOK)
+        var page = new TaskDialogPage
         {
-            // Open Windows Default Apps settings
+            Caption = "Markdown Viewer",
+            Heading = "Welcome to Markdown Viewer",
+            Text = "This app renders Markdown files (.md, .markdown) in your browser.\n\n" +
+                   "To view a Markdown file:\n" +
+                   "• Right-click a .md file → Open with → Markdown Viewer\n" +
+                   "• Or set Markdown Viewer as the default app for .md files",
+            Icon = TaskDialogIcon.Information,
+            AllowCancel = true  // Allow closing with X button
+        };
+
+        // Add button to open Default Apps settings
+        var btnDefaultApps = new TaskDialogCommandLinkButton("Open Default Apps Settings")
+        {
+            DescriptionText = "Set Markdown Viewer as the default app for .md and .markdown files"
+        };
+        btnDefaultApps.Click += (s, e) =>
+        {
             OpenDefaultAppsSettings();
-        }
+        };
+        page.Buttons.Add(btnDefaultApps);
+
+        // Add Close button
+        page.Buttons.Add(TaskDialogButton.Close);
+
+        // Show the dialog
+        TaskDialog.ShowDialog(owner.Handle, page);
     }
 
     /// <summary>
