@@ -3,17 +3,17 @@
   <PropertyGroup>
     <!-- Windows GUI subsystem app (no console window) -->
     <OutputType>WinExe</OutputType>
-    
+
     <!-- Target Windows 10 19041 or later -->
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
-    
+
     <!-- Enable Windows Forms for TaskDialog support -->
     <UseWindowsForms>true</UseWindowsForms>
-    
+
     <!-- Enable nullable reference types -->
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    
+
     <!-- Assembly info -->
     <AssemblyName>MarkdownViewerHost</AssemblyName>
     <RootNamespace>MarkdownViewerHost</RootNamespace>
@@ -24,11 +24,12 @@
     <Company></Company>
     <Copyright>MIT License</Copyright>
     <Description>Host application for Markdown Viewer MSIX package</Description>
-	<ApplicationIcon>..\..\core\icons\markdown.ico</ApplicationIcon>
+    <ApplicationIcon>..\..\core\icons\markdown.ico</ApplicationIcon>
+    <NeutralLanguage>en-us</NeutralLanguage>
   </PropertyGroup>
   <ItemGroup>
-      <EmbeddedResource Include="..\..\core\icons\markdown.ico">
-          <LogicalName>AppIconResource</LogicalName>
-      </EmbeddedResource>
+    <EmbeddedResource Include="..\..\core\icons\markdown.ico">
+      <LogicalName>AppIconResource</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 </Project>

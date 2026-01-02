@@ -93,7 +93,7 @@
     </PropertyGroup>
     
     <Message Text="Signing MSIX package..." Importance="high" />
-    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(SignScriptPath)&quot; -MsixPath &quot;$(MsixOutputPath)&quot;"
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(SignScriptPath)&quot; -Sign -MsixPath &quot;$(MsixOutputPath)&quot;"
           WorkingDirectory="$(MSBuildProjectDirectory)"
           ConsoleToMsBuild="true"
           Condition="Exists('$(SignScriptPath)')" />

@@ -52,7 +52,7 @@ internal static class Program
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception /*ex*/)
         {
             // Exit silently on any error - Engine owns error presentation
             // Host must not show duplicate dialogs
