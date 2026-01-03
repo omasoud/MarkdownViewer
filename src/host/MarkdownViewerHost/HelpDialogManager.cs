@@ -17,6 +17,7 @@ namespace MarkdownViewerHost
         // Keep this short enough to avoid scrolling in common window sizes.
         private const string MarkdownContent =
 @"# MarkView
+![](icon.png)
 ### Markdown Viewer for Windows
 
 MarkView renders local `.md` files in your browser — fast, clean, and safe.
@@ -115,11 +116,11 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
     }}
 
     img {{
-      width: 64px;
-      height: 64px;
+      width: 96px;
+      height: 96px;
       float: right;
       margin-left: 18px;
-      margin-top: 4px;
+      margin-top: -16px;
       border-radius: 10px;
     }}
 
@@ -322,7 +323,7 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
                 ReadOnly = true,
                 WordWrap = true,
                 ScrollBars = RichTextBoxScrollBars.None,
-                DetectUrls = false,
+                DetectUrls = true,
                 Text = MarkdownContent
             };
 
