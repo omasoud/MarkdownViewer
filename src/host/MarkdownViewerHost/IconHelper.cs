@@ -1,11 +1,12 @@
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
+using System.Drawing.Drawing2D;
 
 namespace MarkdownViewerHost
 {
     public static class IconHelper
     {
-        public static Bitmap GetIconBySize(Stream iconStream, int targetSize)
+        public static Bitmap GetIconBySize(Stream iconStream, int targetSize, bool scaleToTarget = false)
         {
             if (iconStream == null) throw new ArgumentNullException(nameof(iconStream));
             iconStream.Position = 0;
@@ -45,10 +46,12 @@ namespace MarkdownViewerHost
                     using var ms = new MemoryStream(rawData);
                     using var tmp = new Bitmap(ms);
                     // Clone detaches the bitmap from the stream so we can close the stream safely
-                    return tmp.Clone(new Rectangle(0, 0, tmp.Width, tmp.Height), tmp.PixelFormat);
+                    var bitmap = tmp.Clone(new Rectangle(0, 0, tmp.Width, tmp.Height), tmp.PixelFormat);
+                    return scaleToTarget ? ScaleBitmap(bitmap, targetSize) : bitmap;
                 }
 
-                return CreateBitmapFromIcoBmp(rawData);
+                var icoBitmap = CreateBitmapFromIcoBmp(rawData);
+                return scaleToTarget ? ScaleBitmap(icoBitmap, targetSize) : icoBitmap;
             }
         }
 
@@ -88,6 +91,17 @@ namespace MarkdownViewerHost
             if (data.Length < 8) return false;
             return data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47 &&
                    data[4] == 0x0D && data[5] == 0x0A && data[6] == 0x1A && data[7] == 0x0A;
+        }
+
+        private static Bitmap ScaleBitmap(Bitmap source, int targetSize)
+        {
+            var scaled = new Bitmap(targetSize, targetSize);
+            using (var g = Graphics.FromImage(scaled))
+            {
+                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                g.DrawImage(source, 0, 0, targetSize, targetSize);
+            }
+            return scaled;
         }
     }
 }

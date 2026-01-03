@@ -58,6 +58,10 @@ internal static class Program
     [STAThread]
     static void Main(string[] args)
     {
+        // System.Diagnostics.Trace.Listeners.Add(new System.Diagnostics.TextWriterTraceListener(System.Console.Out));
+        // System.Diagnostics.Trace.AutoFlush = true;
+
+
         Logger.Log($"=== MarkdownViewerHost started ===");
         Logger.Log($"  Args: [{string.Join(", ", args.Select(a => $"\"{a}\""))}]");
         Logger.Log($"  BaseDirectory: {AppContext.BaseDirectory}");
@@ -89,7 +93,8 @@ internal static class Program
                 {
                     // No arguments - launched from Start Menu or shortcut
                     Logger.Log("  Showing help dialog (no args)");
-                    ShowHelpDialog();
+                    HelpDialogManager.ShowHelpDialog();
+                    //ShowHelpDialog2();
                 }
             }
         }
@@ -196,7 +201,7 @@ internal static class Program
     /// This guides the user to set Markdown Viewer as the default app for .md files.
     /// Uses Windows Forms for a modern, visually appealing UI.
     /// </summary>
-    private static void ShowHelpDialog()
+    private static void ShowHelpDialog2()
 {
     using var form = new Form();
     form.Text = "Markdown Viewer";
@@ -221,27 +226,12 @@ internal static class Program
         // 2. Get the High-Quality Image for the UI
         // We ask for 64, but your helper will likely find the 256px version 
         // and downscale it nicely, or return the 256px one directly.
-        using var bestBitmap = IconHelper.GetIconBySize(stream, 64);
+        using var bestBitmap = IconHelper.GetIconBySize(stream, 64, scaleToTarget: true);
 
         if (bestBitmap != null)
         {
             var iconBox = new PictureBox();
-            
-            // If the bitmap is huge (256px), we scale it down to 64px for the UI
-            if (bestBitmap.Width > 64)
-            {
-                var scaled = new Bitmap(64, 64);
-                using (var g = Graphics.FromImage(scaled))
-                {
-                    g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-                    g.DrawImage(bestBitmap, 0, 0, 64, 64);
-                }
-                iconBox.Image = scaled;
-            }
-            else
-            {
-                iconBox.Image = (Image)bestBitmap.Clone();
-            }
+            iconBox.Image = (Image)bestBitmap.Clone();
 
             iconBox.Size = new Size(64, 64);
             iconBox.SizeMode = PictureBoxSizeMode.CenterImage;

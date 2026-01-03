@@ -1,5 +1,3 @@
-#define DEBUG
-
 using System;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -11,6 +9,8 @@ using System.Diagnostics;
 
 namespace MarkdownViewerHost
 {
+
+
     public static class HelpDialogManager
     {
         // --- 1) RAW MARKDOWN (Source View) ---
@@ -59,6 +59,10 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
       line-height: 1.35;
       margin: 0;
       overflow: hidden; /* keep it clean; prefer content that doesn't need scrolling */
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      cursor: default;
     }}
 
     h1 {{
@@ -142,7 +146,7 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
     }}
   </style>
 </head>
-<body>
+<body onselectstart=""return false"">
   <img src='data:image/png;base64,{0}' onerror=""this.style.display='none'"" />
 
   <h1>MarkView</h1>
@@ -189,9 +193,21 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
         private static readonly Color LinkColor = Color.FromArgb(78, 161, 255);         // link blue
         private static readonly Color BoldColor = Color.FromArgb(206, 145, 120); // Orange
         private static readonly Color ImageTagColor = Color.FromArgb(106, 153, 85); // Green 
+        private sealed class HelpForm : Form
+        {
+            protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+            {
+                if (keyData == Keys.Escape)
+                {
+                    Close();
+                    return true;
+                }
+                return base.ProcessCmdKey(ref msg, keyData);
+            }
+        }
         public static void ShowHelpDialog()
         {
-            using var form = new Form
+            using var form = new HelpForm
             {
                 Text = "MarkView - Welcome",
                 StartPosition = FormStartPosition.CenterScreen,
@@ -233,27 +249,13 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
             }
 
 
-            // // 3. SPLIT CONTAINER (The Content)
-            // var split = new SplitContainer();
-            // split.Dock = DockStyle.Fill; // Fills whatever space is left ABOVE the bottom panel
-            // split.SplitterDistance = (int)(form.Width * 0.90); // 60% Left
-            // split.IsSplitterFixed = true;
-            // split.BackColor = SystemColors.ControlLight;
-            // form.Controls.Add(split);
-
             // --- LAYOUT: SPLIT CONTAINER ---
-            // var split = new SplitContainer();
-            // split.Dock = DockStyle.Fill;
-            // split.SplitterDistance = (int)(85); // 90% Left
-            // split.Orientation = Orientation.Vertical;
-            // split.SplitterWidth = 1; // Thin elegant line
-            // split.BackColor = Color.LightGray; // Color of the divider line
             var split = new SplitContainer
             {
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Vertical,
                 SplitterWidth = 1,
-                BackColor = Color.FromArgb(42, 42, 42),
+                //BackColor = Color.FromArgb(42, 42, 42),
                 IsSplitterFixed = true
             };
 
@@ -269,24 +271,8 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
                 form.BeginInvoke(new Action(SetSplit));
             };
 
-            // write a lot of noise to debug console to test that output is visible
-            Debug.WriteLine("--------------------------------------------------");
-            Debug.WriteLine("DEBUG NOISE START");
-            Debug.WriteLine("--------------------------------------------------");
-            // print form.ClientSize.Width and split.Width
-            Debug.WriteLine($"Form ClientSize Width: {form.ClientSize.Width}");
-            Debug.WriteLine($"Split Width: {split.Width}");
 
-
-            // Set split ratio AFTER ClientSize is known (use ClientSize, not Width)
-            //split.SplitterDistance = (int)(form.ClientSize.Width * 0.092);
-
-
-            // Ensure visual stacking order
-            // bottomPanel.SendToBack();
-            // split.BringToFront();
-
-            // 4. LEFT PANE: RENDERED VIEW
+            // LEFT PANE: RENDERED VIEW
             var browser = new WebBrowser
             {
                 Dock = DockStyle.Fill,
@@ -294,8 +280,12 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
                 AllowNavigation = true, // we intercept external links and open them in default browser
                 IsWebBrowserContextMenuEnabled = false,
                 WebBrowserShortcutsEnabled = false,
-                ScrollBarsEnabled = false
+                ScrollBarsEnabled = false,
+                TabStop = false
             };
+
+            // Prevent it from keeping focus (helps with caret/keyboard issues)
+            browser.GotFocus += (_, __) => form.ActiveControl = null;
 
             browser.Navigating += (_, e) =>
             {
@@ -324,9 +314,19 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
                 WordWrap = true,
                 ScrollBars = RichTextBoxScrollBars.None,
                 DetectUrls = true,
-                Text = MarkdownContent
+                Text = MarkdownContent,
+                TabStop = false,
+                HideSelection = true,
+                Cursor = Cursors.Arrow,
+                ShortcutsEnabled = false
             };
-
+            // Suppress selection gestures
+            rtb.MouseDown += (_, e) =>
+            {
+                form.ActiveControl = null;
+                rtb.SelectionLength = 0;
+            };
+            rtb.GotFocus += (_, __) => form.ActiveControl = null;
             rtb.LinkClicked += (_, e) =>
             {
                 if (!string.IsNullOrWhiteSpace(e?.LinkText))
@@ -397,6 +397,10 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
             return btn;
         }
 
+        /// <summary>
+        /// Apply syntax highlighting to the Markdown source in the RichTextBox. This is intentionally gimmicky.
+        /// </summary>
+        /// <param name="rtb">The RichTextBox containing the Markdown source.</param>
         private static void ColorizeSource(RichTextBox rtb)
         {
             // Important: use line indices + GetFirstCharIndexFromLine() to avoid CRLF offset drift.
@@ -406,39 +410,21 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
             rtb.SelectAll();
             rtb.SelectionColor = TextColor;
 
-            // rtb.Select(0, 5);
-            // rtb.SelectionColor = Color.Pink;
-
-            //     rtb.WordWrap = false;
-            // for (int i = 0; i < lines.Length; i++)
-            // {
-            //     Debug.WriteLine($"Line {i}: {lines[i]}");
-            //     var line = lines[i] ?? string.Empty;
-            //     int start = rtb.GetFirstCharIndexFromLine(i);
-            //     int len = line.Length;
-            //     Debug.WriteLine($"Start index: {start}, Length: {len}");
-            //     if (i==4)
-            //     {
-            //         rtb.Select(start, 5);
-            //         rtb.SelectionColor = Color.Pink;
-            //     }
-            // }            
-            //     rtb.WordWrap = true;
             for (int i = 0; i < lines.Length; i++)
             {
                 Debug.WriteLine($"Line {i}: {lines[i]}");
                 var line = lines[i] ?? string.Empty;
-            rtb.WordWrap = false;
+                rtb.WordWrap = false;
                 int start = rtb.GetFirstCharIndexFromLine(i);
-            rtb.WordWrap = true;
-                Debug.WriteLine($"Start index: {start}");
+                rtb.WordWrap = true;
+                //Debug.WriteLine($"Start index: {start}");
                 if (start < 0) continue;
 
                 int len = line.Length;
                 if (len <= 0) continue;
 
-                //string trimmed = line.TrimStart();
-                string trimmed = line;
+                string trimmed = line.TrimStart();
+                //string trimmed = line;
 
                 if (trimmed.StartsWith("#", StringComparison.Ordinal))
                 {
@@ -465,7 +451,7 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
                     rtb.Select(start, len);
                     // Keep quote/list/header colors if already applied; only override if it's plain text.
                     //if (rtb.SelectionColor == TextColor)
-                        rtb.SelectionColor = LinkColor;
+                    rtb.SelectionColor = LinkColor;
                 }
             }
 
