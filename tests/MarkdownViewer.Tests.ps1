@@ -1310,3 +1310,172 @@ Describe 'MSIX Staged Payload Structure' -Tag 'Integration' {
     }
 }
 
+Describe 'MSIX Package Contents' -Tag 'Integration', 'MsixValidation' {
+    # These tests validate the ACTUAL MSIX package contents by extracting and inspecting
+    # This catches issues where staging is correct but MSBuild fails to include content
+    # 
+    # IMPORTANT: WAP puts the project reference output in a subfolder (MarkdownViewerHost\)
+    # but our staged content (app\, pwsh\) is at the package root. The host EXE detects
+    # this at runtime and looks in the parent directory for app\ and pwsh\.
+    #
+    # Run after building MSIX: Invoke-Pester -Path .\tests\MarkdownViewer.Tests.ps1 -Tag MsixValidation
+    
+    BeforeAll {
+        $repoRoot = Split-Path $PSScriptRoot -Parent
+        
+        # Find MSIX package from a recent build
+        $msixPaths = @(
+            (Join-Path $repoRoot 'installers\win-msix\output\MarkdownViewer_1.0.0.0_x64.msix'),
+            (Join-Path $repoRoot 'installers\win-msix\output\MarkdownViewer_1.0.0.0_ARM64.msix')
+        )
+        $script:msixPath = $msixPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+        $script:hasMsix = $null -ne $script:msixPath
+        $script:extractedOk = $false
+        
+        # Extract MSIX to temp directory for inspection
+        if ($script:hasMsix) {
+            $script:extractDir = Join-Path $env:TEMP "mdv-msix-test-$([Guid]::NewGuid().ToString('N').Substring(0,8))"
+            New-Item -ItemType Directory -Path $script:extractDir -Force | Out-Null
+            
+            # MSIX is a ZIP file, extract it
+            try {
+                Expand-Archive -Path $script:msixPath -DestinationPath $script:extractDir -Force
+                $script:extractedOk = $true
+            } catch {
+                Write-Warning "Failed to extract MSIX: $_"
+            }
+        }
+    }
+    
+    AfterAll {
+        # Cleanup extracted files
+        if ($script:extractDir -and (Test-Path $script:extractDir)) {
+            Remove-Item $script:extractDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+    
+    Context 'MSIX package exists' {
+        It 'has an MSIX package from a previous build' {
+            $script:hasMsix | Should -BeTrue -Because "Expected MSIX at installers\win-msix\output\MarkdownViewer_1.0.0.0_*.msix"
+        }
+        
+        It 'can be extracted as a ZIP archive' {
+            $script:extractedOk | Should -BeTrue
+        }
+    }
+    
+    Context 'MSIX contains WAP project subfolder with host' {
+        # WAP puts the project reference output in a subfolder named after the project
+        # This is where the EXE actually runs from (AppContext.BaseDirectory)
+        BeforeAll {
+            if (-not $script:extractedOk) {
+                Set-ItResult -Skipped -Because "MSIX extraction failed"
+            }
+        }
+        
+        It 'has MarkdownViewerHost subfolder (WAP project reference output)' {
+            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
+            Join-Path $script:extractDir 'MarkdownViewerHost' | Should -Exist
+        }
+        
+        It 'contains MarkdownViewerHost.exe in WAP subfolder' {
+            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
+            Join-Path $script:extractDir 'MarkdownViewerHost\MarkdownViewerHost.exe' | Should -Exist
+        }
+    }
+    
+    Context 'MSIX contains app\ directory with engine' {
+        # app\ and pwsh\ are at package ROOT, not in the WAP subfolder
+        # The host EXE detects this and looks in parent directory at runtime
+        It 'has app subdirectory at package root' {
+            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
+            Join-Path $script:extractDir 'app' | Should -Exist
+        }
+        
+        It 'contains app\Open-Markdown.ps1 engine' {
+            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
+            Join-Path $script:extractDir 'app\Open-Markdown.ps1' | Should -Exist
+        }
+        
+        It 'contains app\MarkdownViewer.psm1 module' {
+            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
+            Join-Path $script:extractDir 'app\MarkdownViewer.psm1' | Should -Exist
+        }
+        
+        It 'contains app\script.js' {
+            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
+            Join-Path $script:extractDir 'app\script.js' | Should -Exist
+        }
+        
+        It 'contains app\style.css' {
+            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
+            Join-Path $script:extractDir 'app\style.css' | Should -Exist
+        }
+        
+        It 'contains app\highlight.min.js' {
+            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
+            Join-Path $script:extractDir 'app\highlight.min.js' | Should -Exist
+        }
+        
+        It 'contains app\highlight-theme.css' {
+            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
+            Join-Path $script:extractDir 'app\highlight-theme.css' | Should -Exist
+        }
+    }
+    
+    Context 'Content is accessible from WAP subfolder (simulates runtime)' {
+        # This test simulates what Program.cs does at runtime:
+        # The EXE runs from MarkdownViewerHost\ subfolder and must find app\ and pwsh\ in parent
+        It 'app\ is accessible from MarkdownViewerHost\ subfolder via parent' {
+            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
+            $wapSubfolder = Join-Path $script:extractDir 'MarkdownViewerHost'
+            if (-not (Test-Path $wapSubfolder)) { Set-ItResult -Skipped -Because "WAP subfolder not found"; return }
+            
+            # Simulate what Program.cs does: look in parent for app\
+            $parentDir = Split-Path $wapSubfolder -Parent
+            $enginePath = Join-Path $parentDir 'app' 'Open-Markdown.ps1'
+            $enginePath | Should -Exist -Because "Host EXE looks for app\ in parent directory"
+        }
+        
+        It 'pwsh\ is accessible from MarkdownViewerHost\ subfolder via parent' {
+            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
+            $wapSubfolder = Join-Path $script:extractDir 'MarkdownViewerHost'
+            if (-not (Test-Path $wapSubfolder)) { Set-ItResult -Skipped -Because "WAP subfolder not found"; return }
+            
+            # Simulate what Program.cs does: look in parent for pwsh\
+            $parentDir = Split-Path $wapSubfolder -Parent
+            $pwshPath = Join-Path $parentDir 'pwsh' 'pwsh.exe'
+            $pwshPath | Should -Exist -Because "Host EXE looks for pwsh\ in parent directory"
+        }
+    }
+    
+    Context 'MSIX contains Assets directory' {
+        It 'has Assets subdirectory' {
+            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
+            Join-Path $script:extractDir 'Assets' | Should -Exist
+        }
+        
+        It 'contains Assets\StoreLogo.png' {
+            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
+            Join-Path $script:extractDir 'Assets\StoreLogo.png' | Should -Exist
+        }
+        
+        It 'contains Assets\Square44x44Logo.png' {
+            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
+            Join-Path $script:extractDir 'Assets\Square44x44Logo.png' | Should -Exist
+        }
+    }
+    
+    Context 'MSIX contains pwsh directory' {
+        It 'has pwsh subdirectory' {
+            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
+            Join-Path $script:extractDir 'pwsh' | Should -Exist
+        }
+        
+        It 'contains pwsh\pwsh.exe' {
+            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
+            Join-Path $script:extractDir 'pwsh\pwsh.exe' | Should -Exist
+        }
+    }
+}
+

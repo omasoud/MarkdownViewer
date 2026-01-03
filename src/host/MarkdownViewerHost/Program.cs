@@ -338,27 +338,26 @@ internal static class Program
     {
         Logger.Log($"  LaunchEngine: {pathOrUri}");
         
-        // Resolve paths relative to the host executable (package install location)
+        // Resolve paths relative to the host executable location
+        // WAP (Windows Application Packaging) puts the project reference output in a subfolder
+        // named after the project (e.g., MarkdownViewerHost\), but our staged content
+        // (pwsh\, app\) is at the package root. We need to detect this and adjust.
         var hostDir = AppContext.BaseDirectory;
-        
-        // WAP places the host EXE in a subfolder named after the project (e.g., MarkdownViewerHost\)
-        // but our staged content (pwsh, app) is at the package root.
-        // Detect this by checking if we're in a subfolder and the parent has pwsh\
         var packageRoot = hostDir;
+        
+        // Check if we're in a subfolder by looking for pwsh\ in parent directory
         var parentDir = Path.GetDirectoryName(hostDir.TrimEnd(Path.DirectorySeparatorChar));
         if (parentDir != null)
         {
             var parentPwshPath = Path.Combine(parentDir, "pwsh", "pwsh.exe");
-            if (File.Exists(parentPwshPath))
+            var parentAppPath = Path.Combine(parentDir, "app", "Open-Markdown.ps1");
+            if (File.Exists(parentPwshPath) || File.Exists(parentAppPath))
             {
-                Logger.Log($"    Detected host is in subfolder, using parent as package root");
+                Logger.Log($"    Detected host is in WAP subfolder, using parent as package root");
                 packageRoot = parentDir + Path.DirectorySeparatorChar;
             }
         }
 
-        // In packaged deployment:
-        // - pwsh is at: <package>/pwsh/pwsh.exe
-        // - engine is at: <package>/app/Open-Markdown.ps1
         var pwshPath = Path.Combine(packageRoot, "pwsh", "pwsh.exe");
         var enginePath = Path.Combine(packageRoot, "app", "Open-Markdown.ps1");
         
@@ -377,7 +376,7 @@ internal static class Program
         {
             // Try relative to host in dev layout (bin/Debug/.../win-x64 -> src/core)
             // Go up from bin\Debug\net10.0-windows10.0.19041.0\win-x64 to project root, then to src/core
-            var devEnginePath = Path.GetFullPath(Path.Combine(hostDir, "..", "..", "..", "..", "..", "..", "src", "core", "Open-Markdown.ps1"));
+            var devEnginePath = Path.GetFullPath(Path.Combine(packageRoot, "..", "..", "..", "..", "..", "..", "src", "core", "Open-Markdown.ps1"));
             Logger.Log($"    Engine not found, trying dev path: {devEnginePath}");
             if (File.Exists(devEnginePath))
             {

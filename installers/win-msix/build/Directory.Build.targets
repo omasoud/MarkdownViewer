@@ -61,23 +61,52 @@
   </Target>
 
   <!-- Include staged content in the package -->
-  <ItemGroup>
-    <!-- Host EXE and dependencies -->
-    <Content Include="$(StagingOutputDir)MarkdownViewerHost.exe" Link="MarkdownViewerHost.exe" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="$(StagingOutputDir)MarkdownViewerHost.dll" Link="MarkdownViewerHost.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(StagingOutputDir)MarkdownViewerHost.dll')" />
-    <Content Include="$(StagingOutputDir)MarkdownViewerHost.runtimeconfig.json" Link="MarkdownViewerHost.runtimeconfig.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(StagingOutputDir)MarkdownViewerHost.runtimeconfig.json')" />
-    <Content Include="$(StagingOutputDir)MarkdownViewerHost.deps.json" Link="MarkdownViewerHost.deps.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(StagingOutputDir)MarkdownViewerHost.deps.json')" />
+  <!-- 
+    IMPORTANT: All staged content must be included DYNAMICALLY via targets that run AFTER staging,
+    because static ItemGroup wildcards are evaluated BEFORE staging runs and will match nothing.
+  -->
+
+  <!-- NOTE: All content is now included dynamically in IncludeStagedContent target below -->
+  
+  <!-- All staged content must be included dynamically after staging runs -->
+  <!-- Use CreateItem to avoid ItemGroup accumulation across multiple target invocations -->
+  <Target Name="IncludeStagedContent" AfterTargets="StagePayload" BeforeTargets="_GenerateAppxPackageFile"
+          Condition="Exists('$(StagingOutputDir)MarkdownViewerHost.exe')">
+    
+    <!-- Host EXE -->
+    <CreateItem Include="$(StagingOutputDir)MarkdownViewerHost.exe"
+                AdditionalMetadata="Link=MarkdownViewerHost.exe;CopyToOutputDirectory=PreserveNewest">
+      <Output TaskParameter="Include" ItemName="Content" />
+    </CreateItem>
+    
+    <!-- Host DLL (if exists) -->
+    <CreateItem Include="$(StagingOutputDir)MarkdownViewerHost.dll"
+                AdditionalMetadata="Link=MarkdownViewerHost.dll;CopyToOutputDirectory=PreserveNewest"
+                Condition="Exists('$(StagingOutputDir)MarkdownViewerHost.dll')">
+      <Output TaskParameter="Include" ItemName="Content" />
+    </CreateItem>
+    
+    <!-- Host config files -->
+    <CreateItem Include="$(StagingOutputDir)MarkdownViewerHost.runtimeconfig.json"
+                AdditionalMetadata="Link=MarkdownViewerHost.runtimeconfig.json;CopyToOutputDirectory=PreserveNewest"
+                Condition="Exists('$(StagingOutputDir)MarkdownViewerHost.runtimeconfig.json')">
+      <Output TaskParameter="Include" ItemName="Content" />
+    </CreateItem>
+    <CreateItem Include="$(StagingOutputDir)MarkdownViewerHost.deps.json"
+                AdditionalMetadata="Link=MarkdownViewerHost.deps.json;CopyToOutputDirectory=PreserveNewest"
+                Condition="Exists('$(StagingOutputDir)MarkdownViewerHost.deps.json')">
+      <Output TaskParameter="Include" ItemName="Content" />
+    </CreateItem>
     
     <!-- Engine payload in app\ -->
-    <Content Include="$(StagingOutputDir)app\**\*" Link="app\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-
-    <!-- NOTE: Assets and pwsh\ content are included dynamically in IncludeStagedAssets target below -->
-  </ItemGroup>
-  
-  <!-- Assets and pwsh must be included dynamically after staging since they don't exist initially -->
-  <!-- Use CreateItem to avoid ItemGroup accumulation across multiple target invocations -->
-  <Target Name="IncludeStagedAssets" AfterTargets="StagePayload" BeforeTargets="_GenerateAppxPackageFile"
-          Condition="Exists('$(StagingOutputDir)pwsh\pwsh.exe')">
+    <ItemGroup>
+      <_AppFiles Include="$(StagingOutputDir)app\**\*" />
+    </ItemGroup>
+    <CreateItem Include="@(_AppFiles)"
+                AdditionalMetadata="Link=app\%(_AppFiles.RecursiveDir)%(_AppFiles.Filename)%(_AppFiles.Extension);CopyToOutputDirectory=PreserveNewest">
+      <Output TaskParameter="Include" ItemName="Content" />
+    </CreateItem>
+    
     <!-- Assets -->
     <ItemGroup>
       <_AssetFiles Include="$(StagingOutputDir)Assets\*.png" />
@@ -86,12 +115,14 @@
                 AdditionalMetadata="Link=Assets\%(_AssetFiles.Filename)%(_AssetFiles.Extension);CopyToOutputDirectory=PreserveNewest">
       <Output TaskParameter="Include" ItemName="Content" />
     </CreateItem>
-    <!-- pwsh -->
-    <ItemGroup>
+    
+    <!-- pwsh (when bundled) -->
+    <ItemGroup Condition="Exists('$(StagingOutputDir)pwsh\pwsh.exe')">
       <_PwshFiles Include="$(StagingOutputDir)pwsh\**\*" />
     </ItemGroup>
     <CreateItem Include="@(_PwshFiles)"
-                AdditionalMetadata="Link=pwsh\%(_PwshFiles.RecursiveDir)%(_PwshFiles.Filename)%(_PwshFiles.Extension);CopyToOutputDirectory=PreserveNewest">
+                AdditionalMetadata="Link=pwsh\%(_PwshFiles.RecursiveDir)%(_PwshFiles.Filename)%(_PwshFiles.Extension);CopyToOutputDirectory=PreserveNewest"
+                Condition="Exists('$(StagingOutputDir)pwsh\pwsh.exe')">
       <Output TaskParameter="Include" ItemName="Content" />
     </CreateItem>
   </Target>
