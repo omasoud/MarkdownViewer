@@ -8,7 +8,6 @@
 // - No activation: Shows help dialog
 
 using System.Diagnostics;
-using System.Reflection;
 using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
 
@@ -94,7 +93,6 @@ internal static class Program
                     // No arguments - launched from Start Menu or shortcut
                     Logger.Log("  Showing help dialog (no args)");
                     HelpDialogManager.ShowHelpDialog();
-                    //ShowHelpDialog2();
                 }
             }
         }
@@ -195,110 +193,6 @@ internal static class Program
         LaunchEngine(uri.AbsoluteUri);
         return true;
     }
-
-    /// <summary>
-    /// Show a help dialog when the app is launched without any file/protocol activation.
-    /// This guides the user to set Markdown Viewer as the default app for .md files.
-    /// Uses Windows Forms for a modern, visually appealing UI.
-    /// </summary>
-    private static void ShowHelpDialog2()
-{
-    using var form = new Form();
-    form.Text = "Markdown Viewer";
-    form.Size = new Size(600, 400);
-    form.BackColor = Color.AliceBlue;
-    form.FormBorderStyle = FormBorderStyle.FixedDialog;
-    form.MaximizeBox = false;
-    form.MinimizeBox = false;
-    form.StartPosition = FormStartPosition.CenterScreen;
-
-    // --- ICON LOGIC START ---
-    var assembly = Assembly.GetExecutingAssembly();
-    using var stream = assembly.GetManifestResourceStream("AppIconResource"); // Ensure name matches .csproj
-
-    if (stream != null)
-    {
-        // 1. Set the Window Icon (Taskbar/Titlebar)
-        // The standard Icon constructor is fine for small sizes
-        form.Icon = new Icon(stream);
-        form.ShowIcon = true;
-
-        // 2. Get the High-Quality Image for the UI
-        // We ask for 64, but your helper will likely find the 256px version 
-        // and downscale it nicely, or return the 256px one directly.
-        using var bestBitmap = IconHelper.GetIconBySize(stream, 64, scaleToTarget: true);
-
-        if (bestBitmap != null)
-        {
-            var iconBox = new PictureBox();
-            iconBox.Image = (Image)bestBitmap.Clone();
-
-            iconBox.Size = new Size(64, 64);
-            iconBox.SizeMode = PictureBoxSizeMode.CenterImage;
-            iconBox.Location = new Point(30, 25);
-            iconBox.BackColor = Color.Transparent; // Clean transparency
-            iconBox.BorderStyle = BorderStyle.None;
-            form.Controls.Add(iconBox);
-        }
-    }
-    // --- ICON LOGIC END ---
-
-    // The rest of your UI setup...
-    var headerFont = new Font("Segoe UI", 18, FontStyle.Regular);
-    var bodyFont = new Font("Segoe UI", 11, FontStyle.Regular);
-    var buttonFont = new Font("Segoe UI", 10, FontStyle.Regular);
-
-    var lblHeading = new Label();
-    lblHeading.Text = "Welcome to Markdown Viewer";
-    lblHeading.Font = headerFont;
-    lblHeading.ForeColor = Color.FromArgb(0, 51, 153);
-    lblHeading.Location = new Point(110, 30);
-    lblHeading.AutoSize = true;
-    form.Controls.Add(lblHeading);
-
-    var lblBody = new Label();
-    lblBody.Text = "This app renders Markdown files (.md) in your browser.\n\n" +
-                   "To view a Markdown file:\n" +
-                   "• Right-click a .md file → Open with → Markdown Viewer\n" +
-                   "• Or double-click a .md file after you have set Markdown\n" +
-                   "   Viewer as the default app below.";
-    lblBody.Font = bodyFont;
-    lblBody.ForeColor = Color.FromArgb(64, 64, 64);
-    lblBody.Location = new Point(110, 80);
-    lblBody.Size = new Size(500, 150);
-    form.Controls.Add(lblBody);
-
-    var btnSettings = new Button();
-    btnSettings.Text = "Open Default Apps Settings";
-    btnSettings.Font = buttonFont;
-    btnSettings.Size = new Size(250, 45);
-    btnSettings.Location = new Point(110, 240);
-    btnSettings.FlatStyle = FlatStyle.Flat;
-    btnSettings.BackColor = Color.FromArgb(0, 120, 215);
-    btnSettings.ForeColor = Color.White;
-    btnSettings.Cursor = Cursors.Hand;
-    btnSettings.FlatAppearance.BorderSize = 0;
-    btnSettings.Click += (s, e) => 
-    {
-        OpenDefaultAppsSettings();
-        form.Close();
-    };
-    form.Controls.Add(btnSettings);
-
-    var btnClose = new Button();
-    btnClose.Text = "Close";
-    btnClose.Font = buttonFont;
-    btnClose.Size = new Size(100, 45);
-    btnClose.Location = new Point(370, 240);
-    btnClose.FlatStyle = FlatStyle.Flat;
-    btnClose.BackColor = Color.FromArgb(240, 240, 240);
-    btnClose.ForeColor = Color.Black;
-    btnClose.FlatAppearance.BorderSize = 0;
-    btnClose.Click += (s, e) => form.Close();
-    form.Controls.Add(btnClose);
-
-    form.ShowDialog();
-} 
      
     /// <summary>
     /// Open Windows Settings to the Default Apps page.
