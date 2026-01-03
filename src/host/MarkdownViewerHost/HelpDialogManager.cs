@@ -33,12 +33,13 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
 - Then double-click any `.md`
 
 ## Highlights
+
 - Dark mode + themes
 - Code syntax highlighting
 - Linked local `.md` files supported
 - Secure by default (CSP + sanitization; MOTW; network blocked; optional remote images)
 
-**Open source (GitHub):** https://github.com/omasoud/MarkdownViewer
+**Open source (GitHub):** [github.com/omasoud/MarkdownViewer](https://github.com/omasoud/MarkdownViewer)
 ";
 
         // --- 2) HTML TEMPLATE (Rendered View) ---
@@ -197,7 +198,7 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
                 MaximizeBox = false,
                 MinimizeBox = false,
                 ClientSize = new Size(920, 660),
-                BackColor = BgColor,
+                BackColor = Color.White,
                 KeyPreview = true
             };
 
@@ -321,7 +322,7 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
                 ReadOnly = true,
                 WordWrap = true,
                 ScrollBars = RichTextBoxScrollBars.None,
-                DetectUrls = true,
+                DetectUrls = false,
                 Text = MarkdownContent
             };
 
@@ -336,100 +337,143 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
 
             split.Panel2.Controls.Add(rtb);
 
-            // 2. BOTTOM PANEL (Buttons)
-            var bottomPanel = new Panel();
-            bottomPanel.Height = 60;
-            bottomPanel.Dock = DockStyle.Bottom;
-            bottomPanel.BackColor = SystemColors.Control;
+            // --- BOTTOM PANEL (buttons) ---
+            var bottomPanel = new Panel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 58,
+                BackColor = SystemColors.Control,
+            };
 
-            // FIX: Force panel to match form width immediately so coordinate math works
-            bottomPanel.Width = form.ClientSize.Width;
+            var divider = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 1,
+                BackColor = Color.LightGray
+            };
+            bottomPanel.Controls.Add(divider);
 
-            var line = new Label { Height = 1, Dock = DockStyle.Top, BackColor = Color.LightGray };
-            bottomPanel.Controls.Add(line);
+            var buttons = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                BackColor = SystemColors.Control
+            };
 
-            var btnDefault = new Button { Text = "Open Default Apps Settings", Size = new Size(200, 30) };
-            // FIX: Position relative to the PANEL
-            btnDefault.BackColor = Color.FromArgb(0, 120, 215);
-            btnDefault.ForeColor = Color.White;
-            btnDefault.FlatStyle = FlatStyle.Flat;
-            btnDefault.FlatAppearance.BorderSize = 0;
-            btnDefault.Cursor = Cursors.Hand;
-            //btnDefault.Location = new Point(bottomPanel.Width - 330, 15);
-            btnDefault.Location = new Point(20, 15);
-            btnDefault.Anchor = AnchorStyles.Right | AnchorStyles.Top;
-            btnDefault.Click += (s, e) => OpenDefaultAppsSettings();
+            var btnDefault = CreateButton("Open Default Apps Settings", new Size(220, 32), Color.FromArgb(0, 120, 215), Color.White);
+            btnDefault.Click += (_, __) => OpenDefaultAppsSettings();
 
-            var btnClose = new Button { Text = "Close", Size = new Size(100, 30) };
-            // FIX: Position relative to the PANEL, not the FORM
-            //btnClose.Location = new Point(bottomPanel.Width - 120, 15);
-            btnClose.Location = new Point(btnDefault.Right + 10, 15);
-            btnClose.BackColor = Color.FromArgb(220, 220, 220);
-            btnClose.ForeColor = Color.Black;
-            btnClose.FlatStyle = FlatStyle.Flat;
-            btnClose.FlatAppearance.BorderSize = 0;
-            btnClose.Cursor = Cursors.Hand;
-            btnClose.Anchor = AnchorStyles.Right | AnchorStyles.Top;
-            btnClose.Click += (s, e) => form.Close();
+            var btnClose = CreateButton("Close", new Size(110, 32), Color.FromArgb(220, 220, 220), Color.Black);
+            btnClose.Click += (_, __) => form.Close();
 
+            // Order matters (RightToLeft flow): add Close first so it ends up far right.
+            buttons.Controls.Add(btnDefault);
+            buttons.Controls.Add(btnClose);
 
+            bottomPanel.Controls.Add(buttons);
 
-
-            bottomPanel.Controls.Add(btnClose);
-            bottomPanel.Controls.Add(btnDefault);
-
-            // Add to form
+            // Add controls: Fill first, then Bottom (no z-order hacks needed)
             form.Controls.Add(split);
-
             form.Controls.Add(bottomPanel);
 
             form.ShowDialog();
         }
 
+        private static Button CreateButton(string text, Size size, Color backColor, Color foreColor)
+        {
+            var btn = new Button
+            {
+                Text = text,
+                Size = size,
+                BackColor = backColor,
+                ForeColor = foreColor,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand,
+                Margin = new Padding(10, 15, 0, 0)
+            };
+            btn.FlatAppearance.BorderSize = 0;
+            return btn;
+        }
+
         private static void ColorizeSource(RichTextBox rtb)
         {
-            string[] lines = rtb.Text.Split('\n');
-            int currentPos = 0;
+            // Important: use line indices + GetFirstCharIndexFromLine() to avoid CRLF offset drift.
+            var lines = rtb.Lines;
 
-            foreach (var line in lines)
+            // Reset
+            rtb.SelectAll();
+            rtb.SelectionColor = TextColor;
+
+            // rtb.Select(0, 5);
+            // rtb.SelectionColor = Color.Pink;
+
+            //     rtb.WordWrap = false;
+            // for (int i = 0; i < lines.Length; i++)
+            // {
+            //     Debug.WriteLine($"Line {i}: {lines[i]}");
+            //     var line = lines[i] ?? string.Empty;
+            //     int start = rtb.GetFirstCharIndexFromLine(i);
+            //     int len = line.Length;
+            //     Debug.WriteLine($"Start index: {start}, Length: {len}");
+            //     if (i==4)
+            //     {
+            //         rtb.Select(start, 5);
+            //         rtb.SelectionColor = Color.Pink;
+            //     }
+            // }            
+            //     rtb.WordWrap = true;
+            for (int i = 0; i < lines.Length; i++)
             {
-                // We must select the actual range in the RTB
-                // Note: RichTextBox "lines" can vary with word wrap, so simpler to regex 
-                // or iterate text, but for this static content, line-by-line works if we track length.
+                Debug.WriteLine($"Line {i}: {lines[i]}");
+                var line = lines[i] ?? string.Empty;
+            rtb.WordWrap = false;
+                int start = rtb.GetFirstCharIndexFromLine(i);
+            rtb.WordWrap = true;
+                Debug.WriteLine($"Start index: {start}");
+                if (start < 0) continue;
 
                 int len = line.Length;
+                if (len <= 0) continue;
 
-                // Headers
-                if (line.Trim().StartsWith("#"))
+                //string trimmed = line.TrimStart();
+                string trimmed = line;
+
+                if (trimmed.StartsWith("#", StringComparison.Ordinal))
                 {
-                    rtb.Select(currentPos, len);
+                    rtb.Select(start, len);
                     rtb.SelectionColor = HeaderColor;
                 }
-                // Bullets
-                else if (line.Trim().StartsWith("*") || line.Trim().StartsWith("-"))
+                else if (trimmed.StartsWith("-", StringComparison.Ordinal) ||
+                         trimmed.StartsWith("*", StringComparison.Ordinal) ||
+                         trimmed.StartsWith("•", StringComparison.Ordinal))
                 {
-                    rtb.Select(currentPos, len);
-                    rtb.SelectionColor = BoldColor;
+                    rtb.Select(start, len);
+                    rtb.SelectionColor = ListColor;
                 }
-                // Image Syntax ![...]
-                else if (line.Trim().StartsWith("!["))
+                else if (trimmed.StartsWith(">", StringComparison.Ordinal))
                 {
-                    rtb.Select(currentPos, len);
-                    rtb.SelectionColor = ImageTagColor;
+                    rtb.Select(start, len);
+                    rtb.SelectionColor = QuoteColor;
                 }
 
-                currentPos += len + 1; // +1 for the newline char we split on
+                // Color bare URLs as links (DetectUrls will also underline; this helps visibility on dark bg).
+                if (line.Contains("http://", StringComparison.OrdinalIgnoreCase) ||
+                    line.Contains("https://", StringComparison.OrdinalIgnoreCase))
+                {
+                    rtb.Select(start, len);
+                    // Keep quote/list/header colors if already applied; only override if it's plain text.
+                    //if (rtb.SelectionColor == TextColor)
+                        rtb.SelectionColor = LinkColor;
+                }
             }
+
             rtb.Select(0, 0);
         }
 
         private static void OpenDefaultAppsSettings()
         {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = "ms-settings:defaultapps",
-                UseShellExecute = true
-            });
+            TryOpenExternal("ms-settings:defaultapps");
         }
         private static void TryOpenExternal(string target)
         {
