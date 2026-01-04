@@ -1,6 +1,6 @@
 # Privacy Policy for MarkView
 
-**Last updated:** January 2025
+**Last updated:** January 2026
 
 ## Overview
 
