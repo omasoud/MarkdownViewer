@@ -54,7 +54,7 @@ function Show-MotwWarning {
     $owner.TopMost = $true
     
     $page = New-Object System.Windows.Forms.TaskDialogPage
-    $page.Caption = "Security Warning - Markdown Viewer"
+    $page.Caption = "Security Warning - MarkView"
     $page.Heading = "This file was downloaded from the internet"
     $page.Text = "$fileName`n`nIt may contain malicious content."
     $page.Icon = [System.Windows.Forms.TaskDialogIcon]::Warning
@@ -93,7 +93,7 @@ function Show-FileNotFound {
     $owner.TopMost = $true
 
     $page = New-Object System.Windows.Forms.TaskDialogPage
-    $page.Caption = "Markdown Viewer"
+    $page.Caption = "MarkView"
     $page.Heading = "File not found"
     $page.Text = if ($FromLink) {
         "The linked Markdown file could not be found:`n`n$FilePath`n`nLink: $FromLink"
@@ -307,7 +307,7 @@ catch {
     $owner.TopMost = $true
     
     $page = New-Object System.Windows.Forms.TaskDialogPage
-    $page.Caption = "Markdown Viewer"
+    $page.Caption = "MarkView"
     $page.Heading = "Error opening file"
     $page.Text = $msg
     $page.Icon = [System.Windows.Forms.TaskDialogIcon]::Error

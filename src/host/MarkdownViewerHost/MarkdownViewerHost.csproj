@@ -23,10 +23,10 @@
     <Version>1.0.0</Version>
     <FileVersion>1.0.0.0</FileVersion>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <Product>Markdown Viewer</Product>
+    <Product>MarkView</Product>
     <Company></Company>
     <Copyright>MIT License</Copyright>
-    <Description>Host application for Markdown Viewer MSIX package</Description>
+    <Description>Host application for MarkView MSIX package</Description>
     <ApplicationIcon>..\..\core\icons\markdown.ico</ApplicationIcon>
     <NeutralLanguage>en-us</NeutralLanguage>
   </PropertyGroup>
