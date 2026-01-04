@@ -193,7 +193,7 @@ internal static class Program
         LaunchEngine(uri.AbsoluteUri);
         return true;
     }
-     
+
     /// <summary>
     /// Open Windows Settings to the Default Apps page.
     /// </summary>
@@ -295,8 +295,10 @@ internal static class Program
         try
         {
             // Start pwsh and exit immediately (stateless host policy)
-            using var process = Process.Start(startInfo);
-            Logger.Log($"    Process started: PID={process?.Id}");
+            using (var process = Process.Start(startInfo))
+            {
+                Logger.Log($"    Process started: PID={process?.Id}");
+            }
             // Do not wait for process - host exits immediately
         }
         catch (Exception ex)
