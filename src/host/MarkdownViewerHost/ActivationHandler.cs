@@ -1,8 +1,6 @@
 // ActivationHandler - Testable core logic for handling app activation
 // This class contains the business logic extracted from Program for testability.
 
-using Windows.ApplicationModel.Activation;
-
 namespace MarkdownViewerHost;
 
 /// <summary>
@@ -11,10 +9,17 @@ namespace MarkdownViewerHost;
 /// </summary>
 public sealed class ActivationHandler
 {
+    /// <summary>
+    /// Environment variable name for test signal path.
+    /// When set, host writes JSON trace and exits without launching pwsh.
+    /// </summary>
+    public const string TestSignalPathEnvVar = "MDV_TEST_SIGNAL_PATH";
+
     private readonly IFileSystem _fileSystem;
     private readonly IProcessLauncher _processLauncher;
     private readonly IAppContext _appContext;
     private readonly IAppActivation _appActivation;
+    private readonly IEnvironment _environment;
     private readonly Action<string>? _log;
 
     public ActivationHandler(
@@ -23,13 +28,35 @@ public sealed class ActivationHandler
         IAppContext appContext,
         IAppActivation appActivation,
         Action<string>? log = null)
+        : this(fileSystem, processLauncher, appContext, appActivation, new DefaultEnvironment(), log)
+    {
+    }
+
+    public ActivationHandler(
+        IFileSystem fileSystem,
+        IProcessLauncher processLauncher,
+        IAppContext appContext,
+        IAppActivation appActivation,
+        IEnvironment environment,
+        Action<string>? log = null)
     {
         _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
         _processLauncher = processLauncher ?? throw new ArgumentNullException(nameof(processLauncher));
         _appContext = appContext ?? throw new ArgumentNullException(nameof(appContext));
         _appActivation = appActivation ?? throw new ArgumentNullException(nameof(appActivation));
+        _environment = environment ?? throw new ArgumentNullException(nameof(environment));
         _log = log;
     }
+
+    /// <summary>
+    /// Gets the test signal path from environment variable, or null if not in test mode.
+    /// </summary>
+    public string? GetTestSignalPath() => _environment.GetEnvironmentVariable(TestSignalPathEnvVar);
+
+    /// <summary>
+    /// Returns true if running in test mode (MDV_TEST_SIGNAL_PATH is set).
+    /// </summary>
+    public bool IsTestMode => !string.IsNullOrEmpty(GetTestSignalPath());
 
     /// <summary>
     /// Try to handle activation using the AppInstance API (for packaged apps).
@@ -47,15 +74,15 @@ public sealed class ActivationHandler
 
         switch (activationResult.Kind)
         {
-            case ActivationKind.File:
+            case ActivationKinds.File:
                 _log?.Invoke("  Handling File activation");
                 return HandleFileActivation(activationResult.FilePaths);
 
-            case ActivationKind.Protocol:
+            case ActivationKinds.Protocol:
                 _log?.Invoke("  Handling Protocol activation");
                 return HandleProtocolActivation(activationResult.ProtocolUri);
 
-            case ActivationKind.Launch:
+            case ActivationKinds.Launch:
                 // Launched without specific activation (e.g., from Start Menu)
                 // Return false to show help dialog via the args.Length == 0 path
                 _log?.Invoke("  Launch activation (no file/protocol) - will show help");
@@ -84,7 +111,7 @@ public sealed class ActivationHandler
             _log?.Invoke($"    File: {path}");
             if (!string.IsNullOrWhiteSpace(path))
             {
-                LaunchEngine(path);
+                LaunchEngine(path, "file");
             }
         }
 
@@ -102,7 +129,7 @@ public sealed class ActivationHandler
         }
 
         // Pass the full URI (including fragment) to the engine
-        LaunchEngine(uri.AbsoluteUri);
+        LaunchEngine(uri.AbsoluteUri, "protocol");
         return true;
     }
 
@@ -222,9 +249,11 @@ public sealed class ActivationHandler
 
     /// <summary>
     /// Launch the PowerShell engine with the given path or URI.
+    /// In test mode (MDV_TEST_SIGNAL_PATH set), writes a JSON trace and exits without launching pwsh.
     /// </summary>
     /// <param name="pathOrUri">Absolute file path or mdview: URI</param>
-    public void LaunchEngine(string pathOrUri)
+    /// <param name="activationKind">The kind of activation that triggered this launch</param>
+    public void LaunchEngine(string pathOrUri, string activationKind = "commandline")
     {
         _log?.Invoke($"  LaunchEngine: {pathOrUri}");
 
@@ -235,6 +264,15 @@ public sealed class ActivationHandler
 
         _log?.Invoke($"    Starting: {pwshPath} {string.Join(" ", arguments)}");
 
+        // Check for test mode
+        var testSignalPath = GetTestSignalPath();
+        if (!string.IsNullOrEmpty(testSignalPath))
+        {
+            _log?.Invoke($"    TEST MODE: Writing signal to {testSignalPath}");
+            WriteTestSignal(testSignalPath, activationKind, pathOrUri, packageRoot, pwshPath, enginePath);
+            return; // Exit without launching pwsh
+        }
+
         try
         {
             var processId = _processLauncher.LaunchProcess(pwshPath, arguments, useShellExecute: false, createNoWindow: true);
@@ -243,6 +281,32 @@ public sealed class ActivationHandler
         catch (Exception ex)
         {
             _log?.Invoke($"    LaunchEngine exception: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Writes a test signal JSON record to the specified path.
+    /// </summary>
+    private void WriteTestSignal(string signalPath, string kind, string arg, string packageRoot, string pwshPath, string enginePath)
+    {
+        var signal = new TestSignalRecord
+        {
+            Kind = kind,
+            Arg = arg,
+            ResolvedPackageRoot = packageRoot,
+            ResolvedPwsh = pwshPath,
+            ResolvedEngine = enginePath,
+            HostBaseDirectory = _appContext.BaseDirectory,
+            Timestamp = DateTime.UtcNow.ToString("o")
+        };
+
+        try
+        {
+            _fileSystem.AppendAllText(signalPath, signal.ToJson() + Environment.NewLine);
+        }
+        catch (Exception ex)
+        {
+            _log?.Invoke($"    Failed to write test signal: {ex.Message}");
         }
     }
 }

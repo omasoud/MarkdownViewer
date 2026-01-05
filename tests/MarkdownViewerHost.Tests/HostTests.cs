@@ -4,7 +4,6 @@
 using System.Diagnostics;
 using MarkdownViewerHost;
 using NSubstitute;
-using Windows.ApplicationModel.Activation;
 using Xunit;
 
 namespace MarkdownViewerHost.Tests;
@@ -64,7 +63,7 @@ public class ActivationHandlerTests
     public void TryHandlePackagedActivation_Returns_False_For_LaunchActivation()
     {
         // Arrange - Launch activation (Start Menu) should return false to show help
-        _appActivation.TryGetActivatedEventArgs().Returns(new ActivationResult(ActivationKind.Launch));
+        _appActivation.TryGetActivatedEventArgs().Returns(new ActivationResult(ActivationKinds.Launch));
 
         // Act
         var result = _handler.TryHandlePackagedActivation();
@@ -79,7 +78,7 @@ public class ActivationHandlerTests
     {
         // Arrange
         var filePaths = new List<string> { @"C:\docs\README.md" };
-        _appActivation.TryGetActivatedEventArgs().Returns(new ActivationResult(ActivationKind.File, filePaths));
+        _appActivation.TryGetActivatedEventArgs().Returns(new ActivationResult(ActivationKinds.File, filePaths));
         _fileSystem.FileExists(Arg.Any<string>()).Returns(true);
         _processLauncher.LaunchProcess(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<bool>(), Arg.Any<bool>())
             .Returns(12345);
@@ -97,7 +96,7 @@ public class ActivationHandlerTests
     {
         // Arrange
         var uri = new Uri("mdview:file:///C:/docs/readme.md#section");
-        _appActivation.TryGetActivatedEventArgs().Returns(new ActivationResult(ActivationKind.Protocol, ProtocolUri: uri));
+        _appActivation.TryGetActivatedEventArgs().Returns(new ActivationResult(ActivationKinds.Protocol, ProtocolUri: uri));
         _fileSystem.FileExists(Arg.Any<string>()).Returns(true);
         _processLauncher.LaunchProcess(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<bool>(), Arg.Any<bool>())
             .Returns(12345);
@@ -117,7 +116,7 @@ public class ActivationHandlerTests
     public void TryHandlePackagedActivation_Returns_False_For_UnhandledActivationKind()
     {
         // Arrange - Use an activation kind that's not handled
-        _appActivation.TryGetActivatedEventArgs().Returns(new ActivationResult(ActivationKind.Search));
+        _appActivation.TryGetActivatedEventArgs().Returns(new ActivationResult(ActivationKinds.Unknown));
 
         // Act
         var result = _handler.TryHandlePackagedActivation();
@@ -515,6 +514,150 @@ public class ActivationHandlerTests
         Assert.Equal(@"C:\engine\Open-Markdown.ps1", args[4]);
         Assert.Equal("-Path", args[5]);
         Assert.Equal(@"C:\docs\test.md", args[6]);
+    }
+
+    #endregion
+
+    #region Test Mode (MDV_TEST_SIGNAL_PATH) Tests
+
+    [Fact]
+    public void IsTestMode_Returns_False_When_EnvVar_Not_Set()
+    {
+        // Arrange - default handler has no test signal path set
+        var environment = Substitute.For<IEnvironment>();
+        environment.GetEnvironmentVariable(ActivationHandler.TestSignalPathEnvVar).Returns((string?)null);
+        
+        var handler = new ActivationHandler(
+            _fileSystem, _processLauncher, _appContext, _appActivation, environment, null);
+
+        // Act & Assert
+        Assert.False(handler.IsTestMode);
+    }
+
+    [Fact]
+    public void IsTestMode_Returns_True_When_EnvVar_Is_Set()
+    {
+        // Arrange
+        var environment = Substitute.For<IEnvironment>();
+        environment.GetEnvironmentVariable(ActivationHandler.TestSignalPathEnvVar).Returns(@"C:\temp\signal.json");
+        
+        var handler = new ActivationHandler(
+            _fileSystem, _processLauncher, _appContext, _appActivation, environment, null);
+
+        // Act & Assert
+        Assert.True(handler.IsTestMode);
+    }
+
+    [Fact]
+    public void LaunchEngine_Writes_Signal_And_Does_Not_Launch_Process_In_TestMode()
+    {
+        // Arrange
+        var environment = Substitute.For<IEnvironment>();
+        var signalPath = @"C:\temp\signal.json";
+        environment.GetEnvironmentVariable(ActivationHandler.TestSignalPathEnvVar).Returns(signalPath);
+        
+        _appContext.BaseDirectory.Returns(@"C:\PackageRoot\");
+        _fileSystem.FileExists(Arg.Any<string>()).Returns(true);
+        
+        var handler = new ActivationHandler(
+            _fileSystem, _processLauncher, _appContext, _appActivation, environment, 
+            msg => _logMessages.Add(msg));
+
+        // Act
+        handler.LaunchEngine(@"C:\docs\README.md");
+
+        // Assert - Process should NOT be launched
+        _processLauncher.DidNotReceive().LaunchProcess(
+            Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<bool>(), Arg.Any<bool>());
+        
+        // Assert - Signal file should be written
+        _fileSystem.Received(1).AppendAllText(signalPath, Arg.Any<string>());
+        
+        // Assert - Log should indicate test mode
+        Assert.Contains(_logMessages, m => m.Contains("TEST MODE"));
+    }
+
+    [Fact]
+    public void LaunchEngine_Writes_Correct_Signal_Content()
+    {
+        // Arrange
+        var environment = Substitute.For<IEnvironment>();
+        var signalPath = @"C:\temp\signal.json";
+        environment.GetEnvironmentVariable(ActivationHandler.TestSignalPathEnvVar).Returns(signalPath);
+        
+        _appContext.BaseDirectory.Returns(@"C:\PackageRoot\");
+        _fileSystem.FileExists(@"C:\PackageRoot\pwsh\pwsh.exe").Returns(true);
+        _fileSystem.FileExists(@"C:\PackageRoot\app\Open-Markdown.ps1").Returns(true);
+        
+        string? writtenContent = null;
+        _fileSystem.When(x => x.AppendAllText(signalPath, Arg.Any<string>()))
+            .Do(x => writtenContent = (string)x[1]);
+        
+        var handler = new ActivationHandler(
+            _fileSystem, _processLauncher, _appContext, _appActivation, environment, null);
+
+        // Act
+        handler.LaunchEngine(@"C:\docs\README.md", "file");
+
+        // Assert
+        Assert.NotNull(writtenContent);
+        Assert.Contains("\"kind\":\"file\"", writtenContent);
+        Assert.Contains("\"arg\":\"C:\\\\docs\\\\README.md\"", writtenContent);
+        Assert.Contains("\"resolvedPwsh\"", writtenContent);
+        Assert.Contains("\"resolvedEngine\"", writtenContent);
+    }
+
+    [Fact]
+    public void HandleFileActivation_Passes_File_ActivationKind()
+    {
+        // Arrange
+        var environment = Substitute.For<IEnvironment>();
+        var signalPath = @"C:\temp\signal.json";
+        environment.GetEnvironmentVariable(ActivationHandler.TestSignalPathEnvVar).Returns(signalPath);
+        
+        _appContext.BaseDirectory.Returns(@"C:\PackageRoot\");
+        _fileSystem.FileExists(Arg.Any<string>()).Returns(true);
+        
+        string? writtenContent = null;
+        _fileSystem.When(x => x.AppendAllText(signalPath, Arg.Any<string>()))
+            .Do(x => writtenContent = (string)x[1]);
+        
+        var handler = new ActivationHandler(
+            _fileSystem, _processLauncher, _appContext, _appActivation, environment, null);
+
+        // Act
+        handler.HandleFileActivation(new List<string> { @"C:\docs\test.md" });
+
+        // Assert
+        Assert.NotNull(writtenContent);
+        Assert.Contains("\"kind\":\"file\"", writtenContent);
+    }
+
+    [Fact]
+    public void HandleProtocolActivation_Passes_Protocol_ActivationKind()
+    {
+        // Arrange
+        var environment = Substitute.For<IEnvironment>();
+        var signalPath = @"C:\temp\signal.json";
+        environment.GetEnvironmentVariable(ActivationHandler.TestSignalPathEnvVar).Returns(signalPath);
+        
+        _appContext.BaseDirectory.Returns(@"C:\PackageRoot\");
+        _fileSystem.FileExists(Arg.Any<string>()).Returns(true);
+        
+        string? writtenContent = null;
+        _fileSystem.When(x => x.AppendAllText(signalPath, Arg.Any<string>()))
+            .Do(x => writtenContent = (string)x[1]);
+        
+        var handler = new ActivationHandler(
+            _fileSystem, _processLauncher, _appContext, _appActivation, environment, null);
+
+        // Act
+        handler.HandleProtocolActivation(new Uri("mdview:file:///C:/docs/test.md#section"));
+
+        // Assert
+        Assert.NotNull(writtenContent);
+        Assert.Contains("\"kind\":\"protocol\"", writtenContent);
+        Assert.Contains("#section", writtenContent);
     }
 
     #endregion

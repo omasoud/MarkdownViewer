@@ -14,6 +14,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Convert to absolute path for consistency
+$StagingDir = [System.IO.Path]::GetFullPath($StagingDir)
+
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Staged Payload Integration Test" -ForegroundColor Cyan  
@@ -23,7 +26,7 @@ Write-Host "  Staging directory: $StagingDir"
 #region Validation: Directory Structure
 
 Write-Host ""
-Write-Host "[1/4] Validating directory structure..." -ForegroundColor Yellow
+Write-Host "[1/5] Validating directory structure..." -ForegroundColor Yellow
 
 # Required paths
 $hostExe = Join-Path $StagingDir 'MarkdownViewerHost.exe'
@@ -108,7 +111,7 @@ Write-Host "  Directory structure: OK" -ForegroundColor Green
 #region Validation: Simulate Host Path Resolution
 
 Write-Host ""
-Write-Host "[2/4] Simulating host path resolution..." -ForegroundColor Yellow
+Write-Host "[2/5] Simulating host path resolution..." -ForegroundColor Yellow
 
 # This simulates what Program.cs does in LaunchEngine()
 # The host runs from staging root, not a subfolder, so paths should work directly
@@ -151,7 +154,7 @@ Write-Host "  Resolved engine: $resolvedEngine" -ForegroundColor Gray
 #region Validation: Engine Module Import
 
 Write-Host ""
-Write-Host "[3/4] Testing engine module import..." -ForegroundColor Yellow
+Write-Host "[3/5] Testing engine module import..." -ForegroundColor Yellow
 
 # Test that the MarkdownViewer.psm1 module can be imported
 $modulePath = Join-Path $appDir 'MarkdownViewer.psm1'
@@ -192,7 +195,7 @@ if (Test-Path $modulePath) {
 #region Validation: Engine Dry Run
 
 Write-Host ""
-Write-Host "[4/4] Testing engine invocation (dry run)..." -ForegroundColor Yellow
+Write-Host "[4/5] Testing engine invocation (dry run)..." -ForegroundColor Yellow
 
 # Create a temporary test markdown file if none provided
 $tempFile = $null
@@ -238,9 +241,11 @@ $engineSyntax = & $pwshToUse -NoProfile -ExecutionPolicy Bypass -Command @"
     `$ErrorActionPreference = 'Stop'
     try {
         # Parse the script to check for syntax errors
-        `$ast = [System.Management.Automation.Language.Parser]::ParseFile('$resolvedEngine', [ref]`$null, [ref]`$errors)
-        if (`$errors.Count -gt 0) {
-            throw "Syntax errors: `$(`$errors.Message -join '; ')"
+        `$tokens = `$null
+        `$parseErrors = `$null
+        `$ast = [System.Management.Automation.Language.Parser]::ParseFile('$resolvedEngine', [ref]`$tokens, [ref]`$parseErrors)
+        if (`$parseErrors.Count -gt 0) {
+            throw "Syntax errors: `$(`$parseErrors.Message -join '; ')"
         }
         
         # Check the script has expected param block
@@ -267,6 +272,189 @@ if ($tempFile -and (Test-Path $tempFile)) {
     Remove-Item $tempFile -Force
     Write-Host "  Cleaned up temp file" -ForegroundColor Gray
 }
+
+#endregion
+
+#region Validation: Host-in-Subfolder Path Resolution (WAP Layout Simulation)
+
+Write-Host ""
+Write-Host "[5/5] Testing host-in-subfolder path resolution (WAP layout)..." -ForegroundColor Yellow
+
+# This test simulates the WAP package layout where the host EXE ends up in a subfolder
+# (e.g., PackageRoot\MarkdownViewerHost\MarkdownViewerHost.exe) while pwsh\ and app\ 
+# are at the package root (PackageRoot\pwsh\, PackageRoot\app\).
+
+$wapTestRoot = Join-Path $env:TEMP "mdv-wap-test-$([Guid]::NewGuid().ToString('N').Substring(0,8))"
+$wapTestFailed = $false
+
+try {
+    Write-Host "  Creating WAP layout simulation at: $wapTestRoot" -ForegroundColor Gray
+    
+    # Create the WAP-like structure:
+    # $wapTestRoot\
+    #   MarkdownViewerHost\
+    #     MarkdownViewerHost.exe (and dependencies)
+    #   pwsh\
+    #     pwsh.exe (copy or stub)
+    #   app\
+    #     Open-Markdown.ps1 (and other files)
+    
+    $wapHostSubfolder = Join-Path $wapTestRoot 'MarkdownViewerHost'
+    $wapPwshDir = Join-Path $wapTestRoot 'pwsh'
+    $wapAppDir = Join-Path $wapTestRoot 'app'
+    
+    New-Item -ItemType Directory -Path $wapHostSubfolder -Force | Out-Null
+    New-Item -ItemType Directory -Path $wapPwshDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $wapAppDir -Force | Out-Null
+    
+    # Copy the host executable and its dependencies to the subfolder
+    $hostDir = Split-Path $hostExe -Parent
+    $hostFiles = Get-ChildItem -Path $hostDir -File | Where-Object { 
+        $_.Extension -in '.exe', '.dll', '.json', '.pdb'
+    }
+    foreach ($file in $hostFiles) {
+        Copy-Item $file.FullName -Destination $wapHostSubfolder -Force
+    }
+    Write-Host "    Copied host files to subfolder" -ForegroundColor Gray
+    
+    # Copy pwsh if bundled, otherwise create a stub
+    if ($hasBundledPwsh) {
+        # Just copy pwsh.exe as a marker file (we won't actually run it)
+        Copy-Item $bundledPwsh -Destination $wapPwshDir -Force
+        Write-Host "    Copied bundled pwsh.exe" -ForegroundColor Gray
+    } else {
+        # Create a dummy pwsh.exe marker (host checks File.Exists)
+        "dummy" | Set-Content -Path (Join-Path $wapPwshDir 'pwsh.exe') -Force
+        Write-Host "    Created stub pwsh.exe marker" -ForegroundColor Gray
+    }
+    
+    # Copy app content
+    Copy-Item -Path (Join-Path $appDir '*') -Destination $wapAppDir -Recurse -Force
+    Write-Host "    Copied app content" -ForegroundColor Gray
+    
+    # Create test signal file path
+    $signalFile = Join-Path $wapTestRoot 'test-signal.json'
+    
+    # Create a test markdown file
+    $testMdFile = Join-Path $wapTestRoot 'test.md'
+    "# Test" | Set-Content -Path $testMdFile -Force
+    
+    # Set up the test environment variable
+    $wapHostExe = Join-Path $wapHostSubfolder 'MarkdownViewerHost.exe'
+    
+    # Test 1: File path argument
+    Write-Host "  Running host with file path argument..." -ForegroundColor Gray
+    $env:MDV_TEST_SIGNAL_PATH = $signalFile
+    try {
+        $process = Start-Process -FilePath $wapHostExe -ArgumentList "`"$testMdFile`"" -PassThru -Wait -NoNewWindow
+        if ($process.ExitCode -ne 0) {
+            Write-Host "    WARNING: Host exited with code $($process.ExitCode)" -ForegroundColor Yellow
+        }
+    } finally {
+        Remove-Item Env:\MDV_TEST_SIGNAL_PATH -ErrorAction SilentlyContinue
+    }
+    
+    # Verify signal file was created
+    if (-not (Test-Path $signalFile)) {
+        Write-Host "  ERROR: Test signal file was not created" -ForegroundColor Red
+        $wapTestFailed = $true
+    } else {
+        $signals = Get-Content $signalFile | ForEach-Object { $_ | ConvertFrom-Json }
+        $fileSignal = $signals | Where-Object { $_.arg -eq $testMdFile }
+        
+        if (-not $fileSignal) {
+            Write-Host "  ERROR: No signal found for file path test" -ForegroundColor Red
+            $wapTestFailed = $true
+        } else {
+            Write-Host "    Signal received for file path test" -ForegroundColor Gray
+            
+            # Verify resolved paths point to parent (package root)
+            $expectedPwsh = Join-Path $wapTestRoot 'pwsh' 'pwsh.exe'
+            $expectedEngine = Join-Path $wapTestRoot 'app' 'Open-Markdown.ps1'
+            
+            # Normalize paths for comparison (handle trailing slashes)
+            $resolvedRoot = $fileSignal.resolvedPackageRoot.TrimEnd('\', '/')
+            $expectedRoot = $wapTestRoot.TrimEnd('\', '/')
+            
+            if ($resolvedRoot -ne $expectedRoot) {
+                Write-Host "  ERROR: Package root not resolved correctly" -ForegroundColor Red
+                Write-Host "    Expected: $expectedRoot" -ForegroundColor Red
+                Write-Host "    Got:      $resolvedRoot" -ForegroundColor Red
+                $wapTestFailed = $true
+            }
+            
+            if ($fileSignal.resolvedPwsh -ne $expectedPwsh) {
+                Write-Host "  ERROR: pwsh path not resolved correctly" -ForegroundColor Red
+                Write-Host "    Expected: $expectedPwsh" -ForegroundColor Red
+                Write-Host "    Got:      $($fileSignal.resolvedPwsh)" -ForegroundColor Red
+                $wapTestFailed = $true
+            }
+            
+            if ($fileSignal.resolvedEngine -ne $expectedEngine) {
+                Write-Host "  ERROR: Engine path not resolved correctly" -ForegroundColor Red
+                Write-Host "    Expected: $expectedEngine" -ForegroundColor Red
+                Write-Host "    Got:      $($fileSignal.resolvedEngine)" -ForegroundColor Red
+                $wapTestFailed = $true
+            }
+            
+            if (-not $wapTestFailed) {
+                Write-Host "    Resolved package root: $($fileSignal.resolvedPackageRoot)" -ForegroundColor Gray
+                Write-Host "    Resolved pwsh: $($fileSignal.resolvedPwsh)" -ForegroundColor Gray
+                Write-Host "    Resolved engine: $($fileSignal.resolvedEngine)" -ForegroundColor Gray
+            }
+        }
+    }
+    
+    # Test 2: Protocol URI argument
+    Remove-Item $signalFile -Force -ErrorAction SilentlyContinue
+    $testUri = "mdview:file:///$($testMdFile -replace '\\','/')#section"
+    
+    Write-Host "  Running host with protocol URI argument..." -ForegroundColor Gray
+    $env:MDV_TEST_SIGNAL_PATH = $signalFile
+    try {
+        $process = Start-Process -FilePath $wapHostExe -ArgumentList "`"$testUri`"" -PassThru -Wait -NoNewWindow
+    } finally {
+        Remove-Item Env:\MDV_TEST_SIGNAL_PATH -ErrorAction SilentlyContinue
+    }
+    
+    if (Test-Path $signalFile) {
+        $signals = Get-Content $signalFile | ForEach-Object { $_ | ConvertFrom-Json }
+        $protocolSignal = $signals | Where-Object { $_.arg -eq $testUri }
+        
+        if ($protocolSignal) {
+            Write-Host "    Signal received for protocol URI test" -ForegroundColor Gray
+            Write-Host "    URI preserved: $($protocolSignal.arg)" -ForegroundColor Gray
+            
+            # Verify the fragment was preserved
+            if ($protocolSignal.arg -notmatch '#section$') {
+                Write-Host "  ERROR: URI fragment was not preserved" -ForegroundColor Red
+                $wapTestFailed = $true
+            }
+        } else {
+            Write-Host "  ERROR: No signal found for protocol URI test" -ForegroundColor Red
+            $wapTestFailed = $true
+        }
+    } else {
+        Write-Host "  ERROR: Test signal file was not created for protocol test" -ForegroundColor Red
+        $wapTestFailed = $true
+    }
+
+} catch {
+    Write-Host "  ERROR: WAP layout test failed: $_" -ForegroundColor Red
+    $wapTestFailed = $true
+} finally {
+    # Cleanup
+    if (Test-Path $wapTestRoot) {
+        Remove-Item $wapTestRoot -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "  Cleaned up WAP test directory" -ForegroundColor Gray
+    }
+}
+
+if ($wapTestFailed) {
+    Write-Error "Host-in-subfolder path resolution test failed"
+}
+
+Write-Host "  Host-in-subfolder test: OK" -ForegroundColor Green
 
 #endregion
 

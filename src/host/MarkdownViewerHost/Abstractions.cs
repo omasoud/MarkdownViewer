@@ -1,9 +1,67 @@
 // Abstractions for testability
 // These interfaces allow mocking external dependencies in unit tests.
 
-using Windows.ApplicationModel.Activation;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace MarkdownViewerHost;
+
+/// <summary>
+/// String constants for activation kinds, avoiding direct dependency on Windows.ApplicationModel.Activation.
+/// </summary>
+public static class ActivationKinds
+{
+    public const string File = "file";
+    public const string Protocol = "protocol";
+    public const string Launch = "launch";
+    public const string Unknown = "unknown";
+}
+
+/// <summary>
+/// Test signal record written to MDV_TEST_SIGNAL_PATH when running in test mode.
+/// This allows integration tests to verify path resolution without launching pwsh.
+/// </summary>
+public sealed class TestSignalRecord
+{
+    [JsonPropertyName("kind")]
+    public string Kind { get; set; } = string.Empty;
+    
+    [JsonPropertyName("arg")]
+    public string Arg { get; set; } = string.Empty;
+    
+    [JsonPropertyName("resolvedPackageRoot")]
+    public string ResolvedPackageRoot { get; set; } = string.Empty;
+    
+    [JsonPropertyName("resolvedPwsh")]
+    public string ResolvedPwsh { get; set; } = string.Empty;
+    
+    [JsonPropertyName("resolvedEngine")]
+    public string ResolvedEngine { get; set; } = string.Empty;
+    
+    [JsonPropertyName("hostBaseDirectory")]
+    public string HostBaseDirectory { get; set; } = string.Empty;
+    
+    [JsonPropertyName("timestamp")]
+    public string Timestamp { get; set; } = string.Empty;
+    
+    public string ToJson() => JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = false });
+}
+
+/// <summary>
+/// Abstraction for environment variable access.
+/// </summary>
+public interface IEnvironment
+{
+    string? GetEnvironmentVariable(string variable);
+}
+
+/// <summary>
+/// Default implementation using System.Environment.
+/// </summary>
+public sealed class DefaultEnvironment : IEnvironment
+{
+    public string? GetEnvironmentVariable(string variable) => Environment.GetEnvironmentVariable(variable);
+}
 
 /// <summary>
 /// Abstraction for file system operations.
@@ -49,9 +107,9 @@ public interface IAppActivation
 }
 
 /// <summary>
-/// Result of activation query.
+/// Result of activation query. Uses string-based Kind to avoid Windows SDK assembly dependency.
 /// </summary>
-public record ActivationResult(ActivationKind Kind, IReadOnlyList<string>? FilePaths = null, Uri? ProtocolUri = null);
+public record ActivationResult(string Kind, IReadOnlyList<string>? FilePaths = null, Uri? ProtocolUri = null);
 
 /// <summary>
 /// Default implementation using System.IO.
@@ -112,6 +170,7 @@ public sealed class DefaultAppContext : IAppContext
 
 /// <summary>
 /// Default implementation using AppInstance API (packaged apps only).
+/// This class is isolated in its own method to allow lazy loading of Windows SDK types.
 /// </summary>
 public sealed class DefaultAppActivation : IAppActivation
 {
@@ -119,31 +178,37 @@ public sealed class DefaultAppActivation : IAppActivation
     {
         try
         {
-            var args = Windows.ApplicationModel.AppInstance.GetActivatedEventArgs();
-            if (args == null) return null;
-
-            switch (args.Kind)
-            {
-                case ActivationKind.File:
-                    var fileArgs = (FileActivatedEventArgs)args;
-                    var paths = fileArgs.Files?.Select(f => f.Path).Where(p => !string.IsNullOrWhiteSpace(p)).ToList();
-                    return new ActivationResult(ActivationKind.File, paths);
-
-                case ActivationKind.Protocol:
-                    var protocolArgs = (ProtocolActivatedEventArgs)args;
-                    return new ActivationResult(ActivationKind.Protocol, ProtocolUri: protocolArgs.Uri);
-
-                case ActivationKind.Launch:
-                    return new ActivationResult(ActivationKind.Launch);
-
-                default:
-                    return new ActivationResult(args.Kind);
-            }
+            return TryGetActivatedEventArgsCore();
         }
         catch
         {
-            // Not running as packaged app, or API not available
+            // Not running as packaged app, or Windows SDK assembly not available
             return null;
+        }
+    }
+    
+    // Separate method to isolate Windows SDK type usage and allow proper exception handling
+    private static ActivationResult? TryGetActivatedEventArgsCore()
+    {
+        var args = Windows.ApplicationModel.AppInstance.GetActivatedEventArgs();
+        if (args == null) return null;
+
+        switch (args.Kind)
+        {
+            case Windows.ApplicationModel.Activation.ActivationKind.File:
+                var fileArgs = (Windows.ApplicationModel.Activation.FileActivatedEventArgs)args;
+                var paths = fileArgs.Files?.Select(f => f.Path).Where(p => !string.IsNullOrWhiteSpace(p)).ToList();
+                return new ActivationResult(ActivationKinds.File, paths);
+
+            case Windows.ApplicationModel.Activation.ActivationKind.Protocol:
+                var protocolArgs = (Windows.ApplicationModel.Activation.ProtocolActivatedEventArgs)args;
+                return new ActivationResult(ActivationKinds.Protocol, ProtocolUri: protocolArgs.Uri);
+
+            case Windows.ApplicationModel.Activation.ActivationKind.Launch:
+                return new ActivationResult(ActivationKinds.Launch);
+
+            default:
+                return new ActivationResult(ActivationKinds.Unknown);
         }
     }
 }
