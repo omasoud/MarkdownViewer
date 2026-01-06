@@ -158,39 +158,57 @@ if (-not $SkipDotnet) {
     try {
         # Run dotnet test on the specific test project (avoid WAP project error)
         $testProject = Join-Path $RepoRoot 'tests\MarkdownViewerHost.Tests\MarkdownViewerHost.Tests.csproj'
-        $testOutput = dotnet test $testProject --no-build -v quiet 2>&1
-        $testExitCode = $LASTEXITCODE
         
-        # Parse the results line
-        $resultLine = $testOutput | Where-Object { $_ -match 'Passed:\s+\d+' } | Select-Object -Last 1
-        if ($resultLine -match 'Failed:\s*(\d+).*Passed:\s*(\d+).*Skipped:\s*(\d+)') {
-            $failed = [int]$Matches[1]
-            $passed = [int]$Matches[2]
-            $skipped = [int]$Matches[3]
-        } elseif ($resultLine -match 'Passed:\s*(\d+)') {
-            $passed = [int]$Matches[1]
-            $failed = 0
-            $skipped = 0
-        } else {
-            # Fallback: try to parse from different format
-            $passed = 0; $failed = 0; $skipped = 0
-            if ($testExitCode -ne 0) { $failed = 1 }
+        # Check if we need to build first
+        $testDll = Join-Path $RepoRoot 'tests\MarkdownViewerHost.Tests\bin\Debug\net481\MarkdownViewerHost.Tests.dll'
+        $noBuildArg = if (Test-Path $testDll) { '--no-build' } else { '' }
+        
+        if (-not (Test-Path $testDll) -and $NoBuild) {
+            Write-Host "[xUnit] Test DLL not found and -NoBuild specified, building test project..." -ForegroundColor Yellow
+            $buildOutput = dotnet build $testProject -v quiet 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "[xUnit] Build failed:" -ForegroundColor Red
+                $buildOutput | Where-Object { $_ -match 'error' } | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
+                $allPassed = $false
+                $results += [PSCustomObject]@{ Suite = 'xUnit'; Passed = 0; Failed = 1; Skipped = 0; Status = 'FAILED' }
+                Pop-Location
+                # Skip the rest of this block
+                $SkipDotnet = $true
+            }
+            $noBuildArg = '--no-build'
         }
         
-        $results += [PSCustomObject]@{
-            Suite = 'xUnit'
-            Passed = $passed
-            Failed = $failed
-            Skipped = $skipped
-            Status = if ($testExitCode -eq 0) { 'PASSED' } else { 'FAILED' }
-        }
-        
-        if ($testExitCode -ne 0) {
-            $allPassed = $false
-            Write-Host "[xUnit] Some tests failed:" -ForegroundColor Red
-            $testOutput | Where-Object { $_ -match 'Failed|Error' } | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
-        } else {
-            Write-Host "[xUnit] $passed tests passed" -ForegroundColor Green
+        if (-not $SkipDotnet) {
+            $testOutput = dotnet test $testProject $noBuildArg -v minimal 2>&1
+            $testExitCode = $LASTEXITCODE
+            
+            # Parse the summary line: "Failed:     0, Passed:    43, Skipped:     0, Total:    43"
+            $summaryLine = $testOutput | Where-Object { $_ -match 'Failed:\s*\d+.*Passed:\s*\d+' } | Select-Object -Last 1
+            if ($summaryLine -match 'Failed:\s*(\d+).*Passed:\s*(\d+).*Skipped:\s*(\d+)') {
+                $failed = [int]$Matches[1]
+                $passed = [int]$Matches[2]
+                $skipped = [int]$Matches[3]
+            } else {
+                # Last fallback: check exit code
+                $passed = 0; $failed = 0; $skipped = 0
+                if ($testExitCode -eq 0) { $passed = 1 } else { $failed = 1 }
+            }
+            
+            $results += [PSCustomObject]@{
+                Suite = 'xUnit'
+                Passed = $passed
+                Failed = $failed
+                Skipped = $skipped
+                Status = if ($testExitCode -eq 0) { 'PASSED' } else { 'FAILED' }
+            }
+            
+            if ($testExitCode -ne 0) {
+                $allPassed = $false
+                Write-Host "[xUnit] Some tests failed:" -ForegroundColor Red
+                $testOutput | Where-Object { $_ -match 'Failed|Error' } | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
+            } else {
+                Write-Host "[xUnit] $passed tests passed" -ForegroundColor Green
+            }
         }
     } finally {
         Pop-Location

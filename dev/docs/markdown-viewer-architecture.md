@@ -265,6 +265,100 @@ const LANG_MAP = {
 5. Host exits immediately
 6. Engine processes markdown and opens browser
 
+### Activation Kinds
+
+The MSIX package registers for three activation kinds, each triggered by different user actions:
+
+| Activation Kind | Trigger | Example |
+|-----------------|---------|---------|
+| **File** | Double-click `.md` file, right-click "Open with" | Explorer → double-click `README.md` |
+| **Protocol** | Click `mdview:` link, in-app link navigation | Browser link, `Start-Process "mdview:..."` |
+| **Launch** | Start menu, taskbar, no arguments | Click app icon |
+
+**Important:** The most common real-world use of Protocol activation is **in-app link navigation**:
+
+```
+                        ┌─────────────────────────────────────────────────────┐
+                        │        Rendered HTML in Browser                     │
+                        │                                                     │
+User clicks File        │  # Project Documentation                           │
+Activation              │                                                     │
+(ActivationKind.File)   │  See also:                                         │
+        │               │  - [Installation Guide](./install.md)  ◄───────────┤
+        ▼               │  - [API Reference](./api.md)                       │
+┌───────────────────┐   │                                                     │
+│ Open main.md      │   │  script.js rewrites these links to:                │
+│ (File Activation) │   │    mdview:file:///C:/docs/install.md               │
+└───────────────────┘   │    mdview:file:///C:/docs/api.md                   │
+        │               └─────────────────────────────────────────────────────┘
+        ▼                                         │
+┌───────────────────┐                             │ User clicks link
+│ Browser renders   │                             │
+│ HTML with         │                             ▼
+│ rewritten links   │◄────────────────────────────┤
+└───────────────────┘                             │
+                                                  │
+                        ┌─────────────────────────┘
+                        │
+                        ▼
+              ┌─────────────────────────┐
+              │ Browser navigates to    │
+              │ mdview:file:///...      │
+              └───────────┬─────────────┘
+                          │
+                          ▼
+              ┌─────────────────────────┐
+              │ Windows invokes         │
+              │ protocol handler        │
+              │ (ActivationKind.Protocol│
+              └───────────┬─────────────┘
+                          │
+                          ▼
+              ┌─────────────────────────┐
+              │ MarkdownViewerHost.exe  │
+              │ receives Protocol       │
+              │ activation via          │
+              │ AppInstance APIs        │
+              └─────────────────────────┘
+```
+
+**Link Rewriting (script.js):**
+
+The client-side JavaScript rewrites local markdown links to use the `mdview:` protocol:
+
+```javascript
+// Input:  <a href="./install.md">Installation</a>
+// Output: <a href="mdview:file:///C:/docs/install.md">Installation</a>
+
+if (abs.toLowerCase().startsWith("file:") && isMarkdownHref(abs)) {
+    a.setAttribute("href", "mdview:" + abs);
+}
+```
+
+This ensures that clicking a relative link to another markdown file triggers the proper activation flow rather than trying to load the raw `.md` file in the browser.
+
+**Protocol URI Format:**
+
+```
+mdview:file:///C:/path/to/document.md
+mdview:file:///C:/path/to/document.md#section-anchor
+```
+
+The engine strips the `mdview:` prefix and handles the remaining `file:` URI, including any `#fragment`.
+
+### Activation Flow: Ad-hoc vs MSIX
+
+| Aspect | Ad-hoc (viewmd.vbs) | MSIX (MarkdownViewerHost.exe) |
+|--------|---------------------|-------------------------------|
+| File activation | Shell → VBS → pwsh | Shell → AppInstance → Host → pwsh |
+| Protocol activation | Shell → VBS → pwsh | Shell → AppInstance → Host → pwsh |
+| Link rewriting | Same (script.js handles mdview:) | Same (script.js handles mdview:) |
+| ActivationKind API | N/A (not packaged) | File, Protocol, or Launch |
+
+Both modes handle `mdview:` URIs identically at the engine level - the only difference is how the URI arrives:
+- **Ad-hoc:** Windows invokes `viewmd.vbs "mdview:file:///..."` directly
+- **MSIX:** Windows delivers `ProtocolActivatedEventArgs` via `AppInstance.GetActivatedEventArgs()`
+
 ## Security Architecture
 
 ### Content Security Policy (CSP)

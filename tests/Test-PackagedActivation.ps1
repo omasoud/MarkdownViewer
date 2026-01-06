@@ -473,7 +473,94 @@ if (-not $installedPackage) {
         # Wait a moment between activations
         Start-Sleep -Milliseconds 500
         
-        # Test 2: File activation via shell open
+        # Test 2: In-app link navigation (simulates clicking a rewritten mdview: link)
+        # This is the REAL protocol activation use case:
+        # 1. User opens main.md which links to [other doc](./other.md)
+        # 2. script.js rewrites this to mdview:file:///path/to/other.md
+        # 3. User clicks the link in the browser
+        # 4. Browser invokes OS protocol handler for mdview:
+        # 5. MSIX app receives ActivationKind.Protocol
+        Write-Host "  Testing in-app link navigation (mdview: from browser)..." -ForegroundColor Gray
+        
+        try {
+            # Create two linked test markdown files
+            $testDir = Join-Path $env:TEMP "mdv-e2e-link-test-$([Guid]::NewGuid().ToString('N').Substring(0,8))"
+            New-Item -ItemType Directory -Path $testDir -Force | Out-Null
+            
+            $mainMd = Join-Path $testDir 'main.md'
+            $linkedMd = Join-Path $testDir 'linked.md'
+            
+            # Main document that links to another markdown file
+            @"
+# Main Document
+
+Click [linked document](./linked.md) to test in-app navigation.
+
+This simulates the real workflow where script.js rewrites the link
+to ``mdview:file:///...`` and clicking it triggers protocol activation.
+"@ | Set-Content -Path $mainMd -Encoding UTF8
+            
+            # The linked document
+            @"
+# Linked Document
+
+You arrived here via mdview: protocol activation!
+This proves that clicking rewritten links triggers ActivationKind.Protocol.
+"@ | Set-Content -Path $linkedMd -Encoding UTF8
+            
+            # Clear the host log
+            $hostLogPath = Join-Path $env:TEMP 'MarkdownViewerHost.log'
+            if (Test-Path $hostLogPath) { Clear-Content $hostLogPath -Force }
+            
+            # Construct the mdview: URI that script.js would generate for the linked file
+            # This is exactly what the browser would navigate to when user clicks the link
+            $linkedFileUri = "file:///$($linkedMd -replace '\\','/')"
+            $mdviewUri = "mdview:$linkedFileUri"
+            
+            Write-Host "    Simulating click on rewritten link: $mdviewUri" -ForegroundColor Gray
+            
+            # Invoke the protocol handler - this is what the browser does
+            Start-Process $mdviewUri -ErrorAction Stop
+            
+            # Give the app time to start and log
+            Start-Sleep -Milliseconds 2500
+            
+            # Read the host log to verify this was true protocol activation
+            $hostLog = if (Test-Path $hostLogPath) { Get-Content $hostLogPath -Raw -ErrorAction SilentlyContinue } else { '' }
+            
+            # Check for true protocol activation (not file activation, not launch)
+            $isProtocolKind = $hostLog -match 'ActivationKind:\s*[Pp]rotocol'
+            $isViaAppInstance = $hostLog -match 'Handling Protocol activation via AppInstance'
+            $hasProtocolUri = $hostLog -match 'ProtocolUri from ActivatedEventArgs:\s*mdview:'
+            $hasLinkedPath = $hostLog -match ([regex]::Escape($linkedMd) -replace '\\\\', '[\\\\/]')
+            
+            # The key assertion: in-app navigation triggers Protocol activation, not File activation
+            if ($isProtocolKind -and $isViaAppInstance -and $hasProtocolUri) {
+                Write-TestResult -Name "In-app link navigation (ActivationKind.Protocol)" -Passed $true
+                Write-Host "    This confirms: clicking rewritten mdview: links triggers true protocol activation" -ForegroundColor Gray
+            } else {
+                $failReason = @()
+                if (-not $isProtocolKind) { $failReason += "ActivationKind != Protocol (in-app links should trigger Protocol, not File)" }
+                if (-not $isViaAppInstance) { $failReason += "Not via AppInstance" }
+                if (-not $hasProtocolUri) { $failReason += "No ProtocolUri in log" }
+                
+                Write-TestResult -Name "In-app link navigation (ActivationKind.Protocol)" -Passed $false -Message ($failReason -join '; ')
+                if ($hostLog) {
+                    Write-Host "    Host log excerpt:" -ForegroundColor Yellow
+                    $hostLog -split "`n" | Select-Object -First 15 | ForEach-Object { Write-Host "      $_" -ForegroundColor Gray }
+                }
+            }
+            
+            # Cleanup test files
+            Remove-Item $testDir -Recurse -Force -ErrorAction SilentlyContinue
+        } catch {
+            Write-TestResult -Name "In-app link navigation" -Passed $false -Message $_.Exception.Message
+        }
+        
+        # Wait a moment between activations
+        Start-Sleep -Milliseconds 500
+        
+        # Test 3: File activation via shell open
         # For Full Trust desktop bridge apps, opening a .md file via the shell
         # triggers true file activation via AppInstance APIs.
         Write-Host "  Testing file activation (shell open)..." -ForegroundColor Gray
@@ -531,7 +618,7 @@ if (-not $installedPackage) {
             Write-TestResult -Name "File activation (ActivationKind.File)" -Passed $false -Message $_.Exception.Message
         }
         
-        # Test 3: Launch activation (no arguments)
+        # Test 4: Launch activation (no arguments)
         Write-Host "  Testing launch activation..." -ForegroundColor Gray
         
         try {
