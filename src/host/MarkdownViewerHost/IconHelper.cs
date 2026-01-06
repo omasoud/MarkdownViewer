@@ -1,6 +1,10 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
 using System.Drawing.Imaging;
+using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
-using System.Drawing.Drawing2D;
 
 namespace MarkdownViewerHost
 {
@@ -8,7 +12,7 @@ namespace MarkdownViewerHost
     {
         public static Bitmap GetIconBySize(Stream iconStream, int targetSize, bool scaleToTarget = false)
         {
-            if (iconStream == null) throw new ArgumentNullException(nameof(iconStream));
+            if (iconStream == null) throw new ArgumentNullException("iconStream");
             iconStream.Position = 0;
 
             var entries = new List<(int w, int h, int imgSize, int imgOffset)>();
@@ -28,8 +32,8 @@ namespace MarkdownViewerHost
                     entries.Add((actualW, actualH, imgSize, imgOffset));
                 }
 
-        if (entries.Count == 0)
-            throw new InvalidOperationException("ICO file contains no valid images");
+                if (entries.Count == 0)
+                    throw new InvalidOperationException("ICO file contains no valid images");
                 var bestEntry = entries
                     .Where(e => e.w >= targetSize && e.h >= targetSize)
                     .OrderBy(e => e.w * e.h)
@@ -43,11 +47,15 @@ namespace MarkdownViewerHost
 
                 if (IsPng(rawData))
                 {
-                    using var ms = new MemoryStream(rawData);
-                    using var tmp = new Bitmap(ms);
-                    // Clone detaches the bitmap from the stream so we can close the stream safely
-                    var bitmap = tmp.Clone(new Rectangle(0, 0, tmp.Width, tmp.Height), tmp.PixelFormat);
-                    return scaleToTarget ? ScaleBitmap(bitmap, targetSize) : bitmap;
+                    using (var ms = new MemoryStream(rawData))
+                    {
+                        using (var tmp = new Bitmap(ms))
+                        {
+                            // Clone detaches the bitmap from the stream so we can close the stream safely
+                            var bitmap = tmp.Clone(new Rectangle(0, 0, tmp.Width, tmp.Height), tmp.PixelFormat);
+                            return scaleToTarget ? ScaleBitmap(bitmap, targetSize) : bitmap;
+                        }
+                    }
                 }
 
                 var icoBitmap = CreateBitmapFromIcoBmp(rawData);

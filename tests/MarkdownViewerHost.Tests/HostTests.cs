@@ -1,63 +1,67 @@
 // MarkdownViewerHost.Tests - Unit tests for the Host application
 // Tests the ActivationHandler logic including path resolution, activation handling, and engine launching.
 
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using MarkdownViewerHost;
 using NSubstitute;
 using Xunit;
 
-namespace MarkdownViewerHost.Tests;
-
-/// <summary>
-/// Tests for the ActivationHandler class which handles the core activation and launching logic.
-/// </summary>
-public class ActivationHandlerTests
+namespace MarkdownViewerHost.Tests
 {
-    private readonly IFileSystem _fileSystem;
-    private readonly IProcessLauncher _processLauncher;
-    private readonly IAppContext _appContext;
-    private readonly IAppActivation _appActivation;
-    private readonly List<string> _logMessages;
-    private readonly ActivationHandler _handler;
-
-    public ActivationHandlerTests()
+    /// <summary>
+    /// Tests for the ActivationHandler class which handles the core activation and launching logic.
+    /// </summary>
+    public class ActivationHandlerTests
     {
-        _fileSystem = Substitute.For<IFileSystem>();
-        _processLauncher = Substitute.For<IProcessLauncher>();
-        _appContext = Substitute.For<IAppContext>();
-        _appActivation = Substitute.For<IAppActivation>();
-        _logMessages = new List<string>();
+        private readonly IFileSystem _fileSystem;
+        private readonly IProcessLauncher _processLauncher;
+        private readonly IAppContext _appContext;
+        private readonly IAppActivation _appActivation;
+        private readonly List<string> _logMessages;
+        private readonly ActivationHandler _handler;
 
-        // Default setup - base directory without WAP subfolder
-        _appContext.BaseDirectory.Returns(@"C:\PackageRoot\");
-        
-        // Default file system behavior - forward path operations
-        _fileSystem.CombinePath(Arg.Any<string[]>()).Returns(x => Path.Combine((string[])x[0]));
-        _fileSystem.GetDirectoryName(Arg.Any<string>()).Returns(x => Path.GetDirectoryName((string)x[0]) ?? string.Empty);
-        _fileSystem.GetFullPath(Arg.Any<string>()).Returns(x => Path.GetFullPath((string)x[0]));
+        public ActivationHandlerTests()
+        {
+            _fileSystem = Substitute.For<IFileSystem>();
+            _processLauncher = Substitute.For<IProcessLauncher>();
+            _appContext = Substitute.For<IAppContext>();
+            _appActivation = Substitute.For<IAppActivation>();
+            _logMessages = new List<string>();
 
-        _handler = new ActivationHandler(
-            _fileSystem,
-            _processLauncher,
-            _appContext,
-            _appActivation,
-            msg => _logMessages.Add(msg));
-    }
+            // Default setup - base directory without WAP subfolder
+            _appContext.BaseDirectory.Returns(@"C:\PackageRoot\");
+
+            // Default file system behavior - forward path operations
+            _fileSystem.CombinePath(Arg.Any<string[]>()).Returns(x => Path.Combine((string[])x[0]));
+            _fileSystem.GetDirectoryName(Arg.Any<string>()).Returns(x => Path.GetDirectoryName((string)x[0]) ?? string.Empty);
+            _fileSystem.GetFullPath(Arg.Any<string>()).Returns(x => Path.GetFullPath((string)x[0]));
+
+            _handler = new ActivationHandler(
+                _fileSystem,
+                _processLauncher,
+                _appContext,
+                _appActivation,
+                msg => _logMessages.Add(msg));
+        }
 
     #region TryHandlePackagedActivation Tests
 
     [Fact]
-    public void TryHandlePackagedActivation_Returns_False_When_NoActivationData()
-    {
-        // Arrange
-        _appActivation.TryGetActivatedEventArgs().Returns((ActivationResult?)null);
+        public void TryHandlePackagedActivation_Returns_False_When_NoActivationData()
+        {
+            // Arrange
+            _appActivation.TryGetActivatedEventArgs().Returns((ActivationResult)null);
 
-        // Act
-        var result = _handler.TryHandlePackagedActivation();
+            // Act
+            var result = _handler.TryHandlePackagedActivation();
 
-        // Assert
-        Assert.False(result);
-    }
+            // Assert
+            Assert.False(result);
+        }
 
     [Fact]
     public void TryHandlePackagedActivation_Returns_False_For_LaunchActivation()
@@ -96,7 +100,7 @@ public class ActivationHandlerTests
     {
         // Arrange
         var uri = new Uri("mdview:file:///C:/docs/readme.md#section");
-        _appActivation.TryGetActivatedEventArgs().Returns(new ActivationResult(ActivationKinds.Protocol, ProtocolUri: uri));
+        _appActivation.TryGetActivatedEventArgs().Returns(new ActivationResult(ActivationKinds.Protocol, protocolUri: uri));
         _fileSystem.FileExists(Arg.Any<string>()).Returns(true);
         _processLauncher.LaunchProcess(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<bool>(), Arg.Any<bool>())
             .Returns(12345);
@@ -521,18 +525,18 @@ public class ActivationHandlerTests
     #region Test Mode (MDV_TEST_SIGNAL_PATH) Tests
 
     [Fact]
-    public void IsTestMode_Returns_False_When_EnvVar_Not_Set()
-    {
-        // Arrange - default handler has no test signal path set
-        var environment = Substitute.For<IEnvironment>();
-        environment.GetEnvironmentVariable(ActivationHandler.TestSignalPathEnvVar).Returns((string?)null);
-        
-        var handler = new ActivationHandler(
-            _fileSystem, _processLauncher, _appContext, _appActivation, environment, null);
+        public void IsTestMode_Returns_False_When_EnvVar_Not_Set()
+        {
+            // Arrange - default handler has no test signal path set
+            var environment = Substitute.For<IEnvironment>();
+            environment.GetEnvironmentVariable(ActivationHandler.TestSignalPathEnvVar).Returns((string)null);
 
-        // Act & Assert
-        Assert.False(handler.IsTestMode);
-    }
+            var handler = new ActivationHandler(
+                _fileSystem, _processLauncher, _appContext, _appActivation, environment, null);
+
+            // Act & Assert
+            Assert.False(handler.IsTestMode);
+        }
 
     [Fact]
     public void IsTestMode_Returns_True_When_EnvVar_Is_Set()
@@ -589,7 +593,7 @@ public class ActivationHandlerTests
         _fileSystem.FileExists(@"C:\PackageRoot\pwsh\pwsh.exe").Returns(true);
         _fileSystem.FileExists(@"C:\PackageRoot\app\Open-Markdown.ps1").Returns(true);
         
-        string? writtenContent = null;
+        string writtenContent = null;
         _fileSystem.When(x => x.AppendAllText(signalPath, Arg.Any<string>()))
             .Do(x => writtenContent = (string)x[1]);
         
@@ -618,7 +622,7 @@ public class ActivationHandlerTests
         _appContext.BaseDirectory.Returns(@"C:\PackageRoot\");
         _fileSystem.FileExists(Arg.Any<string>()).Returns(true);
         
-        string? writtenContent = null;
+        string writtenContent = null;
         _fileSystem.When(x => x.AppendAllText(signalPath, Arg.Any<string>()))
             .Do(x => writtenContent = (string)x[1]);
         
@@ -644,7 +648,7 @@ public class ActivationHandlerTests
         _appContext.BaseDirectory.Returns(@"C:\PackageRoot\");
         _fileSystem.FileExists(Arg.Any<string>()).Returns(true);
         
-        string? writtenContent = null;
+        string writtenContent = null;
         _fileSystem.When(x => x.AppendAllText(signalPath, Arg.Any<string>()))
             .Do(x => writtenContent = (string)x[1]);
         
@@ -664,88 +668,86 @@ public class ActivationHandlerTests
 }
 
 /// <summary>
-/// Original tests preserved for behavioral documentation and framework validation.
-/// </summary>
-public class HostBehaviorTests
-{
-    [Fact]
-    public void ArgumentList_Should_Contain_Structured_Args()
+    /// Original tests preserved for behavioral documentation and framework validation.
+    /// </summary>
+    public class HostBehaviorTests
     {
-        // Verify ProcessStartInfo.ArgumentList approach is used
-        var startInfo = new ProcessStartInfo
+        [Fact]
+        public void Arguments_Should_Be_Properly_Quoted()
         {
-            FileName = "pwsh",
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        
-        startInfo.ArgumentList.Add("-NoProfile");
-        startInfo.ArgumentList.Add("-ExecutionPolicy");
-        startInfo.ArgumentList.Add("Bypass");
-        startInfo.ArgumentList.Add("-File");
-        startInfo.ArgumentList.Add(@"C:\path\to\Open-Markdown.ps1");
-        startInfo.ArgumentList.Add("-Path");
-        startInfo.ArgumentList.Add(@"C:\docs\README.md");
-        
-        Assert.Equal(7, startInfo.ArgumentList.Count);
-        Assert.Equal("-NoProfile", startInfo.ArgumentList[0]);
-        Assert.Equal("-Path", startInfo.ArgumentList[5]);
-        Assert.Equal(@"C:\docs\README.md", startInfo.ArgumentList[6]);
-    }
-    
-    [Fact]
-    public void ProcessStartInfo_Should_Hide_Window()
-    {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "pwsh",
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            WindowStyle = ProcessWindowStyle.Hidden
-        };
-        
-        Assert.False(startInfo.UseShellExecute);
-        Assert.True(startInfo.CreateNoWindow);
-        Assert.Equal(ProcessWindowStyle.Hidden, startInfo.WindowStyle);
-    }
-    
-    [Fact]
-    public void AppContext_BaseDirectory_Should_Be_Available()
-    {
-        // Verify we can get the base directory for path resolution
-        var baseDir = AppContext.BaseDirectory;
-        
-        Assert.NotNull(baseDir);
-        Assert.NotEmpty(baseDir);
-    }
-    
-    [Theory]
-    [InlineData("mdview:file:///C:/docs/other.md")]
-    [InlineData("mdview:file:///C:/docs/other.md#heading")]
-    public void Uri_AbsoluteUri_Should_Preserve_Fragment(string uriString)
-    {
-        // System.Uri should preserve the fragment when using AbsoluteUri
-        var uri = new Uri(uriString);
-        Assert.Equal(uriString, uri.AbsoluteUri);
-        
-        // Fragment should be accessible
-        if (uriString.Contains('#'))
-        {
-            Assert.NotEmpty(uri.Fragment);
+            // Verify ProcessArgumentQuoter properly quotes arguments for the Arguments string
+            var args = new[]
+            {
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                @"C:\path\to\Open-Markdown.ps1",
+                "-Path",
+                @"C:\docs\README.md"
+            };
+
+            var quoted = string.Join(" ", args.Select(a => ProcessArgumentQuoter.QuoteArgument(a)));
+
+            Assert.Contains("-NoProfile", quoted);
+            Assert.Contains("-Path", quoted);
+            Assert.Contains(@"C:\docs\README.md", quoted);
         }
-    }
-    
-    [Fact]
-    public void ProcessStartInfo_For_Settings_Should_UseShellExecute()
-    {
-        // Opening ms-settings: URIs requires UseShellExecute = true
-        var startInfo = new ProcessStartInfo
+
+        [Fact]
+        public void ProcessStartInfo_Should_Hide_Window()
         {
-            FileName = "ms-settings:defaultapps",
-            UseShellExecute = true
-        };
-        
-        Assert.True(startInfo.UseShellExecute);
-        Assert.Equal("ms-settings:defaultapps", startInfo.FileName);
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "pwsh",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden
+            };
+
+            Assert.False(startInfo.UseShellExecute);
+            Assert.True(startInfo.CreateNoWindow);
+            Assert.Equal(ProcessWindowStyle.Hidden, startInfo.WindowStyle);
+        }
+
+        [Fact]
+        public void AppContext_BaseDirectory_Should_Be_Available()
+        {
+            // Verify we can get the base directory for path resolution
+            var baseDir = AppContext.BaseDirectory;
+
+            Assert.NotNull(baseDir);
+            Assert.NotEmpty(baseDir);
+        }
+
+        [Theory]
+        [InlineData("mdview:file:///C:/docs/other.md")]
+        [InlineData("mdview:file:///C:/docs/other.md#heading")]
+        public void Uri_AbsoluteUri_Should_Preserve_Fragment(string uriString)
+        {
+            // System.Uri should preserve the fragment when using AbsoluteUri
+            var uri = new Uri(uriString);
+            Assert.Equal(uriString, uri.AbsoluteUri);
+
+            // Fragment should be accessible
+            if (uriString.IndexOf('#') >= 0)
+            {
+                Assert.NotEmpty(uri.Fragment);
+            }
+        }
+
+        [Fact]
+        public void ProcessStartInfo_For_Settings_Should_UseShellExecute()
+        {
+            // Opening ms-settings: URIs requires UseShellExecute = true
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "ms-settings:defaultapps",
+                UseShellExecute = true
+            };
+
+            Assert.True(startInfo.UseShellExecute);
+            Assert.Equal("ms-settings:defaultapps", startInfo.FileName);
+        }
     }
 }

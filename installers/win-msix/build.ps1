@@ -186,28 +186,24 @@ function Build-SingleArchMsix {
     # Build Host EXE
     if (-not $NoBuild) {
         Write-Host "Building Host EXE for $Arch..." -ForegroundColor Yellow
-        $rid = "win-$Arch"
         $hostTempDir = Join-Path $archStageDir 'host-temp'
         
         Push-Location $HostProjectDir
         try {
-            dotnet publish -c $Config -r $rid --self-contained false -o $hostTempDir
+            # For .NET Framework 4.8.1, use msbuild instead of dotnet publish
+            msbuild /p:Configuration=$Config /restore /t:Build /v:m
             if ($LASTEXITCODE -ne 0) {
-                throw "dotnet publish failed for $Arch with exit code $LASTEXITCODE"
+                throw "msbuild failed for $Arch with exit code $LASTEXITCODE"
             }
         }
         finally {
             Pop-Location
         }
         
-        # Copy Host EXE to stage root
-        Copy-Item (Join-Path $hostTempDir 'MarkdownViewerHost.exe') $archStageDir
-        Copy-Item (Join-Path $hostTempDir 'MarkdownViewerHost.dll') $archStageDir
-        Copy-Item (Join-Path $hostTempDir 'MarkdownViewerHost.runtimeconfig.json') $archStageDir
-        Copy-Item (Join-Path $hostTempDir 'MarkdownViewerHost.deps.json') $archStageDir
-        
-        # Clean up temp
-        Remove-Item $hostTempDir -Recurse -Force
+        # Copy Host EXE to stage root (only the EXE for .NET Framework)
+        # net481 outputs to bin\{Configuration}\net481\
+        $hostBinDir = Join-Path $HostProjectDir "bin\$Config\net481"
+        Copy-Item (Join-Path $hostBinDir 'MarkdownViewerHost.exe') $archStageDir
         
         Write-Host "Host EXE built for $Arch" -ForegroundColor Green
     }
@@ -463,28 +459,23 @@ else {
     # Build Host EXE
     if (-not $SkipBuild) {
         Write-Host "Building Host EXE..." -ForegroundColor Yellow
-        $rid = "win-$Architecture"
         
         Push-Location $HostProjectDir
         try {
-            dotnet publish -c $Configuration -r $rid --self-contained false -o (Join-Path $StageDir 'host-temp')
+            # For .NET Framework 4.8.1, use msbuild instead of dotnet publish
+            msbuild /p:Configuration=$Configuration /restore /t:Build /v:m
             if ($LASTEXITCODE -ne 0) {
-                throw "dotnet publish failed with exit code $LASTEXITCODE"
+                throw "msbuild failed with exit code $LASTEXITCODE"
             }
         }
         finally {
             Pop-Location
         }
         
-        # Copy Host EXE to stage root
-        $hostTempDir = Join-Path $StageDir 'host-temp'
-        Copy-Item (Join-Path $hostTempDir 'MarkdownViewerHost.exe') $StageDir
-        Copy-Item (Join-Path $hostTempDir 'MarkdownViewerHost.dll') $StageDir
-        Copy-Item (Join-Path $hostTempDir 'MarkdownViewerHost.runtimeconfig.json') $StageDir
-        Copy-Item (Join-Path $hostTempDir 'MarkdownViewerHost.deps.json') $StageDir
-        
-        # Clean up temp
-        Remove-Item $hostTempDir -Recurse -Force
+        # Copy Host EXE to stage root (only the EXE for .NET Framework)
+        # net481 outputs to bin\{Configuration}\net481\
+        $hostBinDir = Join-Path $HostProjectDir "bin\$Configuration\net481"
+        Copy-Item (Join-Path $hostBinDir 'MarkdownViewerHost.exe') $StageDir
         
         Write-Host "Host EXE built successfully" -ForegroundColor Green
     }

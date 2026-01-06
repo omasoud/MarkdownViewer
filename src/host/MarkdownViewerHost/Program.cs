@@ -7,96 +7,102 @@
 // - Unpackaged (dev): Falls back to command-line args
 // - No activation: Shows help dialog
 
-namespace MarkdownViewerHost;
+using System;
+using System.IO;
+using System.Linq;
+using System.Windows.Forms;
 
-/// <summary>
-/// Simple file logger for debugging WinExe apps where Console.WriteLine doesn't work.
-/// Logs are written to %TEMP%\MarkdownViewerHost.log
-/// </summary>
-internal static class Logger
+namespace MarkdownViewerHost
 {
-    private static readonly string LogPath = Path.Combine(Path.GetTempPath(), "MarkdownViewerHost.log");
-    private static readonly bool EnableLogging = true; // Set to false in release if desired
-    
-    public static void Log(string message)
+    /// <summary>
+    /// Simple file logger for debugging WinExe apps where Console.WriteLine doesn't work.
+    /// Logs are written to %TEMP%\MarkdownViewerHost.log
+    /// </summary>
+    internal static class Logger
     {
-        if (!EnableLogging) return;
-        try
+        private static readonly string LogPath = Path.Combine(Path.GetTempPath(), "MarkdownViewerHost.log");
+        private static readonly bool EnableLogging = true; // Set to false in release if desired
+
+        public static void Log(string message)
         {
-            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-            File.AppendAllText(LogPath, $"[{timestamp}] {message}{Environment.NewLine}");
-        }
-        catch
-        {
-            // Ignore logging failures
-        }
-    }
-    
-    public static void LogException(Exception ex, string context = "")
-    {
-        Log($"EXCEPTION {context}: {ex.GetType().Name}: {ex.Message}");
-        Log($"  StackTrace: {ex.StackTrace}");
-    }
-    
-    public static void Clear()
-    {
-        try { File.Delete(LogPath); } catch { }
-    }
-}
-
-/// <summary>
-/// Entry point for the Markdown Viewer host application.
-/// Handles MSIX activation (file associations, protocol) and launches the PowerShell engine.
-/// </summary>
-internal static class Program
-{
-    [STAThread]
-    static void Main(string[] args)
-    {
-        Logger.Log($"=== MarkdownViewerHost started ===");
-        Logger.Log($"  Args: [{string.Join(", ", args.Select(a => $"\"{a}\""))}]");
-        Logger.Log($"  BaseDirectory: {AppContext.BaseDirectory}");
-        
-        // Enable visual styles for TaskDialog
-        Application.EnableVisualStyles();
-        Application.SetCompatibleTextRenderingDefault(false);
-
-        // Create the activation handler with default (real) implementations
-        var handler = new ActivationHandler(
-            new DefaultFileSystem(),
-            new DefaultProcessLauncher(),
-            new DefaultAppContext(),
-            new DefaultAppActivation(),
-            Logger.Log);
-
-        try
-        {
-            // Try to get activation data from AppInstance API (packaged apps)
-            var activationHandled = handler.TryHandlePackagedActivation();
-            Logger.Log($"  PackagedActivation handled: {activationHandled}");
-
-            if (!activationHandled)
+            if (!EnableLogging) return;
+            try
             {
-                // Fallback to command-line args (unpackaged/dev scenario)
-                if (args.Length > 0)
-                {
-                    handler.HandleCommandLineArgs(args);
-                }
-                else
-                {
-                    // No arguments - launched from Start Menu or shortcut
-                    Logger.Log("  Showing help dialog (no args)");
-                    HelpDialogManager.ShowHelpDialog();
-                }
+                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                File.AppendAllText(LogPath, string.Format("[{0}] {1}{2}", timestamp, message, Environment.NewLine));
+            }
+            catch
+            {
+                // Ignore logging failures
             }
         }
-        catch (Exception ex)
+
+        public static void LogException(Exception ex, string context = "")
         {
-            Logger.LogException(ex, "Main");
-            // Exit silently on any error - Engine owns error presentation
-            // Host must not show duplicate dialogs
+            Log(string.Format("EXCEPTION {0}: {1}: {2}", context, ex.GetType().Name, ex.Message));
+            Log(string.Format("  StackTrace: {0}", ex.StackTrace));
         }
-        
-        Logger.Log("=== MarkdownViewerHost exiting ===");
+
+        public static void Clear()
+        {
+            try { File.Delete(LogPath); } catch { }
+        }
+    }
+
+    /// <summary>
+    /// Entry point for the Markdown Viewer host application. 
+    /// Handles MSIX activation (file associations, protocol) and launches the PowerShell engine.
+    /// </summary>
+    internal static class Program
+    {
+        [STAThread]
+        static void Main(string[] args)
+        {
+            Logger.Log("=== MarkdownViewerHost started ===");
+            Logger.Log(string.Format("  Args: [{0}]", string.Join(", ", args.Select(a => string.Format("\"{0}\"", a)))));
+            Logger.Log(string.Format("  BaseDirectory: {0}", AppContext.BaseDirectory));
+
+            // Enable visual styles for TaskDialog
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+
+            // Create the activation handler with default (real) implementations
+            var handler = new ActivationHandler(
+                new DefaultFileSystem(),
+                new DefaultProcessLauncher(),
+                new DefaultAppContext(),
+                new DefaultAppActivation(),
+                Logger.Log);
+
+            try
+            {
+                // Try to get activation data from AppInstance API (packaged apps)
+                var activationHandled = handler.TryHandlePackagedActivation();
+                Logger.Log(string.Format("  PackagedActivation handled: {0}", activationHandled));
+
+                if (!activationHandled)
+                {
+                    // Fallback to command-line args (unpackaged/dev scenario)
+                    if (args.Length > 0)
+                    {
+                        handler.HandleCommandLineArgs(args);
+                    }
+                    else
+                    {
+                        // No arguments - launched from Start Menu or shortcut
+                        Logger.Log("  Showing help dialog (no args)");
+                        HelpDialogManager.ShowHelpDialog();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogException(ex, "Main");
+                // Exit silently on any error - Engine owns error presentation
+                // Host must not show duplicate dialogs
+            }
+
+            Logger.Log("=== MarkdownViewerHost exiting ===");
+        }
     }
 }

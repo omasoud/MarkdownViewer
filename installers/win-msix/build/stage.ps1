@@ -169,21 +169,14 @@ Write-Host "  Staging directory prepared: $StagingDir" -ForegroundColor Green
 # Step 2: Copy host output to staging root
 Write-Host ""
 Write-Host "[2/5] Copying host output..." -ForegroundColor Yellow
-$hostFiles = @(
-    'MarkdownViewerHost.exe',
-    'MarkdownViewerHost.dll',
-    'MarkdownViewerHost.runtimeconfig.json',
-    'MarkdownViewerHost.deps.json'
-)
-foreach ($file in $hostFiles) {
-    $srcPath = Join-Path $HostOutputDir $file
-    if (Test-Path $srcPath) {
-        Copy-Item $srcPath $StagingDir
-        Write-Host "  Copied: $file" -ForegroundColor Gray
-    }
-    else {
-        Write-Warning "  Host file not found: $srcPath"
-    }
+# For .NET Framework 4.8.1, we only need the EXE (no DLL, runtimeconfig, deps)
+$hostExe = Join-Path $HostOutputDir 'MarkdownViewerHost.exe'
+if (Test-Path $hostExe) {
+    Copy-Item $hostExe $StagingDir
+    Write-Host "  Copied: MarkdownViewerHost.exe" -ForegroundColor Gray
+}
+else {
+    Write-Warning "  Host file not found: $hostExe"
 }
 Write-Host "  Host output copied" -ForegroundColor Green
 

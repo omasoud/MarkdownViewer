@@ -1,21 +1,14 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
 
   <PropertyGroup>
     <!-- Windows GUI subsystem app (no console window) -->
     <OutputType>WinExe</OutputType>
 
-    <!-- Target Windows 10 19041 or later -->
-    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
-    
-    <!-- Runtime identifiers for MSIX packaging (enables proper restore for publish) -->
-    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <!-- Target .NET Framework 4.8.1 (pre-installed on Windows 11) -->
+    <TargetFramework>net481</TargetFramework>
 
-    <!-- Enable Windows Forms for TaskDialog support -->
+    <!-- Enable Windows Forms for help dialog -->
     <UseWindowsForms>true</UseWindowsForms>
-
-    <!-- Enable nullable reference types -->
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
 
     <!-- Assembly info -->
     <AssemblyName>MarkdownViewerHost</AssemblyName>
@@ -30,9 +23,15 @@
     <ApplicationIcon>..\..\core\icons\markdown.ico</ApplicationIcon>
     <NeutralLanguage>en-us</NeutralLanguage>
   </PropertyGroup>
+
   <ItemGroup>
     <EmbeddedResource Include="..\..\core\icons\markdown.ico">
       <LogicalName>AppIconResource</LogicalName>
     </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- WinRT contracts to compile against Windows.ApplicationModel activation APIs -->
+    <PackageReference Include="Microsoft.Windows.SDK.Contracts" Version="10.0.22621.2428" />
   </ItemGroup>
 </Project>

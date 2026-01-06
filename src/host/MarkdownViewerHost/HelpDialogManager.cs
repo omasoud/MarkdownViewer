@@ -207,7 +207,7 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
         }
         public static void ShowHelpDialog()
         {
-            using var form = new HelpForm
+            using (var form = new HelpForm
             {
                 Text = "MarkView - Welcome",
                 StartPosition = FormStartPosition.CenterScreen,
@@ -217,7 +217,8 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
                 ClientSize = new Size(920, 660),
                 BackColor = Color.White,
                 KeyPreview = true
-            };
+            })
+            {
 
             // Handle Escape key to close the dialog
             form.KeyDown += (s, e) =>
@@ -230,21 +231,27 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
 
             // 1. PREPARE THE ICON (Convert to Base64 for HTML)
             var assembly = Assembly.GetExecutingAssembly();
-            using var stream = assembly.GetManifestResourceStream("AppIconResource");
             string iconBase64 = "";
 
-            if (stream != null)
+            using (var stream = assembly.GetManifestResourceStream("AppIconResource"))
             {
-                // Set Window Icon
-                form.Icon = new Icon(stream);
-
-                // Convert high-res version to Base64 for the WebBrowser
-                using var highRes = IconHelper.GetIconBySize(stream, 256);
-                if (highRes != null)
+                if (stream != null)
                 {
-                    using var ms = new MemoryStream();
-                    highRes.Save(ms, ImageFormat.Png);
-                    iconBase64 = Convert.ToBase64String(ms.ToArray());
+                    // Set Window Icon
+                    form.Icon = new Icon(stream);
+
+                    // Convert high-res version to Base64 for the WebBrowser
+                    using (var highRes = IconHelper.GetIconBySize(stream, 256))
+                    {
+                        if (highRes != null)
+                        {
+                            using (var ms = new MemoryStream())
+                            {
+                                highRes.Save(ms, ImageFormat.Png);
+                                iconBase64 = Convert.ToBase64String(ms.ToArray());
+                            }
+                        }
+                    }
                 }
             }
 
@@ -379,6 +386,7 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
             form.Controls.Add(bottomPanel);
 
             form.ShowDialog();
+            }
         }
 
         private static Button CreateButton(string text, Size size, Color backColor, Color foreColor)
@@ -445,8 +453,8 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
                 }
 
                 // Color bare URLs as links (DetectUrls will also underline; this helps visibility on dark bg).
-                if (line.Contains("http://", StringComparison.OrdinalIgnoreCase) ||
-                    line.Contains("https://", StringComparison.OrdinalIgnoreCase))
+                if (line.IndexOf("http://", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    line.IndexOf("https://", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     rtb.Select(start, len);
                     // Keep quote/list/header colors if already applied; only override if it's plain text.
