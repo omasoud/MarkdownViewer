@@ -14,6 +14,8 @@
     <!-- Control staging behavior -->
     <SkipPwsh Condition="'$(SkipPwsh)' == ''">false</SkipPwsh>
     <ForceRegenAssets Condition="'$(ForceRegenAssets)' == ''">false</ForceRegenAssets>
+    <SkipPwshTrim Condition="'$(SkipPwshTrim)' == ''">false</SkipPwshTrim>
+    <PwshTrimLevel Condition="'$(PwshTrimLevel)' == ''">All</PwshTrimLevel>
   </PropertyGroup>
 
   <!-- Calculate host output directory - includes Platform since WAP passes it to the host project -->
@@ -51,6 +53,8 @@
       <StageArgs>$(StageArgs) -WinDir "$(WinDirClean)"</StageArgs>
       <StageArgs Condition="'$(SkipPwsh)' == 'true'">$(StageArgs) -SkipPwsh</StageArgs>
       <StageArgs Condition="'$(ForceRegenAssets)' == 'true'">$(StageArgs) -ForceRegenAssets</StageArgs>
+      <StageArgs Condition="'$(SkipPwshTrim)' == 'true'">$(StageArgs) -SkipPwshTrim</StageArgs>
+      <StageArgs Condition="'$(PwshTrimLevel)' != '' and '$(PwshTrimLevel)' != 'All'">$(StageArgs) -PwshTrimLevel $(PwshTrimLevel)</StageArgs>
     </PropertyGroup>
     
     <Message Text="Running: pwsh -File &quot;$(StageScriptPath)&quot; $(StageArgs)" Importance="normal" />

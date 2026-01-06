@@ -55,7 +55,9 @@ MarkdownViewer/
 │       ├── Build.Tests.ps1
 │       └── Stage.Tests.ps1
 └── dev/
-    └── docs/                    # Developer documentation
+    ├── docs/                    # Developer documentation
+    └── scripts/
+        └── Clean-Build.ps1      # Cleans all build outputs
 ```
 
 ## Building
@@ -75,24 +77,53 @@ The Host EXE targets .NET Framework 4.8.1, which requires msbuild (not dotnet CL
 $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
 . "$vsPath\Common7\Tools\Launch-VsDevShell.ps1" -SkipAutomaticLocation
 
-# Build entire solution
+# Restore NuGet packages and build entire solution (Debug, default platform)
+msbuild MarkdownViewer.slnx /t:Restore
 msbuild MarkdownViewer.slnx
 
-# Build specific project
-msbuild src/host/MarkdownViewerHost/MarkdownViewerHost.csproj
-
 # Build for release
+msbuild MarkdownViewer.slnx /t:Restore
 msbuild MarkdownViewer.slnx /p:Configuration=Release
+
+# Build x64 release (explicit platform)
+msbuild MarkdownViewer.slnx /t:Restore /p:Platform=x64
+msbuild MarkdownViewer.slnx /p:Configuration=Release /p:Platform=x64
 ```
 
-**Note:** `dotnet build` works for the C# test project but not for the main Host EXE.
+**Note:** After cleaning, you must run `/t:Restore` to restore NuGet packages before building. `dotnet build` works for the C# test project but not for the main Host EXE.
 
 ### Build Outputs
 
 | Project | Output Location |
 |---------|-----------------|
-| MarkdownViewerHost | `src/host/MarkdownViewerHost/bin/x64/Debug/net481/` |
-| MarkdownViewerHost.Tests | `tests/MarkdownViewerHost.Tests/bin/Debug/net9.0/` |
+| MarkdownViewerHost | `src/host/MarkdownViewerHost/bin/<Platform>/Debug/net481/` |
+| MarkdownViewerHost.Tests | `tests/MarkdownViewerHost.Tests/bin/Debug/net481/` |
+| MSIX Package | `installers/win-msix/output/MarkdownViewer_<version>_<arch>.msix` |
+
+### Cleaning Build Outputs
+
+Use the clean script to remove all build artifacts:
+
+```powershell
+# Clean all build outputs
+.\dev\scripts\Clean-Build.ps1
+
+# Preview what would be cleaned without deleting
+.\dev\scripts\Clean-Build.ps1 -WhatIf
+
+# Also remove Visual Studio cache (causes VS reload)
+.\dev\scripts\Clean-Build.ps1 -IncludeVsCache
+```
+
+**What gets cleaned:**
+- `src/host/MarkdownViewerHost/bin/` and `obj/`
+- `tests/MarkdownViewerHost.Tests/bin/` and `obj/`
+- `tests/ActivationDriver/bin/` and `obj/`
+- `installers/win-msix/bin/`, `obj/`, `output/`, `AppPackages/`, `BundleArtifacts/`
+
+**What is preserved:**
+- PowerShell bundle cache (`%TEMP%\MarkdownViewer-BuildCache`)
+- Source files and configuration
 
 ## Running Tests
 
@@ -355,8 +386,42 @@ msbuild .\installers\win-msix\MarkdownViewer.wapproj /p:Platform=x64 /p:Configur
 | `/p:Platform=x64|ARM64` | Target architecture (required) |
 | `/p:Configuration=Debug|Release` | Build configuration (default: Debug) |
 | `/p:SkipPwsh=true` | Skip bundling PowerShell runtime |
+| `/p:SkipPwshTrim=true` | Skip trimming bundled pwsh (keeps full size) |
+| `/p:PwshTrimLevel=None|Level1|Level2|Level3|All` | Trimming level (default: All) |
 | `/p:ForceRegenAssets=true` | Force regenerate PNG assets from ICO |
 | `/p:SignMsix=true` | Sign package after build |
+
+#### PowerShell Bundle Trimming
+
+By default, the staging process trims the bundled PowerShell runtime to reduce package size. This is controlled by `Trim-BundledPwsh.ps1` which removes unused components:
+
+| Level | What's Removed | Size Impact |
+|-------|----------------|-------------|
+| Level1 | Locales (except en-US), ref/, preview/, Roslyn, WPF stack, unused modules, XML docs | ~130 MB |
+| Level2 | Schemas/, diagnostic tools (createdump, mscordaccore), setup scripts | ~5 MB |
+| Level3 | Design-time assemblies, WCF/ServiceModel | ~5 MB |
+| All | All of the above (default) | ~140 MB total |
+
+**Typical size reduction:** 278 MB → 143 MB (48% reduction for x64)
+
+The trimming preserves only the modules needed for Markdown viewing:
+- `Microsoft.PowerShell.Management`
+- `Microsoft.PowerShell.Utility`
+
+After trimming, the script verifies that `ConvertFrom-Markdown` still works. If verification fails, the build stops. For cross-platform builds (e.g., building ARM64 on x64), verification is skipped since the binary can't run.
+
+**Disabling Trimming:**
+
+```powershell
+# Skip all trimming (keeps full pwsh bundle)
+msbuild ... /p:SkipPwshTrim=true
+
+# Apply only Level 1 trimming (safest)
+msbuild ... /p:PwshTrimLevel=Level1
+
+# No trimming at all
+msbuild ... /p:PwshTrimLevel=None
+```
 
 **Output:** `installers\win-msix\AppPackages\MarkdownViewer_<version>_<arch>_Test\MarkdownViewer_<version>_<arch>.msix`
 

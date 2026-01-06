@@ -27,7 +27,12 @@ param(
     
     [switch]$SkipPwsh,       # Skip bundling pwsh (for dev testing)
     
-    [switch]$ForceRegenAssets  # Force regeneration of PNG assets
+    [switch]$ForceRegenAssets,  # Force regeneration of PNG assets
+    
+    [switch]$SkipPwshTrim,   # Skip trimming bundled pwsh (keeps full size)
+    
+    [ValidateSet('None', 'Level1', 'Level2', 'Level3', 'All')]
+    [string]$PwshTrimLevel = 'All'  # Trimming level (default: All)
 )
 
 $ErrorActionPreference = 'Stop'
@@ -154,7 +159,7 @@ $assetsDir = Join-Path $StagingDir 'Assets'
 
 # Step 1: Clean staging directory
 Write-Host ""
-Write-Host "[1/5] Cleaning staging directory..." -ForegroundColor Yellow
+Write-Host "[1/6] Cleaning staging directory..." -ForegroundColor Yellow
 if (Test-Path $StagingDir) {
     Remove-Item $StagingDir -Recurse -Force
 }
@@ -168,7 +173,7 @@ Write-Host "  Staging directory prepared: $StagingDir" -ForegroundColor Green
 
 # Step 2: Copy host output to staging root
 Write-Host ""
-Write-Host "[2/5] Copying host output..." -ForegroundColor Yellow
+Write-Host "[2/6] Copying host output..." -ForegroundColor Yellow
 # For .NET Framework 4.8.1, we only need the EXE (no DLL, runtimeconfig, deps)
 $hostExe = Join-Path $HostOutputDir 'MarkdownViewerHost.exe'
 if (Test-Path $hostExe) {
@@ -182,7 +187,7 @@ Write-Host "  Host output copied" -ForegroundColor Green
 
 # Step 3: Copy engine payload to app\
 Write-Host ""
-Write-Host "[3/5] Copying engine payload..." -ForegroundColor Yellow
+Write-Host "[3/6] Copying engine payload..." -ForegroundColor Yellow
 $engineFiles = @(
     'Open-Markdown.ps1',
     'script.js',
@@ -218,7 +223,7 @@ Write-Host "  Engine payload copied to app\" -ForegroundColor Green
 
 # Step 4: Download and unpack pwsh
 Write-Host ""
-Write-Host "[4/5] Bundling PowerShell runtime..." -ForegroundColor Yellow
+Write-Host "[4/6] Bundling PowerShell runtime..." -ForegroundColor Yellow
 if ($SkipPwsh) {
     Write-Host "  Skipped (SkipPwsh specified)" -ForegroundColor Yellow
 }
@@ -245,9 +250,36 @@ else {
     }
 }
 
-# Step 5: Generate MSIX assets
+# Step 5: Trim bundled pwsh to reduce package size
 Write-Host ""
-Write-Host "[5/5] Generating MSIX assets..." -ForegroundColor Yellow
+Write-Host "[5/6] Trimming PowerShell bundle..." -ForegroundColor Yellow
+if ($SkipPwsh) {
+    Write-Host "  Skipped (no pwsh bundled)" -ForegroundColor Yellow
+}
+elseif ($SkipPwshTrim) {
+    Write-Host "  Skipped (SkipPwshTrim specified)" -ForegroundColor Yellow
+}
+elseif ($PwshTrimLevel -eq 'None') {
+    Write-Host "  Skipped (TrimLevel=None)" -ForegroundColor Yellow
+}
+else {
+    $trimScript = Join-Path $ScriptRoot 'Trim-BundledPwsh.ps1'
+    if (Test-Path $trimScript) {
+        & $trimScript -PwshDir $pwshDir -TrimLevel $PwshTrimLevel -Verify
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "Pwsh trimming failed! Use -SkipPwshTrim to skip."
+            exit 1
+        }
+    }
+    else {
+        Write-Warning "  Trim script not found: $trimScript"
+        Write-Host "  Skipping trim (script missing)" -ForegroundColor Yellow
+    }
+}
+
+# Step 6: Generate MSIX assets
+Write-Host ""
+Write-Host "[6/6] Generating MSIX assets..." -ForegroundColor Yellow
 $icoPath = Join-Path $CoreDir 'icons\markdown.ico'
 $requiredAssets = @(
     @{ Name = 'StoreLogo.png'; Width = 50; Height = 50 },
