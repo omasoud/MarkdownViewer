@@ -17,7 +17,7 @@ Markdown Viewer is a Windows application that renders Markdown files as styled H
                     ▼                                      ▼
 ┌─────────────────────────────────┐    ┌─────────────────────────────────────┐
 │     Ad-hoc: viewmd.vbs          │    │     MSIX: MarkdownViewerHost.exe    │
-│  - Windows Script Host wrapper  │    │  - .NET 10 GUI subsystem app        │
+│  - Windows Script Host wrapper  │    │  - .NET Framework 4.8.1 GUI app     │
 │  - Launches pwsh silently       │    │  - Receives file/protocol activation│
 │  - Uses system pwsh             │    │  - Launches bundled pwsh            │
 └─────────────────┬───────────────┘    └─────────────────┬───────────────────┘
@@ -81,12 +81,12 @@ CreateObject("WScript.Shell").Run cmd, 0, False
 
 #### MSIX: MarkdownViewerHost.exe
 
-**Purpose:** .NET 10 host application for MSIX activation handling.
+**Purpose:** .NET Framework 4.8.1 host application for MSIX activation handling.
 
 **Location:** `src/host/MarkdownViewerHost/`
 
 **Responsibilities:**
-- Receives file and protocol activation from Windows
+- Receives file and protocol activation from Windows via AppInstance APIs
 - Passes activation arguments to bundled pwsh
 - Uses structured argument passing (no string concatenation)
 - Hides console window (WinExe subsystem)
@@ -94,8 +94,9 @@ CreateObject("WScript.Shell").Run cmd, 0, False
 
 **Key Properties:**
 - OutputType: WinExe (no console flash)
-- Target: net10.0-windows10.0.19041.0
-- No WPF/WinForms dependency
+- Target: net481 (Full Trust desktop bridge, not packaged UWP)
+- Uses Windows.ApplicationModel.AppInstance for packaged activation
+- Uses System.Windows.Forms for help dialog
 
 ### 2. Core Engine: Open-Markdown.ps1
 
