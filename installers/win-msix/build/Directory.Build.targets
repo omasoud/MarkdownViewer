@@ -16,9 +16,9 @@
     <ForceRegenAssets Condition="'$(ForceRegenAssets)' == ''">false</ForceRegenAssets>
   </PropertyGroup>
 
-  <!-- Calculate host output directory - .NET Framework 4.8.1 uses AnyCPU output -->
+  <!-- Calculate host output directory - includes Platform since WAP passes it to the host project -->
   <PropertyGroup>
-    <HostOutputDir>$(HostProjectDir)bin\$(Configuration)\net481\</HostOutputDir>
+    <HostOutputDir>$(HostProjectDir)bin\$(Platform)\$(Configuration)\net481\</HostOutputDir>
   </PropertyGroup>
 
   <!-- Target: Build the host EXE before staging -->

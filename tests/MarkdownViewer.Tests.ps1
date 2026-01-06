@@ -1319,9 +1319,15 @@ Describe 'MSIX Package Contents' -Tag 'Integration', 'MsixValidation' {
     # this at runtime and looks in the parent directory for app\ and pwsh\.
     #
     # Run after building MSIX: Invoke-Pester -Path .\tests\MarkdownViewer.Tests.ps1 -Tag MsixValidation
+    #
+    # When run via Invoke-AllTests.ps1, the MSIX_BUILT env var is set, meaning the MSIX
+    # should exist and tests should fail (not skip) if it doesn't.
     
     BeforeAll {
         $repoRoot = Split-Path $PSScriptRoot -Parent
+        
+        # Check if Invoke-AllTests.ps1 built the MSIX (should fail, not skip, if missing)
+        $script:msixShouldExist = $env:INVOKE_ALL_TESTS_MSIX_BUILT -eq '1'
         
         # Find MSIX package from a recent build
         $msixPaths = @(
@@ -1356,10 +1362,28 @@ Describe 'MSIX Package Contents' -Tag 'Integration', 'MsixValidation' {
     
     Context 'MSIX package exists' {
         It 'has an MSIX package from a previous build' {
-            $script:hasMsix | Should -BeTrue -Because "Expected MSIX at installers\win-msix\output\MarkdownViewer_1.0.0.0_*.msix"
+            if (-not $script:hasMsix) {
+                if ($script:msixShouldExist) {
+                    # Run via Invoke-AllTests.ps1 which should have built the MSIX
+                    $script:hasMsix | Should -BeTrue -Because "MSIX should have been built by Invoke-AllTests.ps1"
+                } else {
+                    # Run standalone - skip gracefully
+                    Set-ItResult -Skipped -Because "No MSIX found at installers\win-msix\output\MarkdownViewer_1.0.0.0_*.msix - build MSIX first"
+                }
+                return
+            }
+            $script:hasMsix | Should -BeTrue
         }
         
         It 'can be extracted as a ZIP archive' {
+            if (-not $script:hasMsix) {
+                if ($script:msixShouldExist) {
+                    $script:hasMsix | Should -BeTrue -Because "MSIX should exist"
+                } else {
+                    Set-ItResult -Skipped -Because "No MSIX package available"
+                }
+                return
+            }
             $script:extractedOk | Should -BeTrue
         }
     }
@@ -1367,25 +1391,11 @@ Describe 'MSIX Package Contents' -Tag 'Integration', 'MsixValidation' {
     Context 'MSIX contains host executable at package root' {
         # Host EXE is placed at the package root (not in a subfolder)
         # The host detects app\ and pwsh\ are siblings in the same directory
-        BeforeAll {
-            if (-not $script:extractedOk) {
-                Set-ItResult -Skipped -Because "MSIX extraction failed"
-            }
-        }
         
+        # .NET Framework 4.8.1 produces only EXE (no DLL or runtimeconfig.json)
         It 'contains MarkdownViewerHost.exe at package root' {
             if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
             Join-Path $script:extractDir 'MarkdownViewerHost.exe' | Should -Exist
-        }
-        
-        It 'contains MarkdownViewerHost.dll at package root' {
-            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
-            Join-Path $script:extractDir 'MarkdownViewerHost.dll' | Should -Exist
-        }
-        
-        It 'contains MarkdownViewerHost.runtimeconfig.json at package root' {
-            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
-            Join-Path $script:extractDir 'MarkdownViewerHost.runtimeconfig.json' | Should -Exist
         }
     }
     

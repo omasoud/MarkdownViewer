@@ -1,5 +1,13 @@
 # Invoke-AllTests.ps1 - Run all tests in the Markdown Viewer project
 # This script runs both PowerShell (Pester) and C# (xUnit) tests in one command.
+#
+# IMPORTANT: This script requires Visual Studio Developer PowerShell to build the MSIX package.
+# Launch it with:
+#   . 'G:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\Launch-VsDevShell.ps1' -SkipAutomaticLocation
+#
+# Or use vswhere:
+#   $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+#   . "$vsPath\Common7\Tools\Launch-VsDevShell.ps1" -SkipAutomaticLocation
 
 #Requires -Version 7.0
 
@@ -34,20 +42,59 @@ $results = @()
 #region Build
 
 if (-not $NoBuild) {
-    Write-Host "[Build] Building solution..." -ForegroundColor Yellow
-    Push-Location $RepoRoot
-    try {
-        $buildOutput = dotnet build MarkdownViewer.slnx -c Debug 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "[Build] FAILED" -ForegroundColor Red
-            $buildOutput | Where-Object { $_ -match 'error' } | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
-            $allPassed = $false
-            $results += [PSCustomObject]@{ Suite = 'Build'; Passed = 0; Failed = 1; Skipped = 0; Status = 'FAILED' }
-        } else {
-            Write-Host "[Build] OK" -ForegroundColor Green
+    # Check if msbuild is available (required for WAP/MSIX build)
+    $msbuildAvailable = $null -ne (Get-Command msbuild -ErrorAction SilentlyContinue)
+    
+    if (-not $msbuildAvailable) {
+        Write-Host "[Build] ERROR: msbuild not found in PATH" -ForegroundColor Red
+        Write-Host "[Build] This script requires Visual Studio Developer PowerShell." -ForegroundColor Red
+        Write-Host "[Build] Launch it with:" -ForegroundColor Yellow
+        Write-Host '  $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath' -ForegroundColor Gray
+        Write-Host '  . "$vsPath\Common7\Tools\Launch-VsDevShell.ps1" -SkipAutomaticLocation' -ForegroundColor Gray
+        Write-Host ""
+        $allPassed = $false
+        $results += [PSCustomObject]@{ Suite = 'Build'; Passed = 0; Failed = 1; Skipped = 0; Status = 'FAILED' }
+    } else {
+        # Step 1: Build solution (C# projects)
+        Write-Host "[Build] Building solution (dotnet build)..." -ForegroundColor Yellow
+        Push-Location $RepoRoot
+        try {
+            $buildOutput = dotnet build MarkdownViewer.slnx -c Debug 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "[Build] Solution build FAILED" -ForegroundColor Red
+                $buildOutput | Where-Object { $_ -match 'error' } | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
+                $allPassed = $false
+                $results += [PSCustomObject]@{ Suite = 'Build'; Passed = 0; Failed = 1; Skipped = 0; Status = 'FAILED' }
+            } else {
+                Write-Host "[Build] Solution OK" -ForegroundColor Green
+                
+                # Step 2: Build MSIX package (requires msbuild)
+                Write-Host "[Build] Building MSIX package (msbuild)..." -ForegroundColor Yellow
+                $wapProject = Join-Path $RepoRoot 'installers\win-msix\MarkdownViewer.wapproj'
+                $msixOutput = msbuild $wapProject /p:Platform=x64 /p:Configuration=Release /v:m /restore 2>&1
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Host "[Build] MSIX build FAILED" -ForegroundColor Red
+                    $msixOutput | Where-Object { $_ -match 'error' } | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
+                    $allPassed = $false
+                    $results += [PSCustomObject]@{ Suite = 'Build'; Passed = 0; Failed = 1; Skipped = 0; Status = 'FAILED' }
+                } else {
+                    # Verify MSIX was created
+                    $msixPath = Join-Path $RepoRoot 'installers\win-msix\output\MarkdownViewer_1.0.0.0_x64.msix'
+                    if (Test-Path $msixPath) {
+                        Write-Host "[Build] MSIX OK: $msixPath" -ForegroundColor Green
+                        $results += [PSCustomObject]@{ Suite = 'Build'; Passed = 1; Failed = 0; Skipped = 0; Status = 'PASSED' }
+                        # Set env var so Pester tests know MSIX should exist (fail instead of skip)
+                        $env:INVOKE_ALL_TESTS_MSIX_BUILT = '1'
+                    } else {
+                        Write-Host "[Build] MSIX build completed but package not found at: $msixPath" -ForegroundColor Red
+                        $allPassed = $false
+                        $results += [PSCustomObject]@{ Suite = 'Build'; Passed = 0; Failed = 1; Skipped = 0; Status = 'FAILED' }
+                    }
+                }
+            }
+        } finally {
+            Pop-Location
         }
-    } finally {
-        Pop-Location
     }
     Write-Host ""
 }

@@ -6,7 +6,8 @@ This guide covers building, testing, and developing Markdown Viewer.
 
 - **PowerShell 7+** (pwsh) - Required for all scripts and testing
 - **Windows 10 SDK** - Required for MSIX packaging (includes `makeappx.exe`)
-- **.NET 10 SDK** - Required for building the Host EXE
+- **.NET Framework 4.8.1** - Pre-installed on Windows 11 (no SDK needed)
+- **Visual Studio 2026** - Required for building the Host EXE (msbuild)
 - **Pester 5.x** - Required for PowerShell tests
 
 ### Installing Prerequisites
@@ -15,8 +16,8 @@ This guide covers building, testing, and developing Markdown Viewer.
 # PowerShell 7 (if not installed)
 winget install Microsoft.PowerShell
 
-# .NET 10 SDK
-winget install Microsoft.DotNet.SDK.Preview
+# .NET Framework 4.8.1 is pre-installed on Windows 11
+# No separate installation needed
 
 # Pester 5.x (in PowerShell 7)
 Install-Module -Name Pester -Force -SkipPublisherCheck -Scope CurrentUser
@@ -39,7 +40,7 @@ MarkdownViewer/
 │   │   ├── viewmd.vbs           # VBScript launcher (ad-hoc)
 │   │   └── uninstall.vbs        # Silent uninstall helper
 │   └── host/                    # MSIX Host EXE
-│       └── MarkdownViewerHost/  # .NET 10 project
+│       └── MarkdownViewerHost/  # .NET Framework 4.8.1 WinForms project
 ├── installers/
 │   ├── win-adhoc/               # Per-user ad-hoc installer
 │   └── win-msix/                # MSIX packaging
@@ -65,25 +66,33 @@ MarkdownViewer/
 2. Select Build > Build Solution (Ctrl+Shift+B)
 3. Projects build to their respective `bin/Debug/` directories
 
-### Option 2: Command Line
+### Option 2: Command Line (msbuild)
+
+The Host EXE targets .NET Framework 4.8.1, which requires msbuild (not dotnet CLI):
 
 ```powershell
+# Launch VS Developer PowerShell first
+$vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+. "$vsPath\Common7\Tools\Launch-VsDevShell.ps1" -SkipAutomaticLocation
+
 # Build entire solution
-dotnet build MarkdownViewer.slnx
+msbuild MarkdownViewer.slnx
 
 # Build specific project
-dotnet build src/host/MarkdownViewerHost/MarkdownViewerHost.csproj
+msbuild src/host/MarkdownViewerHost/MarkdownViewerHost.csproj
 
 # Build for release
-dotnet build MarkdownViewer.slnx -c Release
+msbuild MarkdownViewer.slnx /p:Configuration=Release
 ```
+
+**Note:** `dotnet build` works for the C# test project but not for the main Host EXE.
 
 ### Build Outputs
 
 | Project | Output Location |
 |---------|-----------------|
-| MarkdownViewerHost | `src/host/MarkdownViewerHost/bin/Debug/net10.0-windows10.0.19041.0/` |
-| MarkdownViewerHost.Tests | `tests/MarkdownViewerHost.Tests/bin/Debug/net10.0/` |
+| MarkdownViewerHost | `src/host/MarkdownViewerHost/bin/x64/Debug/net481/` |
+| MarkdownViewerHost.Tests | `tests/MarkdownViewerHost.Tests/bin/Debug/net9.0/` |
 
 ## Running Tests
 
@@ -100,7 +109,11 @@ This project has three levels of tests:
 The easiest way to run all tests at once:
 
 ```powershell
-# Run all Pester + xUnit tests (builds first)
+# Launch VS Developer PowerShell first (required for msbuild)
+$vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+. "$vsPath\Common7\Tools\Launch-VsDevShell.ps1" -SkipAutomaticLocation
+
+# Run all tests (builds MSIX, runs Pester + xUnit)
 .\tests\Invoke-AllTests.ps1
 
 # Skip the build step (if already built)
@@ -110,14 +123,17 @@ The easiest way to run all tests at once:
 .\tests\Invoke-AllTests.ps1 -IncludeE2E
 ```
 
+**Note:** `Invoke-AllTests.ps1` requires msbuild to build the MSIX package. Run from VS Developer PowerShell.
+
 **Expected output:**
 ```
 Test Summary
 ================================================
-  Pester      270 passed,  0 failed, 25 skipped  [PASSED]
+  Build         1 passed,  0 failed,  0 skipped  [PASSED]
+  Pester      270 passed,  0 failed, 23 skipped  [PASSED]
   xUnit        43 passed,  0 failed,  0 skipped  [PASSED]
 
-  Total:      313 passed,  0 failed, 25 skipped
+  Total:      314 passed,  0 failed, 23 skipped
 
 ALL TESTS PASSED
 ```
@@ -362,7 +378,7 @@ The Clean target removes:
 
 **Prerequisites for WAP Build:**
 - Visual Studio 2026 with "Windows Application Packaging Project" workload
-- .NET 10 SDK
+- .NET Framework 4.8.1 (pre-installed on Windows 11)
 - ImageMagick (optional, for asset generation from ICO - falls back to solid-color placeholders)
 
 #### Method 2: build.ps1 (Legacy)
