@@ -13,7 +13,9 @@ param(
     
     [switch]$TrustCert,          # Add cert to TrustedPeople store (enables sideload)
     
-    [string]$CertSubject = 'CN=MarkdownViewer',  # Must match manifest Publisher
+    [switch]$TrustRoot,          # Add cert to Trusted Root store (required for MSIX installation)
+    
+    [string]$CertSubject = 'CN=7D515F91-B0EF-4927-8C46-4D23245ABE47',  # Must match manifest Publisher
     
     [string]$CertFriendlyName = 'Markdown Viewer Dev Certificate',
     
@@ -123,6 +125,35 @@ function Add-CertToTrustedPeople {
     }
 }
 
+# Add certificate to Trusted Root store for MSIX installation
+# This is required because self-signed certs need to be in the root store for MSIX to trust them
+function Add-CertToTrustedRoot {
+    param([System.Security.Cryptography.X509Certificates.X509Certificate2]$Certificate)
+    
+    Write-Host "Adding certificate to Trusted Root store..." -ForegroundColor Yellow
+    
+    # Check if already in TrustedRoot
+    $existingCert = Get-ChildItem -Path Cert:\CurrentUser\Root | Where-Object { $_.Thumbprint -eq $Certificate.Thumbprint }
+    
+    if ($existingCert) {
+        Write-Host "  Certificate already in Trusted Root" -ForegroundColor Green
+        return
+    }
+    
+    # Export and import to Trusted Root
+    try {
+        $tempPath = Join-Path $env:TEMP "temp_cert_$([Guid]::NewGuid().ToString('N').Substring(0,8)).cer"
+        $Certificate | Export-Certificate -FilePath $tempPath -Type CERT -Force | Out-Null
+        Import-Certificate -FilePath $tempPath -CertStoreLocation Cert:\CurrentUser\Root | Out-Null
+        Remove-Item $tempPath -Force -ErrorAction SilentlyContinue
+        Write-Host "  Certificate added to Trusted Root store" -ForegroundColor Green
+    }
+    catch {
+        Write-Warning "  Failed to add certificate to Trusted Root: $_"
+        Write-Host "  You may need to run as Administrator for LocalMachine trust, or manually trust the certificate." -ForegroundColor Yellow
+    }
+}
+
 # Sign an MSIX package
 function Sign-MsixPackage {
     param(
@@ -160,13 +191,14 @@ function Sign-MsixPackage {
 Write-Host "Markdown Viewer MSIX Signing Script" -ForegroundColor Cyan
 Write-Host "===================================" -ForegroundColor Cyan
 
-if (-not $CreateCert -and -not $Sign -and -not $TrustCert) {
+if (-not $CreateCert -and -not $Sign -and -not $TrustCert -and -not $TrustRoot) {
     Write-Host ""
     Write-Host "Usage:" -ForegroundColor Yellow
-    Write-Host "  Create certificate:  .\sign.ps1 -CreateCert"
-    Write-Host "  Trust certificate:   .\sign.ps1 -TrustCert"
-    Write-Host "  Sign MSIX:           .\sign.ps1 -Sign -MsixPath <path>"
-    Write-Host "  All in one:          .\sign.ps1 -CreateCert -TrustCert -Sign -MsixPath <path>"
+    Write-Host "  Create certificate:   .\sign.ps1 -CreateCert"
+    Write-Host "  Trust for sideload:   .\sign.ps1 -TrustCert"
+    Write-Host "  Trust for MSIX:       .\sign.ps1 -TrustRoot"
+    Write-Host "  Sign MSIX:            .\sign.ps1 -Sign -MsixPath <path>"
+    Write-Host "  All in one:           .\sign.ps1 -CreateCert -TrustCert -TrustRoot -Sign -MsixPath <path>"
     Write-Host ""
     Write-Host "The certificate subject must match the Publisher in AppxManifest.xml"
     Write-Host "Current subject: $CertSubject"
@@ -182,7 +214,7 @@ if ($CreateCert) {
 else {
     # Try to find existing certificate
     $cert = Get-DevCertificate -Subject $CertSubject
-    if (-not $cert -and ($Sign -or $TrustCert)) {
+    if (-not $cert -and ($Sign -or $TrustCert -or $TrustRoot)) {
         Write-Host "No valid certificate found. Creating one..." -ForegroundColor Yellow
         $cert = New-DevCertificate -Subject $CertSubject -FriendlyName $CertFriendlyName -ValidityDays $CertValidityDays
     }
@@ -191,6 +223,11 @@ else {
 # Trust certificate if requested
 if ($TrustCert -and $cert) {
     Add-CertToTrustedPeople -Certificate $cert
+}
+
+# Add to Trusted Root if requested (required for MSIX installation)
+if ($TrustRoot -and $cert) {
+    Add-CertToTrustedRoot -Certificate $cert
 }
 
 # Sign package if requested

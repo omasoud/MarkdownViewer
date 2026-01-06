@@ -294,7 +294,9 @@ $html
         Write-Doc -outPath $outRemote -allowRemoteImages:$true -hasRemoteImages:$hasRemoteImages
     }
 
-    $launch = if ($frag) { $outLocal + $frag } else { $outLocal }
+    # When there's a fragment, we must use the file:// URI so the browser handles #fragment correctly.
+    # Using a plain path like "C:\...\file.html#section" causes Windows to look for a file literally named that.
+    $launch = if ($frag) { $uLocal + $frag } else { $outLocal }
     Start-Process $launch
 }
 catch {

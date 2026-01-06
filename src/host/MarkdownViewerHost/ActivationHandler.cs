@@ -14,6 +14,13 @@ public sealed class ActivationHandler
     /// When set, host writes JSON trace and exits without launching pwsh.
     /// </summary>
     public const string TestSignalPathEnvVar = "MDV_TEST_SIGNAL_PATH";
+    
+    /// <summary>
+    /// Environment variable name for E2E trace path (alias for test signal).
+    /// When set, host writes JSON trace and exits without launching pwsh.
+    /// Used for MSIX E2E activation tests.
+    /// </summary>
+    public const string E2ETracePathEnvVar = "MDV_E2E_TRACE_PATH";
 
     private readonly IFileSystem _fileSystem;
     private readonly IProcessLauncher _processLauncher;
@@ -50,8 +57,14 @@ public sealed class ActivationHandler
 
     /// <summary>
     /// Gets the test signal path from environment variable, or null if not in test mode.
+    /// Checks MDV_TEST_SIGNAL_PATH first, then MDV_E2E_TRACE_PATH as fallback.
     /// </summary>
-    public string? GetTestSignalPath() => _environment.GetEnvironmentVariable(TestSignalPathEnvVar);
+    public string? GetTestSignalPath()
+    {
+        var path = _environment.GetEnvironmentVariable(TestSignalPathEnvVar);
+        if (!string.IsNullOrEmpty(path)) return path;
+        return _environment.GetEnvironmentVariable(E2ETracePathEnvVar);
+    }
 
     /// <summary>
     /// Returns true if running in test mode (MDV_TEST_SIGNAL_PATH is set).
@@ -249,7 +262,7 @@ public sealed class ActivationHandler
 
     /// <summary>
     /// Launch the PowerShell engine with the given path or URI.
-    /// In test mode (MDV_TEST_SIGNAL_PATH set), writes a JSON trace and exits without launching pwsh.
+    /// In test mode (MDV_TEST_SIGNAL_PATH or MDV_E2E_TRACE_PATH set), writes a JSON trace and exits without launching pwsh.
     /// </summary>
     /// <param name="pathOrUri">Absolute file path or mdview: URI</param>
     /// <param name="activationKind">The kind of activation that triggered this launch</param>
@@ -269,7 +282,7 @@ public sealed class ActivationHandler
         if (!string.IsNullOrEmpty(testSignalPath))
         {
             _log?.Invoke($"    TEST MODE: Writing signal to {testSignalPath}");
-            WriteTestSignal(testSignalPath, activationKind, pathOrUri, packageRoot, pwshPath, enginePath);
+            WriteTestSignal(testSignalPath, activationKind, pathOrUri, packageRoot, pwshPath, enginePath, arguments);
             return; // Exit without launching pwsh
         }
 
@@ -287,7 +300,7 @@ public sealed class ActivationHandler
     /// <summary>
     /// Writes a test signal JSON record to the specified path.
     /// </summary>
-    private void WriteTestSignal(string signalPath, string kind, string arg, string packageRoot, string pwshPath, string enginePath)
+    private void WriteTestSignal(string signalPath, string kind, string arg, string packageRoot, string pwshPath, string enginePath, IReadOnlyList<string> arguments)
     {
         var signal = new TestSignalRecord
         {
@@ -297,6 +310,7 @@ public sealed class ActivationHandler
             ResolvedPwsh = pwshPath,
             ResolvedEngine = enginePath,
             HostBaseDirectory = _appContext.BaseDirectory,
+            PwshArguments = arguments,
             Timestamp = DateTime.UtcNow.ToString("o")
         };
 

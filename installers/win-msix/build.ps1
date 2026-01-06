@@ -302,7 +302,8 @@ function Build-SingleArchMsix {
             foreach ($asset in $assetsToGenerate) {
                 $destPath = Join-Path $assetsDir $asset.Name
                 $size = "$($asset.Width)x$($asset.Height)"
-                & magick $icoPath -resize $size -background transparent -gravity center -extent $size $destPath 2>$null
+                # Use [0] to select only the first frame from the ICO (ICOs can have multiple frames)
+                & magick "$icoPath[0]" -resize $size -background transparent -gravity center -extent $size $destPath 2>$null
                 if ($LASTEXITCODE -eq 0) {
                     Write-Host "    Generated: $($asset.Name)" -ForegroundColor Gray
                 }
@@ -542,7 +543,7 @@ else {
     
     # Copy MSIX assets
     Write-Host "Copying MSIX assets..." -ForegroundColor Yellow
-    $sourceAssets = Join-Path $PackageDir 'Assets'
+    $sourceAssets = Join-Path $ScriptRoot 'Assets'
     $requiredAssets = @(
         @{ Name = 'StoreLogo.png'; Width = 50; Height = 50 },
         @{ Name = 'Square44x44Logo.png'; Width = 44; Height = 44 },
@@ -577,7 +578,8 @@ else {
             foreach ($asset in $assetsToGenerate) {
                 $destPath = Join-Path $AssetsDir $asset.Name
                 $size = "$($asset.Width)x$($asset.Height)"
-                & magick $icoPath -resize $size -background transparent -gravity center -extent $size $destPath 2>$null
+                # Use [0] to select only the first frame from the ICO (ICOs can have multiple frames)
+                & magick "$icoPath[0]" -resize $size -background transparent -gravity center -extent $size $destPath 2>$null
                 if ($LASTEXITCODE -eq 0) {
                     Write-Host "    Generated: $($asset.Name)" -ForegroundColor Gray
                 }
@@ -598,7 +600,7 @@ else {
     
     # Copy and update AppxManifest.xml
     Write-Host "Preparing AppxManifest.xml..." -ForegroundColor Yellow
-    $manifestSource = Join-Path $PackageDir 'AppxManifest.xml'
+    $manifestSource = Join-Path $ScriptRoot 'Package.appxmanifest'
     $manifestDest = Join-Path $StageDir 'AppxManifest.xml'
     
     $manifest = Get-Content $manifestSource -Raw

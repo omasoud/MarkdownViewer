@@ -1364,29 +1364,34 @@ Describe 'MSIX Package Contents' -Tag 'Integration', 'MsixValidation' {
         }
     }
     
-    Context 'MSIX contains WAP project subfolder with host' {
-        # WAP puts the project reference output in a subfolder named after the project
-        # This is where the EXE actually runs from (AppContext.BaseDirectory)
+    Context 'MSIX contains host executable at package root' {
+        # Host EXE is placed at the package root (not in a subfolder)
+        # The host detects app\ and pwsh\ are siblings in the same directory
         BeforeAll {
             if (-not $script:extractedOk) {
                 Set-ItResult -Skipped -Because "MSIX extraction failed"
             }
         }
         
-        It 'has MarkdownViewerHost subfolder (WAP project reference output)' {
+        It 'contains MarkdownViewerHost.exe at package root' {
             if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
-            Join-Path $script:extractDir 'MarkdownViewerHost' | Should -Exist
+            Join-Path $script:extractDir 'MarkdownViewerHost.exe' | Should -Exist
         }
         
-        It 'contains MarkdownViewerHost.exe in WAP subfolder' {
+        It 'contains MarkdownViewerHost.dll at package root' {
             if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
-            Join-Path $script:extractDir 'MarkdownViewerHost\MarkdownViewerHost.exe' | Should -Exist
+            Join-Path $script:extractDir 'MarkdownViewerHost.dll' | Should -Exist
+        }
+        
+        It 'contains MarkdownViewerHost.runtimeconfig.json at package root' {
+            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
+            Join-Path $script:extractDir 'MarkdownViewerHost.runtimeconfig.json' | Should -Exist
         }
     }
     
     Context 'MSIX contains app\ directory with engine' {
-        # app\ and pwsh\ are at package ROOT, not in the WAP subfolder
-        # The host EXE detects this and looks in parent directory at runtime
+        # app\ directory is at package root alongside the host EXE
+        # Contains the PowerShell engine and web assets
         It 'has app subdirectory at package root' {
             if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
             Join-Path $script:extractDir 'app' | Should -Exist
@@ -1466,14 +1471,18 @@ Describe 'MSIX Package Contents' -Tag 'Integration', 'MsixValidation' {
         }
     }
     
-    Context 'MSIX contains pwsh directory' {
-        It 'has pwsh subdirectory' {
-            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
+    Context 'MSIX contains pwsh directory (when bundled)' {
+        # pwsh\ is optional - only present when PowerShell runtime is bundled
+        # Skip these tests if pwsh wasn't bundled (e.g., built with -SkipPwsh)
+        BeforeAll {
+            $script:hasBundledPwsh = $script:extractedOk -and (Test-Path (Join-Path $script:extractDir 'pwsh'))
+        }
+        
+        It 'has pwsh subdirectory' -Skip:(-not $script:hasBundledPwsh) {
             Join-Path $script:extractDir 'pwsh' | Should -Exist
         }
         
-        It 'contains pwsh\pwsh.exe' {
-            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
+        It 'contains pwsh\pwsh.exe' -Skip:(-not $script:hasBundledPwsh) {
             Join-Path $script:extractDir 'pwsh\pwsh.exe' | Should -Exist
         }
     }

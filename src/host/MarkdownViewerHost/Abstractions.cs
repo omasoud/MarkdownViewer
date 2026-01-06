@@ -18,7 +18,7 @@ public static class ActivationKinds
 }
 
 /// <summary>
-/// Test signal record written to MDV_TEST_SIGNAL_PATH when running in test mode.
+/// Test signal record written to MDV_TEST_SIGNAL_PATH (or MDV_E2E_TRACE_PATH) when running in test mode.
 /// This allows integration tests to verify path resolution without launching pwsh.
 /// </summary>
 public sealed class TestSignalRecord
@@ -40,6 +40,9 @@ public sealed class TestSignalRecord
     
     [JsonPropertyName("hostBaseDirectory")]
     public string HostBaseDirectory { get; set; } = string.Empty;
+    
+    [JsonPropertyName("pwshArguments")]
+    public IReadOnlyList<string> PwshArguments { get; set; } = Array.Empty<string>();
     
     [JsonPropertyName("timestamp")]
     public string Timestamp { get; set; } = string.Empty;

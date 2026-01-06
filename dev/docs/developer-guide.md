@@ -44,8 +44,15 @@ MarkdownViewer/
 │   ├── win-adhoc/               # Per-user ad-hoc installer
 │   └── win-msix/                # MSIX packaging
 ├── tests/
-│   ├── MarkdownViewer.Tests.ps1 # Pester tests (PowerShell)
-│   └── MarkdownViewerHost.Tests/# xUnit tests (C#)
+│   ├── Invoke-AllTests.ps1      # Run all tests at once
+│   ├── MarkdownViewer.Tests.ps1 # Pester tests (engine, module, MSIX structure)
+│   ├── Test-PackagedActivation.ps1  # E2E MSIX activation tests
+│   ├── Test-StagedPayload.ps1   # Staged payload integration tests
+│   ├── MarkdownViewerHost.Tests/# xUnit tests (C# host)
+│   ├── ActivationDriver/        # COM activation tool for E2E tests
+│   └── pwsh/                    # Build/stage script tests
+│       ├── Build.Tests.ps1
+│       └── Stage.Tests.ps1
 └── dev/
     └── docs/                    # Developer documentation
 ```
@@ -80,41 +87,146 @@ dotnet build MarkdownViewer.slnx -c Release
 
 ## Running Tests
 
-### PowerShell Tests (Pester)
+This project has three levels of tests:
 
-The main test suite for the PowerShell engine and module:
+| Test Suite | Framework | Count | Purpose |
+|------------|-----------|-------|---------|
+| Pester | PowerShell | ~270 | Engine, module, sanitizer, MSIX structure |
+| xUnit | C#/.NET | ~43 | Host EXE activation handling |
+| E2E MSIX | PowerShell | ~8 | Full packaged app activation (interactive) |
+
+### Run All Tests (Recommended)
+
+The easiest way to run all tests at once:
 
 ```powershell
-# Run from repository root
-Import-Module Pester -RequiredVersion 5.7.1 -Force
-Invoke-Pester "tests\MarkdownViewer.Tests.ps1" -Output Detailed
+# Run all Pester + xUnit tests (builds first)
+.\tests\Invoke-AllTests.ps1
 
-# Or with minimal output
-Invoke-Pester "tests\MarkdownViewer.Tests.ps1" -Output Minimal
+# Skip the build step (if already built)
+.\tests\Invoke-AllTests.ps1 -NoBuild
+
+# Include E2E MSIX tests (interactive, requires clicking Install)
+.\tests\Invoke-AllTests.ps1 -IncludeE2E
 ```
 
-**Expected:** 170 tests pass
+**Expected output:**
+```
+Test Summary
+================================================
+  Pester      270 passed,  0 failed, 25 skipped  [PASSED]
+  xUnit        43 passed,  0 failed,  0 skipped  [PASSED]
+
+  Total:      313 passed,  0 failed, 25 skipped
+
+ALL TESTS PASSED
+```
+
+### PowerShell Tests (Pester)
+
+Tests for the PowerShell engine, module, HTML sanitizer, and MSIX packaging structure:
+
+```powershell
+# Run ALL Pester tests in the tests directory
+Import-Module Pester -RequiredVersion 5.7.1 -Force
+Invoke-Pester tests -Output Minimal
+
+# Run with detailed output (useful for debugging failures)
+Invoke-Pester tests -Output Detailed
+
+# Run only the main test file
+Invoke-Pester tests\MarkdownViewer.Tests.ps1 -Output Minimal
+
+# Run only build/stage tests
+Invoke-Pester tests\pwsh -Output Minimal
+```
+
+**Test files:**
+- `tests/MarkdownViewer.Tests.ps1` - Main test suite (engine, module, sanitizer, MSIX structure)
+- `tests/pwsh/Build.Tests.ps1` - build.ps1 script tests
+- `tests/pwsh/Stage.Tests.ps1` - stage.ps1 script tests
+
+#### Skipped Tests (25)
+
+Some tests are conditionally skipped and will run when prerequisites are met:
+
+| Condition | Tests Skipped | How to Run |
+|-----------|---------------|------------|
+| No staging directory | ~12 | Run `.\installers\win-msix\build.ps1` first |
+| No bundled pwsh | ~3 | Run build with `-DownloadPwsh` flag |
+| No MSIX file | ~10 | Run build to create MSIX package |
+
+To run with all tests enabled:
+```powershell
+# Build MSIX first (creates staging directory)
+.\installers\win-msix\build.ps1 -DownloadPwsh
+
+# Now all tests will run
+Invoke-Pester tests -Output Minimal
+```
 
 ### C# Tests (xUnit)
 
-Tests for the Host EXE:
+Tests for the Host EXE activation handling (file activation, protocol activation, path resolution):
 
 ```powershell
-# Run via dotnet CLI
-dotnet test MarkdownViewer.slnx
-
-# Or run specific test project
+# Run C# tests via dotnet CLI
 dotnet test tests\MarkdownViewerHost.Tests\MarkdownViewerHost.Tests.csproj
+
+# Run with detailed output
+dotnet test tests\MarkdownViewerHost.Tests\MarkdownViewerHost.Tests.csproj -v normal
+
+# Run after building (faster)
+dotnet test tests\MarkdownViewerHost.Tests\MarkdownViewerHost.Tests.csproj --no-build
 ```
 
-**Expected:** 12 tests pass
+**Note:** Running `dotnet test MarkdownViewer.slnx` will show an error about the WAP project not supporting VSTest. This is harmless - the C# tests still run. Use the specific project path to avoid the warning.
+
+### E2E MSIX Activation Tests (Interactive)
+
+Full end-to-end tests that build, install, and activate the MSIX package. These tests require user interaction (clicking "Install" in App Installer):
+
+```powershell
+# Run full E2E test (builds MSIX, installs, tests activation)
+.\tests\Test-PackagedActivation.ps1
+
+# Skip build if MSIX already exists
+.\tests\Test-PackagedActivation.ps1 -SkipBuild
+
+# Keep the package installed after test (for manual testing)
+.\tests\Test-PackagedActivation.ps1 -KeepInstalled
+```
+
+**What the E2E test does:**
+1. Checks for Windows App SDK runtime (warns if present - may mask issues)
+2. Builds ActivationDriver.exe (COM-based activation tool)
+3. Builds MSIX package via build.ps1
+4. Runs staged payload integration test
+5. Scans for forbidden runtime dependencies
+6. **Installs MSIX** (opens App Installer - **click Install**)
+7. Tests protocol, file, and launch activation
+8. Uninstalls the package (unless `-KeepInstalled`)
+
+**Expected output:**
+```
+Test Summary
+================================================
+  Passed:  8
+  Failed:  0
+  Skipped: 0
+
+E2E TESTS PASSED
+```
+
+**First-time setup:** The test will prompt for UAC elevation to trust the signing certificate. This is a one-time operation.
 
 ### Visual Studio Test Explorer
 
-1. Open `MarkdownViewer.sln` in Visual Studio
+1. Open `MarkdownViewer.slnx` in Visual Studio 2026
 2. Open Test > Test Explorer (Ctrl+E, T)
 3. Click "Run All Tests" or select specific tests
-4. C# xUnit tests appear automatically; Pester tests require the Pester Test Adapter extension
+4. C# xUnit tests appear automatically
+5. For Pester tests, install the "Pester Test Adapter" extension
 
 ## Development Testing
 
