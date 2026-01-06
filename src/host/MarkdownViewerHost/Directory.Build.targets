@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+  Directory.Build.targets for MarkdownViewerHost
+  
+  .NET Framework 4.8.1 doesn't support RuntimeIdentifiers. When WAP projects try to build
+  this project with a RuntimeIdentifier (e.g., win-x64, win-x86), it causes NETSDK1047 errors.
+  
+  This targets file clears any RuntimeIdentifier passed by the WAP project.
+-->
+<Project>
+  <!-- Clear RuntimeIdentifier early, before SDK targets evaluate it -->
+  <PropertyGroup>
+    <RuntimeIdentifier></RuntimeIdentifier>
+    <RuntimeIdentifiers></RuntimeIdentifiers>
+    <!-- Also clear Platform if it's set to x64/x86/ARM64 - use AnyCPU for .NET Framework -->
+    <Platform Condition="'$(Platform)' == 'x64' OR '$(Platform)' == 'x86' OR '$(Platform)' == 'ARM64'">AnyCPU</Platform>
+    <PlatformTarget Condition="'$(Platform)' == 'AnyCPU'">AnyCPU</PlatformTarget>
+  </PropertyGroup>
+</Project>

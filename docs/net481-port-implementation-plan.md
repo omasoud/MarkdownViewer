@@ -113,9 +113,10 @@ Reference implementation: [solution3.txt](../dev/docs/solution3.txt)
 
 ### Files Created
 - `src/host/MarkdownViewerHost/ProcessArgumentQuoter.cs` - Argument quoting helper
+- `src/host/MarkdownViewerHost/Directory.Build.targets` - Clears RuntimeIdentifier when passed by WAP project
 
 ### Files Modified
-- `src/host/MarkdownViewerHost/MarkdownViewerHost.csproj` - Framework/SDK changes
+- `src/host/MarkdownViewerHost/MarkdownViewerHost.csproj` - Framework/SDK changes, clear RuntimeIdentifier
 - `src/host/MarkdownViewerHost/Abstractions.cs` - .NET Framework compatibility
 - `src/host/MarkdownViewerHost/ActivationHandler.cs` - .NET Framework compatibility
 - `src/host/MarkdownViewerHost/Program.cs` - .NET Framework compatibility
@@ -123,6 +124,8 @@ Reference implementation: [solution3.txt](../dev/docs/solution3.txt)
 - `src/host/MarkdownViewerHost/IconHelper.cs` - .NET Framework compatibility
 - `tests/MarkdownViewerHost.Tests/MarkdownViewerHost.Tests.csproj` - Framework changes
 - `tests/MarkdownViewerHost.Tests/HostTests.cs` - .NET Framework compatibility
+- `installers/win-msix/MarkdownViewer.wapproj` - Simplified ProjectReference for .NET Framework
+- `installers/win-msix/build/Directory.Build.targets` - Use MSBuild instead of dotnet publish, simplified content
 - `installers/win-msix/build.ps1` - Use msbuild instead of dotnet publish
 - `installers/win-msix/build/stage.ps1` - Simplify host file list
 

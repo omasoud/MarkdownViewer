@@ -16,18 +16,18 @@
     <ForceRegenAssets Condition="'$(ForceRegenAssets)' == ''">false</ForceRegenAssets>
   </PropertyGroup>
 
-  <!-- Calculate host output directory based on platform -->
+  <!-- Calculate host output directory - .NET Framework 4.8.1 uses AnyCPU output -->
   <PropertyGroup>
-    <HostRuntimeIdentifier>win-$(Platform.ToLower())</HostRuntimeIdentifier>
-    <HostOutputDir>$(HostProjectDir)bin\$(Configuration)\net10.0-windows10.0.19041.0\$(HostRuntimeIdentifier)\publish\</HostOutputDir>
+    <HostOutputDir>$(HostProjectDir)bin\$(Configuration)\net481\</HostOutputDir>
   </PropertyGroup>
 
   <!-- Target: Build the host EXE before staging -->
   <Target Name="BuildHostProject" BeforeTargets="StagePayload">
-    <Message Text="Building MarkdownViewerHost for $(Platform)..." Importance="high" />
-    <Exec Command="dotnet publish &quot;$(HostProjectDir)MarkdownViewerHost.csproj&quot; -c $(Configuration) -r $(HostRuntimeIdentifier) --self-contained false -o &quot;$(HostOutputDir)&quot;"
-          WorkingDirectory="$(HostProjectDir)"
-          ConsoleToMsBuild="true" />
+    <Message Text="Building MarkdownViewerHost (.NET Framework 4.8.1)..." Importance="high" />
+    <!-- .NET Framework 4.8.1 builds with msbuild, no RuntimeIdentifier needed -->
+    <MSBuild Projects="$(HostProjectDir)MarkdownViewerHost.csproj"
+             Properties="Configuration=$(Configuration)"
+             Targets="Restore;Build" />
   </Target>
 
   <!-- Target: Stage payload before packaging -->
@@ -73,28 +73,16 @@
   <Target Name="IncludeStagedContent" AfterTargets="StagePayload" BeforeTargets="_GenerateAppxPackageFile"
           Condition="Exists('$(StagingOutputDir)MarkdownViewerHost.exe')">
     
-    <!-- Host EXE -->
+    <!-- Host EXE (.NET Framework 4.8.1 - single EXE, no DLL/runtimeconfig/deps) -->
     <CreateItem Include="$(StagingOutputDir)MarkdownViewerHost.exe"
                 AdditionalMetadata="Link=MarkdownViewerHost.exe;CopyToOutputDirectory=PreserveNewest">
       <Output TaskParameter="Include" ItemName="Content" />
     </CreateItem>
     
-    <!-- Host DLL (if exists) -->
-    <CreateItem Include="$(StagingOutputDir)MarkdownViewerHost.dll"
-                AdditionalMetadata="Link=MarkdownViewerHost.dll;CopyToOutputDirectory=PreserveNewest"
-                Condition="Exists('$(StagingOutputDir)MarkdownViewerHost.dll')">
-      <Output TaskParameter="Include" ItemName="Content" />
-    </CreateItem>
-    
-    <!-- Host config files -->
-    <CreateItem Include="$(StagingOutputDir)MarkdownViewerHost.runtimeconfig.json"
-                AdditionalMetadata="Link=MarkdownViewerHost.runtimeconfig.json;CopyToOutputDirectory=PreserveNewest"
-                Condition="Exists('$(StagingOutputDir)MarkdownViewerHost.runtimeconfig.json')">
-      <Output TaskParameter="Include" ItemName="Content" />
-    </CreateItem>
-    <CreateItem Include="$(StagingOutputDir)MarkdownViewerHost.deps.json"
-                AdditionalMetadata="Link=MarkdownViewerHost.deps.json;CopyToOutputDirectory=PreserveNewest"
-                Condition="Exists('$(StagingOutputDir)MarkdownViewerHost.deps.json')">
+    <!-- Host config file (.NET Framework app.config) -->
+    <CreateItem Include="$(StagingOutputDir)MarkdownViewerHost.exe.config"
+                AdditionalMetadata="Link=MarkdownViewerHost.exe.config;CopyToOutputDirectory=PreserveNewest"
+                Condition="Exists('$(StagingOutputDir)MarkdownViewerHost.exe.config')">
       <Output TaskParameter="Include" ItemName="Content" />
     </CreateItem>
     

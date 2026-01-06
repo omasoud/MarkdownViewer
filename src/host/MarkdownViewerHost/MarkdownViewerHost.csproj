@@ -9,6 +9,13 @@
 
     <!-- Enable Windows Forms for help dialog -->
     <UseWindowsForms>true</UseWindowsForms>
+    
+    <!-- 
+      .NET Framework doesn't use RuntimeIdentifiers. Clear any RID passed by WAP project
+      to prevent NETSDK1047 errors during MSIX packaging builds.
+    -->
+    <RuntimeIdentifier></RuntimeIdentifier>
+    <RuntimeIdentifiers></RuntimeIdentifiers>
 
     <!-- Assembly info -->
     <AssemblyName>MarkdownViewerHost</AssemblyName>
