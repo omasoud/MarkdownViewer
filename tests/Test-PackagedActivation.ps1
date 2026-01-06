@@ -454,6 +454,8 @@ if (-not $installedPackage) {
             
             if ($isProtocolKind -and $isViaAppInstance -and $isHandledTrue -and $hasProtocolUri) {
                 Write-TestResult -Name "Protocol activation (ActivationKind.Protocol)" -Passed $true
+                # Show key log lines for verification
+                Write-Host "    Verified: ActivationKind=protocol, ProtocolUri present" -ForegroundColor Gray
             } else {
                 # Detailed failure message
                 $failReason = @()
@@ -463,8 +465,12 @@ if (-not $installedPackage) {
                 if (-not $hasProtocolUri) { $failReason += "No ProtocolUri from ActivatedEventArgs" }
                 
                 Write-TestResult -Name "Protocol activation (ActivationKind.Protocol)" -Passed $false -Message ($failReason -join '; ')
-                Write-Host "    Host log excerpt:" -ForegroundColor Yellow
-                $hostLog -split "`n" | Select-Object -First 20 | ForEach-Object { Write-Host "      $_" -ForegroundColor Gray }
+                Write-Host "    Host log content:" -ForegroundColor Yellow
+                if ([string]::IsNullOrWhiteSpace($hostLog)) {
+                    Write-Host "      (log is empty - app may not have started)" -ForegroundColor Red
+                } else {
+                    $hostLog -split "`n" | Select-Object -First 20 | ForEach-Object { Write-Host "      $_" -ForegroundColor Gray }
+                }
             }
         } catch {
             Write-TestResult -Name "Protocol activation" -Passed $false -Message $_.Exception.Message
@@ -545,8 +551,10 @@ This proves that clicking rewritten links triggers ActivationKind.Protocol.
                 if (-not $hasProtocolUri) { $failReason += "No ProtocolUri in log" }
                 
                 Write-TestResult -Name "In-app link navigation (ActivationKind.Protocol)" -Passed $false -Message ($failReason -join '; ')
-                if ($hostLog) {
-                    Write-Host "    Host log excerpt:" -ForegroundColor Yellow
+                Write-Host "    Host log content:" -ForegroundColor Yellow
+                if ([string]::IsNullOrWhiteSpace($hostLog)) {
+                    Write-Host "      (log is empty - app may not have started)" -ForegroundColor Red
+                } else {
                     $hostLog -split "`n" | Select-Object -First 15 | ForEach-Object { Write-Host "      $_" -ForegroundColor Gray }
                 }
             }
