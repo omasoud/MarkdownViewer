@@ -114,10 +114,12 @@ internal class Program
             Console.WriteLine($"Activating app (protocol): {appId}");
             Console.WriteLine($"  URI: {protocolUri}");
 
-            // For protocol activation, we pass the URI as the argument to ActivateApplication
-            // This is how Windows actually handles protocol activation for packaged apps
-            hr = aam.ActivateApplication(appId, protocolUri, ActivateOptions.NoSplashScreen, out processId);
-            CheckHResult(hr, "ActivateApplication (protocol)");
+            // Use ActivateForProtocol to trigger true protocol activation.
+            // This causes Windows to deliver ProtocolActivatedEventArgs via AppInstance,
+            // which validates that the MSIX protocol extension is correctly registered.
+            var itemArray = ShellHelpers.CreateShellItemArrayFromUri(protocolUri);
+            hr = aam.ActivateForProtocol(appId, itemArray, out processId);
+            CheckHResult(hr, "ActivateForProtocol");
         }
         else if (!string.IsNullOrEmpty(filePath))
         {

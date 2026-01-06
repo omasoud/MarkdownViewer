@@ -87,7 +87,14 @@ namespace MarkdownViewerHost
         public bool TryHandlePackagedActivation()
         {
             var activationResult = _appActivation.TryGetActivatedEventArgs();
-            if (_log != null) _log(string.Format("  AppActivation result: {0}", activationResult != null ? activationResult.Kind : "(null)"));
+            if (_log != null) 
+            {
+                _log(string.Format("  AppActivation result: {0}", activationResult != null ? activationResult.Kind.ToString() : "(null)"));
+                if (activationResult != null)
+                {
+                    _log(string.Format("  ActivationKind: {0}", activationResult.Kind));
+                }
+            }
 
             if (activationResult == null)
             {
@@ -96,12 +103,16 @@ namespace MarkdownViewerHost
 
             if (activationResult.Kind == ActivationKinds.File)
             {
-                if (_log != null) _log("  Handling File activation");
+                if (_log != null) _log("  Handling File activation via AppInstance");
                 return HandleFileActivation(activationResult.FilePaths);
             }
             else if (activationResult.Kind == ActivationKinds.Protocol)
             {
-                if (_log != null) _log("  Handling Protocol activation");
+                if (_log != null) 
+                {
+                    _log("  Handling Protocol activation via AppInstance");
+                    _log(string.Format("  ProtocolUri from ActivatedEventArgs: {0}", activationResult.ProtocolUri?.AbsoluteUri ?? "(null)"));
+                }
                 return HandleProtocolActivation(activationResult.ProtocolUri);
             }
             else if (activationResult.Kind == ActivationKinds.Launch)

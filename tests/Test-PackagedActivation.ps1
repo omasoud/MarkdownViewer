@@ -424,28 +424,47 @@ if (-not $installedPackage) {
         Write-Host ""
         Write-Host "  Running activation tests..." -ForegroundColor Yellow
         
-        # Test 1: Protocol activation
-        Write-Host "  Testing protocol activation..." -ForegroundColor Gray
+        # Test 1: Protocol activation via shell (how users actually invoke mdview: URIs)
+        # For Full Trust desktop bridge apps, shell-based protocol activation triggers
+        # true packaged activation via AppInstance APIs. The COM ActivateForProtocol
+        # method doesn't work for Full Trust apps - that's UWP-only.
+        Write-Host "  Testing protocol activation (shell)..." -ForegroundColor Gray
         $protocolUri = "mdview:file:///$($testMdFile -replace '\\','/')#test-section"
         
         try {
-            # For packaged apps, activate via COM and just check that it starts.
-            # Don't use --wait since we can't monitor processes we didn't start.
+            # Clear the host log to capture only this activation
+            $hostLogPath = Join-Path $env:TEMP 'MarkdownViewerHost.log'
+            if (Test-Path $hostLogPath) { Clear-Content $hostLogPath -Force }
             
-            $activationOutput = & $activationDriverExe --aumid $aumid --protocol $protocolUri 2>&1
-            $activationExitCode = $LASTEXITCODE
+            # Shell-based protocol activation - this is how users invoke the app
+            # via browser links, Start-Process, or clicking protocol URLs
+            Start-Process $protocolUri -ErrorAction Stop
             
-            if ($activationExitCode -eq 0) {
-                # App was activated successfully - this catches "missing runtime" errors
-                Write-TestResult -Name "Protocol activation (app starts)" -Passed $true
-                
-                # Give the app a moment to render, then we'll move on
-                Start-Sleep -Milliseconds 1000
+            # Give the app time to start and log
+            Start-Sleep -Milliseconds 2000
+            
+            # Read the host log to verify activation kind
+            $hostLog = if (Test-Path $hostLogPath) { Get-Content $hostLogPath -Raw -ErrorAction SilentlyContinue } else { '' }
+            
+            # Check for true protocol activation indicators
+            $isProtocolKind = $hostLog -match 'ActivationKind:\s*[Pp]rotocol'
+            $isViaAppInstance = $hostLog -match 'Handling Protocol activation via AppInstance'
+            $isHandledTrue = $hostLog -match 'PackagedActivation handled:\s*True'
+            $hasProtocolUri = $hostLog -match 'ProtocolUri from ActivatedEventArgs:\s*mdview:'
+            
+            if ($isProtocolKind -and $isViaAppInstance -and $isHandledTrue -and $hasProtocolUri) {
+                Write-TestResult -Name "Protocol activation (ActivationKind.Protocol)" -Passed $true
             } else {
-                Write-TestResult -Name "Protocol activation (app starts)" -Passed $false -Message "ActivationDriver exit code: $activationExitCode"
-                if ($activationOutput) {
-                    Write-Host "    Output: $activationOutput" -ForegroundColor Red
-                }
+                # Detailed failure message
+                $failReason = @()
+                if (-not $isProtocolKind) { $failReason += "ActivationKind != Protocol" }
+                if (-not $isViaAppInstance) { $failReason += "Not via AppInstance" }
+                if (-not $isHandledTrue) { $failReason += "PackagedActivation handled != True" }
+                if (-not $hasProtocolUri) { $failReason += "No ProtocolUri from ActivatedEventArgs" }
+                
+                Write-TestResult -Name "Protocol activation (ActivationKind.Protocol)" -Passed $false -Message ($failReason -join '; ')
+                Write-Host "    Host log excerpt:" -ForegroundColor Yellow
+                $hostLog -split "`n" | Select-Object -First 20 | ForEach-Object { Write-Host "      $_" -ForegroundColor Gray }
             }
         } catch {
             Write-TestResult -Name "Protocol activation" -Passed $false -Message $_.Exception.Message
@@ -454,60 +473,62 @@ if (-not $installedPackage) {
         # Wait a moment between activations
         Start-Sleep -Milliseconds 500
         
-        # Test 2: File activation (via ShellExecute/Invoke-Item, not COM ActivateForFile)
-        # For MSIX apps with manifest-declared file associations, we need to "open" the file
-        # which triggers the OS to use the registered file association.
-        # NOTE: This will only work if MarkView is the default handler for .md files.
-        # On dev machines, another app (VS Code, etc.) may be registered as the default.
-        Write-Host "  Testing file activation via shell association..." -ForegroundColor Gray
+        # Test 2: File activation via shell open
+        # For Full Trust desktop bridge apps, opening a .md file via the shell
+        # triggers true file activation via AppInstance APIs.
+        Write-Host "  Testing file activation (shell open)..." -ForegroundColor Gray
         
         try {
-            # Create a fresh test file for file association test
-            $testMdForAssoc = Join-Path $env:TEMP "mdv-e2e-assoc-test-$([Guid]::NewGuid().ToString('N').Substring(0,8)).md"
-            "# File Association Test`n`nOpened via shell association." | Set-Content -Path $testMdForAssoc -Encoding UTF8
+            # Create a fresh test file for file activation test
+            $testMdForFile = Join-Path $env:TEMP "mdv-e2e-file-test-$([Guid]::NewGuid().ToString('N').Substring(0,8)).md"
+            "# File Activation Test`n`nOpened via shell." | Set-Content -Path $testMdForFile -Encoding UTF8
             
-            # Give the shell a moment to register the file association
-            Start-Sleep -Seconds 2
+            # Clear the host log to capture only this activation
+            $hostLogPath = Join-Path $env:TEMP 'MarkdownViewerHost.log'
+            if (Test-Path $hostLogPath) { Clear-Content $hostLogPath -Force }
             
-            # Use Start-Process with the file (triggers ShellExecute, which uses file associations)
-            $fileActivationResult = Start-Process -FilePath $testMdForAssoc -PassThru -ErrorAction Stop
+            # Shell-based file activation - uses the registered file type association
+            # This opens the file using the default handler for .md files
+            Start-Process $testMdForFile -ErrorAction Stop
             
-            # If we got here and got a process, some handler was invoked
-            if ($null -ne $fileActivationResult) {
-                # Check if it's our app or a different one
-                if ($fileActivationResult.ProcessName -like '*MarkdownViewer*' -or $fileActivationResult.ProcessName -like '*MarkView*') {
-                    Write-TestResult -Name "File activation (via shell association)" -Passed $true
-                } else {
-                    # Another app opened the file - this is expected on dev machines
-                    Write-Host "    NOTE: .md file opened by $($fileActivationResult.ProcessName), not MarkView" -ForegroundColor Yellow
-                    Write-Host "    This is expected if another app is the default handler for .md files" -ForegroundColor Yellow
-                    Write-TestResult -Name "File activation (via shell association)" -Passed $true
-                    Write-Host "    (File association registered but not default handler)" -ForegroundColor Yellow
-                }
-                
-                # Give the app a moment to start, then kill it
-                Start-Sleep -Milliseconds 1000
-                try {
-                    $fileActivationResult.Kill()
-                } catch {
-                    # Process may have already exited
-                }
+            # Give the app time to start and log
+            Start-Sleep -Milliseconds 2000
+            
+            # Read the host log to verify activation kind
+            $hostLog = if (Test-Path $hostLogPath) { Get-Content $hostLogPath -Raw -ErrorAction SilentlyContinue } else { '' }
+            
+            # Check for true file activation indicators
+            $isFileKind = $hostLog -match 'ActivationKind:\s*[Ff]ile'
+            $isViaAppInstance = $hostLog -match 'Handling File activation via AppInstance'
+            $isHandledTrue = $hostLog -match 'PackagedActivation handled:\s*True'
+            $hasFilePath = $hostLog -match 'FileActivation:\s*\d+\s*file\(s\)'
+            
+            if ($isFileKind -and $isViaAppInstance -and $isHandledTrue -and $hasFilePath) {
+                Write-TestResult -Name "File activation (ActivationKind.File)" -Passed $true
             } else {
-                Write-TestResult -Name "File activation (via shell association)" -Passed $false -Message "Start-Process returned null"
+                # Check if the app even ran (maybe .md is not associated with our app)
+                if (-not $hostLog) {
+                    # Check if another app opened the file
+                    Write-TestResult -Name "File activation (ActivationKind.File)" -Passed $false -Message ".md files not associated with MarkView app"
+                    Write-Host "    NOTE: File type association may need to be set manually via Windows Settings" -ForegroundColor Yellow
+                } else {
+                    # Detailed failure message
+                    $failReason = @()
+                    if (-not $isFileKind) { $failReason += "ActivationKind != File" }
+                    if (-not $isViaAppInstance) { $failReason += "Not via AppInstance" }
+                    if (-not $isHandledTrue) { $failReason += "PackagedActivation handled != True" }
+                    if (-not $hasFilePath) { $failReason += "No FileActivation in log" }
+                    
+                    Write-TestResult -Name "File activation (ActivationKind.File)" -Passed $false -Message ($failReason -join '; ')
+                    Write-Host "    Host log excerpt:" -ForegroundColor Yellow
+                    $hostLog -split "`n" | Select-Object -First 20 | ForEach-Object { Write-Host "      $_" -ForegroundColor Gray }
+                }
             }
             
             # Cleanup test file
-            Remove-Item $testMdForAssoc -Force -ErrorAction SilentlyContinue
+            Remove-Item $testMdForFile -Force -ErrorAction SilentlyContinue
         } catch {
-            # If the error indicates no app is registered, that's a different issue
-            $errMsg = $_.Exception.Message
-            if ($errMsg -match 'cannot find all the information' -or $errMsg -match 'no application' -or $errMsg -match 'association') {
-                Write-Host "    NOTE: No default app registered for .md files or association not yet active" -ForegroundColor Yellow
-                Write-Host "    The package was just installed - file associations may take time to register" -ForegroundColor Yellow
-                Write-TestSkipped -Name "File activation (via shell association)" -Reason "No default handler or association pending"
-            } else {
-                Write-TestResult -Name "File activation (via shell association)" -Passed $false -Message $errMsg
-            }
+            Write-TestResult -Name "File activation (ActivationKind.File)" -Passed $false -Message $_.Exception.Message
         }
         
         # Test 3: Launch activation (no arguments)
