@@ -124,18 +124,6 @@ Describe 'Full Pipeline with UNC Base Path - Ideal Behavior' {
             $result | Should -Be 'file://localhost/c$/repo/docs/spec.md'
         }
     }
-    
-    Context 'What buggy base URL produces (documenting current behavior)' {
-        # These tests document what happens with the PSProvider-prefixed base URL
-        # They should FAIL when we fix the bug (because we'll use IdealBaseUrl)
-        
-        It 'BUG: Relative path with buggy base produces wrong URL' {
-            # This documents the bug - resolved URL contains PSProvider prefix
-            $result = Get-ResolvedUrl -LinkTarget 'docs/spec.md' -BaseUrl $script:BuggyBaseUrl
-            # The buggy URL - should NOT match this when fixed
-            $result | Should -Not -Be 'file:///Microsoft.PowerShell.Core/FileSystem:://localhost/c$/repo/subdir/docs/spec.md'
-        }
-    }
 }
 
 Describe 'Get-FileBaseHref PSProvider Stripping - Ideal Behavior' {

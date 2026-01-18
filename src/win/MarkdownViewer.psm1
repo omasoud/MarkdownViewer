@@ -129,6 +129,12 @@ function Get-FileBaseHref {
 
     $dir = Split-Path -LiteralPath $FilePath
 
+    # Strip PSProvider prefixes that can appear when paths come from PSDrives
+    # e.g. "Microsoft.PowerShell.Core\FileSystem::" or just "FileSystem::"
+    if ($dir -match '^(?:Microsoft\.PowerShell\.Core\\)?FileSystem::(.+)$') {
+        $dir = $Matches[1]
+    }
+
     if ($dir.StartsWith('\\?\UNC\', [StringComparison]::OrdinalIgnoreCase)) {
         # \\?\UNC\server\share\path -> file://server/share/path/
         $unc = $dir.Substring(8)
