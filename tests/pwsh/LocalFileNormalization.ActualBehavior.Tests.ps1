@@ -1,6 +1,9 @@
 # LocalFileNormalization.ActualBehavior.Tests.ps1
-# Tests that verify ConvertFrom-Markdown produces IDEAL link behavior.
-# These tests FAIL when bugs exist, documenting what needs fixing.
+# Tests that verify the FULL PIPELINE produces correct file: URLs.
+# Pipeline: ConvertFrom-Markdown → script.js URL resolution → final mdview: URL
+#
+# These tests assert IDEAL behavior. Failures indicate bugs to fix.
+# When bugs are fixed, all tests should pass.
 
 #Requires -Version 7.0
 
@@ -27,135 +30,161 @@ BeforeAll {
         if ($html -match '<a\s+href="([^"]*)"') {
             return $Matches[1]
         }
-        return '[NOT_A_LINK]'
+        return $null  # No link created
     }
     
     <#
     .SYNOPSIS
-        Simulates what new URL(href, base).href produces.
+        Simulates the full pipeline: ConvertFrom-Markdown + script.js URL resolution.
+        Returns the final resolved URL (without mdview: prefix for comparison).
     #>
-    function Resolve-JsUrl {
+    function Get-ResolvedLinkUrl {
         [CmdletBinding()]
         param(
             [Parameter(Mandatory)]
-            [string]$Href,
+            [string]$LinkTarget,
             
             [Parameter(Mandatory)]
             [string]$BaseUrl
         )
         
-        if ($Href -eq '[NOT_A_LINK]') {
-            return '[NOT_A_LINK]'
+        $href = Get-MarkdownLinkHref -LinkText 'test' -LinkTarget $LinkTarget
+        
+        if ($null -eq $href) {
+            return $null  # Link not created by markdown parser
         }
         
+        # Simulate script.js: new URL(href, base).href
         try {
             $base = [Uri]$BaseUrl
-            $resolved = [Uri]::new($base, $Href)
+            $resolved = [Uri]::new($base, $href)
             return $resolved.AbsoluteUri
         } catch {
-            return "[ERROR]"
+            return "[RESOLUTION_ERROR]"
         }
     }
 }
 
-Describe 'ConvertFrom-Markdown Link Processing - Ideal Behavior' {
-    # These tests verify IDEAL behavior. Failures indicate bugs to fix.
+Describe 'Full Pipeline Link Resolution - Ideal Behavior' {
+    # Tests verify the ENTIRE pipeline produces correct URLs.
+    # Failures indicate bugs in ConvertFrom-Markdown or resolution logic.
     
     BeforeAll {
+        # Base URL simulating a file opened from C:\repo\subdir\test.md
         $script:BaseUrl = 'file:///C:/repo/subdir/'
     }
     
     Context 'Relative paths' {
         
-        It 'Backslash relative path should produce working href' {
-            $href = Get-MarkdownLinkHref -LinkText 'spec' -LinkTarget 'docs\spec.md'
-            # IDEAL: backslash should be converted to forward slash, not encoded
-            $href | Should -Be 'docs/spec.md'
+        It 'Backslash relative path should resolve correctly: docs\spec.md' {
+            $result = Get-ResolvedLinkUrl -LinkTarget 'docs\spec.md' -BaseUrl $script:BaseUrl
+            $result | Should -Be 'file:///C:/repo/subdir/docs/spec.md'
         }
         
-        It 'Forward-slash relative path produces working href' {
-            $href = Get-MarkdownLinkHref -LinkText 'spec' -LinkTarget 'docs/spec.md'
-            $href | Should -Be 'docs/spec.md'
+        It 'Forward-slash relative path resolves correctly: docs/spec.md' {
+            $result = Get-ResolvedLinkUrl -LinkTarget 'docs/spec.md' -BaseUrl $script:BaseUrl
+            $result | Should -Be 'file:///C:/repo/subdir/docs/spec.md'
         }
     }
     
     Context 'Parent traversal (..)' {
         
-        It 'Backslash parent traversal should produce working href' {
-            $href = Get-MarkdownLinkHref -LinkText 'spec' -LinkTarget '..\docs\spec.md'
-            # IDEAL: backslash should be converted to forward slash
-            $href | Should -Be '../docs/spec.md'
+        It 'Backslash parent traversal should resolve correctly: ..\docs\spec.md' {
+            $result = Get-ResolvedLinkUrl -LinkTarget '..\docs\spec.md' -BaseUrl $script:BaseUrl
+            $result | Should -Be 'file:///C:/repo/docs/spec.md'
         }
         
-        It 'Forward-slash parent traversal produces working href' {
-            $href = Get-MarkdownLinkHref -LinkText 'spec' -LinkTarget '../docs/spec.md'
-            $href | Should -Be '../docs/spec.md'
-        }
-    }
-    
-    Context 'Windows absolute paths (C:\)' {
-        
-        It 'Windows absolute path should convert to file: URL' {
-            $href = Get-MarkdownLinkHref -LinkText 'spec' -LinkTarget 'C:\docs\spec.md'
-            # IDEAL: should become file:///C:/docs/spec.md
-            $href | Should -Be 'file:///C:/docs/spec.md'
-        }
-        
-        It 'Windows path with spaces should become link with encoded spaces' {
-            $href = Get-MarkdownLinkHref -LinkText 'spec' -LinkTarget 'C:\My Docs\spec.md'
-            # IDEAL: should create link with %20 encoding
-            $href | Should -Be 'file:///C:/My%20Docs/spec.md'
+        It 'Forward-slash parent traversal resolves correctly: ../docs/spec.md' {
+            $result = Get-ResolvedLinkUrl -LinkTarget '../docs/spec.md' -BaseUrl $script:BaseUrl
+            $result | Should -Be 'file:///C:/repo/docs/spec.md'
         }
     }
     
-    Context 'Windows forward-slash absolute paths (C:/)' {
+    Context 'Windows absolute paths with backslash (C:\)' {
         
-        It 'C:/ path should convert to file: URL' {
-            $href = Get-MarkdownLinkHref -LinkText 'spec' -LinkTarget 'C:/docs/spec.md'
-            # IDEAL: should become file:///C:/docs/spec.md
-            $href | Should -Be 'file:///C:/docs/spec.md'
+        It 'C:\ path should resolve to file: URL: C:\spec.md' {
+            $result = Get-ResolvedLinkUrl -LinkTarget 'C:\spec.md' -BaseUrl $script:BaseUrl
+            $result | Should -Be 'file:///C:/spec.md'
+        }
+        
+        It 'C:\ path with spaces should create link and resolve: C:\My Docs\spec.md' {
+            $result = Get-ResolvedLinkUrl -LinkTarget 'C:\My Docs\spec.md' -BaseUrl $script:BaseUrl
+            $result | Should -Be 'file:///C:/My%20Docs/spec.md'
         }
     }
     
-    Context 'UNC paths (\\server)' {
+    Context 'Windows absolute paths with forward slash (C:/)' {
         
-        It 'UNC path should convert to file: URL' {
-            $href = Get-MarkdownLinkHref -LinkText 'spec' -LinkTarget '\\server\share\docs\spec.md'
-            # IDEAL: should become file://server/share/docs/spec.md
-            $href | Should -Be 'file://server/share/docs/spec.md'
+        It 'C:/ path resolves to file: URL: C:/spec.md' {
+            $result = Get-ResolvedLinkUrl -LinkTarget 'C:/spec.md' -BaseUrl $script:BaseUrl
+            $result | Should -Be 'file:///C:/spec.md'
         }
         
-        It 'UNC path with spaces should become link with encoded spaces' {
-            $href = Get-MarkdownLinkHref -LinkText 'spec' -LinkTarget '\\server\share\My Docs\spec.md'
-            # IDEAL: should create link with %20 encoding
-            $href | Should -Be 'file://server/share/My%20Docs/spec.md'
+        It 'C:/ path with spaces should create link and resolve: C:/My Docs/spec.md' {
+            $result = Get-ResolvedLinkUrl -LinkTarget 'C:/My Docs/spec.md' -BaseUrl $script:BaseUrl
+            $result | Should -Be 'file:///C:/My%20Docs/spec.md'
         }
     }
     
-    Context 'Forward-slash UNC paths (//server)' {
+    Context 'UNC paths with backslash (\\server)' {
         
-        It '//server path should convert to file: URL' {
-            $href = Get-MarkdownLinkHref -LinkText 'spec' -LinkTarget '//server/share/docs/spec.md'
-            # IDEAL: should become file://server/share/docs/spec.md
-            $href | Should -Be 'file://server/share/docs/spec.md'
+        It 'UNC path should resolve to file: URL: \\server\share\spec.md' {
+            $result = Get-ResolvedLinkUrl -LinkTarget '\\server\share\spec.md' -BaseUrl $script:BaseUrl
+            $result | Should -Be 'file://server/share/spec.md'
+        }
+        
+        It 'UNC path with spaces should create link and resolve: \\server\share\My Docs\spec.md' {
+            $result = Get-ResolvedLinkUrl -LinkTarget '\\server\share\My Docs\spec.md' -BaseUrl $script:BaseUrl
+            $result | Should -Be 'file://server/share/My%20Docs/spec.md'
         }
     }
     
-    Context 'file: URLs (should work)' {
+    Context 'UNC-like paths with forward slash (//server)' {
         
-        It 'file:/// URL href is preserved' {
-            $href = Get-MarkdownLinkHref -LinkText 'spec' -LinkTarget 'file:///C:/docs/spec.md'
-            $href | Should -Be 'file:///C:/docs/spec.md'
+        It '//server path resolves to file: URL: //server/share/spec.md' {
+            $result = Get-ResolvedLinkUrl -LinkTarget '//server/share/spec.md' -BaseUrl $script:BaseUrl
+            $result | Should -Be 'file://server/share/spec.md'
         }
         
-        It 'file:// UNC URL href is preserved' {
-            $href = Get-MarkdownLinkHref -LinkText 'spec' -LinkTarget 'file://server/share/docs/spec.md'
-            $href | Should -Be 'file://server/share/docs/spec.md'
+        It '//server path with spaces should create link and resolve: //server/share/My Docs/spec.md' {
+            $result = Get-ResolvedLinkUrl -LinkTarget '//server/share/My Docs/spec.md' -BaseUrl $script:BaseUrl
+            $result | Should -Be 'file://server/share/My%20Docs/spec.md'
+        }
+    }
+    
+    Context 'file:/// URLs (local drive)' {
+        
+        It 'file:/// URL resolves correctly: file:///C:/spec.md' {
+            $result = Get-ResolvedLinkUrl -LinkTarget 'file:///C:/spec.md' -BaseUrl $script:BaseUrl
+            $result | Should -Be 'file:///C:/spec.md'
         }
         
-        It 'file:/// URL with encoded spaces is preserved' {
-            $href = Get-MarkdownLinkHref -LinkText 'spec' -LinkTarget 'file:///C:/My%20Docs/spec.md'
-            $href | Should -Be 'file:///C:/My%20Docs/spec.md'
+        It 'file:/// URL with unencoded spaces should create link: file:///C:/My Docs/spec.md' {
+            $result = Get-ResolvedLinkUrl -LinkTarget 'file:///C:/My Docs/spec.md' -BaseUrl $script:BaseUrl
+            $result | Should -Be 'file:///C:/My%20Docs/spec.md'
+        }
+        
+        It 'file:/// URL with encoded spaces resolves correctly: file:///C:/My%20Docs/spec.md' {
+            $result = Get-ResolvedLinkUrl -LinkTarget 'file:///C:/My%20Docs/spec.md' -BaseUrl $script:BaseUrl
+            $result | Should -Be 'file:///C:/My%20Docs/spec.md'
+        }
+    }
+    
+    Context 'file:// URLs (UNC form)' {
+        
+        It 'file:// UNC URL resolves correctly: file://server/share/spec.md' {
+            $result = Get-ResolvedLinkUrl -LinkTarget 'file://server/share/spec.md' -BaseUrl $script:BaseUrl
+            $result | Should -Be 'file://server/share/spec.md'
+        }
+        
+        It 'file:// UNC URL with unencoded spaces should create link: file://server/share/My Docs/spec.md' {
+            $result = Get-ResolvedLinkUrl -LinkTarget 'file://server/share/My Docs/spec.md' -BaseUrl $script:BaseUrl
+            $result | Should -Be 'file://server/share/My%20Docs/spec.md'
+        }
+        
+        It 'file:// UNC URL with encoded spaces resolves correctly: file://server/share/My%20Docs/spec.md' {
+            $result = Get-ResolvedLinkUrl -LinkTarget 'file://server/share/My%20Docs/spec.md' -BaseUrl $script:BaseUrl
+            $result | Should -Be 'file://server/share/My%20Docs/spec.md'
         }
     }
 }
