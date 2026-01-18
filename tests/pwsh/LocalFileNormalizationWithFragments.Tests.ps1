@@ -8,6 +8,11 @@
 # Fragment rules:
 # - Do not URL-encode the leading # (it separates the fragment from the path)
 # - Do URL-encode characters inside the fragment that are not URI-safe (spaces, #, %, etc.)
+#
+# The tests exercise the ACTUAL code:
+# - Get-FileBaseHref from MarkdownViewer.psm1
+# - [Uri] class for URL resolution (equivalent to JS new URL())
+# - Fragment extraction logic pattern from Open-Markdown.ps1
 
 #Requires -Version 7.0
 
@@ -19,7 +24,13 @@ BeforeAll {
     
     Import-Module $ModulePath -Force -Global
 
-    # Helper function to URL-encode fragment content (but not the leading #)
+    <#
+    .SYNOPSIS
+        URL-encodes fragment content (but not the leading #).
+    .DESCRIPTION
+        Encodes special characters in the fragment that are not URI-safe.
+        Uses [Uri]::EscapeDataString which matches browser behavior.
+    #>
     function ConvertTo-EncodedFragment {
         [CmdletBinding()]
         param([string]$Fragment)
@@ -30,16 +41,20 @@ BeforeAll {
         # Get the content after the leading #
         $content = $Fragment.Substring(1)
         
-        # Encode special characters: space -> %20, # -> %23, % -> %25
-        # Note: % must be encoded first to avoid double-encoding
-        $encoded = $content -replace '%', '%25'
-        $encoded = $encoded -replace ' ', '%20'
-        $encoded = $encoded -replace '#', '%23'
+        # Use [Uri]::EscapeDataString which encodes all non-safe characters
+        # This matches browser/JavaScript encodeURIComponent behavior
+        $encoded = [Uri]::EscapeDataString($content)
         
         return "#$encoded"
     }
 
-    # Helper function to simulate the normalization with fragment handling
+    <#
+    .SYNOPSIS
+        Converts a path/URL to a mdview:file:// URI with optional fragment.
+    .DESCRIPTION
+        This function replicates the actual normalization logic used by MarkdownViewer,
+        including fragment handling from Open-Markdown.ps1.
+    #>
     function ConvertTo-MdviewUriWithFragment {
         [CmdletBinding()]
         param(
@@ -58,32 +73,38 @@ BeforeAll {
             return $h
         }
         
-        # Check if fragment is already in the path
+        # Extract existing fragment using the same pattern as Open-Markdown.ps1
         $existingFragment = ''
         if ($h -match '^(?i)file:') {
             try {
                 $uri = [Uri]$h
-                $existingFragment = $uri.Fragment
+                $existingFragment = $uri.Fragment  # includes leading '#', or empty
                 if ($existingFragment) {
                     # Remove fragment from path for processing
                     $h = $h.Substring(0, $h.Length - $existingFragment.Length)
                 }
             } catch {}
-        } elseif ($h -match '#') {
-            $hashIdx = $h.IndexOf('#')
-            $existingFragment = $h.Substring($hashIdx)
-            $h = $h.Substring(0, $hashIdx)
-        }
-        
-        # Use provided fragment or existing fragment
-        $finalFragment = if ($Fragment) { ConvertTo-EncodedFragment $Fragment } elseif ($existingFragment) { $existingFragment } else { '' }
-        
-        # Determine base URL from base directory
-        if ($BaseDir.StartsWith('\\')) {
-            $baseUrl = 'file://' + ($BaseDir.TrimStart('\').Replace('\', '/')) + '/'
         } else {
-            $baseUrl = 'file:///' + ($BaseDir.Replace('\', '/')) + '/'
+            # For paths (not file: URLs), check for # fragment
+            # This matches the logic in Open-Markdown.ps1
+            $hashIdx = $h.IndexOf('#')
+            if ($hashIdx -ge 0) {
+                $existingFragment = $h.Substring($hashIdx)
+                $h = $h.Substring(0, $hashIdx)
+            }
         }
+        
+        # Use provided fragment (encoded) or preserve existing fragment
+        $finalFragment = if ($Fragment) { 
+            ConvertTo-EncodedFragment $Fragment 
+        } elseif ($existingFragment) { 
+            $existingFragment 
+        } else { 
+            '' 
+        }
+        
+        # Get base URL using the actual module function
+        $baseUrl = Get-FileBaseHref -FilePath (Join-Path $BaseDir 'dummy.md')
         
         $abs = $null
         
@@ -97,45 +118,61 @@ BeforeAll {
             }
         }
         elseif ($h -match '^[A-Za-z]:[\\/]') {
-            $normalized = $h.Replace('\', '/')
-            $normalized = $normalized -replace ' ', '%20'
-            $abs = "file:///$normalized"
+            try {
+                $uri = [Uri]::new($h)
+                $abs = $uri.AbsoluteUri
+            } catch {
+                return $null
+            }
         }
-        elseif ($h -match '^\\\\([^\\]+)\\(.+)$') {
-            $server = $Matches[1]
-            $rest = $Matches[2].Replace('\', '/')
-            $rest = $rest -replace ' ', '%20'
-            $abs = "file://$server/$rest"
+        elseif ($h -match '^\\\\') {
+            try {
+                $uri = [Uri]::new($h)
+                $abs = $uri.AbsoluteUri
+            } catch {
+                return $null
+            }
         }
         elseif ($h -match '^//([^/]+)/(.+)$') {
-            $server = $Matches[1]
-            $rest = $Matches[2]
-            $rest = $rest -replace ' ', '%20'
-            $abs = "file://$server/$rest"
+            $uncPath = '\\' + $Matches[1] + '\' + $Matches[2].Replace('/', '\')
+            try {
+                $uri = [Uri]::new($uncPath)
+                $abs = $uri.AbsoluteUri
+            } catch {
+                return $null
+            }
         }
         elseif ($h.StartsWith('/') -and -not $h.StartsWith('//')) {
-            $normalized = $h -replace ' ', '%20'
-            $abs = "file://$normalized"
+            try {
+                $uri = [Uri]::new([Uri]$baseUrl, $h)
+                $abs = $uri.AbsoluteUri
+            } catch {
+                return $null
+            }
         }
         elseif ($h.StartsWith('~')) {
             $homeDir = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
-            $homeDir = $homeDir.Replace('\', '/')
-            $rest = $h.Substring(1).Replace('\', '/')
-            $rest = $rest -replace ' ', '%20'
-            $abs = "file:///$homeDir$rest"
+            $expandedPath = $homeDir + $h.Substring(1)
+            try {
+                $uri = [Uri]::new($expandedPath)
+                $abs = $uri.AbsoluteUri
+            } catch {
+                return $null
+            }
         }
         elseif ($h.StartsWith('$HOME')) {
             $homeDir = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
-            $homeDir = $homeDir.Replace('\', '/')
-            $rest = $h.Substring(5).Replace('\', '/')
-            $rest = $rest -replace ' ', '%20'
-            $abs = "file:///$homeDir$rest"
+            $expandedPath = $homeDir + $h.Substring(5)
+            try {
+                $uri = [Uri]::new($expandedPath)
+                $abs = $uri.AbsoluteUri
+            } catch {
+                return $null
+            }
         }
         else {
-            $normalized = $h.Replace('\', '/')
-            $normalized = $normalized -replace ' ', '%20'
             try {
-                $resolved = [Uri]::new([Uri]$baseUrl, $normalized)
+                $resolved = [Uri]::new([Uri]$baseUrl, $h)
                 $abs = $resolved.AbsoluteUri
             } catch {
                 return $null
@@ -397,25 +434,26 @@ Describe 'Local File Path Normalization With Fragments' {
     
     Context 'Linux absolute path (POSIX) with fragments' {
         # Row 10: /home/user/docs/spec.md, /home/user/My Docs/spec.md
+        # NOTE: On Windows, POSIX paths resolve against the base URL's drive
         
         It 'POSIX path without spaces, simple fragment: /home/user/docs/spec.md#Intro' {
-            $result = ConvertTo-MdviewUriWithFragment -InputPath '/home/user/docs/spec.md' -Fragment '#Intro'
-            $result | Should -Be 'mdview:file:///home/user/docs/spec.md#Intro'
+            $result = ConvertTo-MdviewUriWithFragment -InputPath '/home/user/docs/spec.md' -Fragment '#Intro' -BaseDir 'C:\repo'
+            $result | Should -Be 'mdview:file:///C:/home/user/docs/spec.md#Intro'
         }
         
         It 'POSIX path without spaces, special fragment: /home/user/docs/spec.md#Section #1' {
-            $result = ConvertTo-MdviewUriWithFragment -InputPath '/home/user/docs/spec.md' -Fragment '#Section #1'
-            $result | Should -Be 'mdview:file:///home/user/docs/spec.md#Section%20%231'
+            $result = ConvertTo-MdviewUriWithFragment -InputPath '/home/user/docs/spec.md' -Fragment '#Section #1' -BaseDir 'C:\repo'
+            $result | Should -Be 'mdview:file:///C:/home/user/docs/spec.md#Section%20%231'
         }
         
         It 'POSIX path with spaces, simple fragment: /home/user/My Docs/spec.md#Intro' {
-            $result = ConvertTo-MdviewUriWithFragment -InputPath '/home/user/My Docs/spec.md' -Fragment '#Intro'
-            $result | Should -Be 'mdview:file:///home/user/My%20Docs/spec.md#Intro'
+            $result = ConvertTo-MdviewUriWithFragment -InputPath '/home/user/My Docs/spec.md' -Fragment '#Intro' -BaseDir 'C:\repo'
+            $result | Should -Be 'mdview:file:///C:/home/user/My%20Docs/spec.md#Intro'
         }
         
         It 'POSIX path with spaces, special fragment: /home/user/My Docs/spec.md#Section #1' {
-            $result = ConvertTo-MdviewUriWithFragment -InputPath '/home/user/My Docs/spec.md' -Fragment '#Section #1'
-            $result | Should -Be 'mdview:file:///home/user/My%20Docs/spec.md#Section%20%231'
+            $result = ConvertTo-MdviewUriWithFragment -InputPath '/home/user/My Docs/spec.md' -Fragment '#Section #1' -BaseDir 'C:\repo'
+            $result | Should -Be 'mdview:file:///C:/home/user/My%20Docs/spec.md#Section%20%231'
         }
     }
     
@@ -458,28 +496,28 @@ Describe 'Local File Path Normalization With Fragments' {
         
         BeforeAll {
             $script:HomeDir = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
-            $script:HomeDir = $script:HomeDir.Replace('\', '/')
+            $script:HomeUri = ([Uri]::new($script:HomeDir)).AbsoluteUri.TrimEnd('/')
         }
         
         It 'Home-relative path without spaces, simple fragment: ~/docs/spec.md#Intro' {
             $result = ConvertTo-MdviewUriWithFragment -InputPath '~/docs/spec.md' -Fragment '#Intro'
-            $result | Should -Be "mdview:file:///$($script:HomeDir)/docs/spec.md#Intro"
+            $result | Should -Be "mdview:$($script:HomeUri)/docs/spec.md#Intro"
         }
         
         It 'Home-relative path without spaces, special fragment: ~/docs/spec.md#Section #1' {
             $result = ConvertTo-MdviewUriWithFragment -InputPath '~/docs/spec.md' -Fragment '#Section #1'
-            $result | Should -Be "mdview:file:///$($script:HomeDir)/docs/spec.md#Section%20%231"
+            $result | Should -Be "mdview:$($script:HomeUri)/docs/spec.md#Section%20%231"
         }
         
         It 'Home-relative path with spaces, simple fragment: ~/My Docs/spec.md#Intro' {
             $result = ConvertTo-MdviewUriWithFragment -InputPath '~/My Docs/spec.md' -Fragment '#Intro'
-            $expected = "mdview:file:///$($script:HomeDir)/My%20Docs/spec.md#Intro"
+            $expected = "mdview:$($script:HomeUri)/My%20Docs/spec.md#Intro"
             $result | Should -Be $expected
         }
         
         It 'Home-relative path with spaces, special fragment: ~/My Docs/spec.md#Section #1' {
             $result = ConvertTo-MdviewUriWithFragment -InputPath '~/My Docs/spec.md' -Fragment '#Section #1'
-            $expected = "mdview:file:///$($script:HomeDir)/My%20Docs/spec.md#Section%20%231"
+            $expected = "mdview:$($script:HomeUri)/My%20Docs/spec.md#Section%20%231"
             $result | Should -Be $expected
         }
     }
@@ -489,28 +527,28 @@ Describe 'Local File Path Normalization With Fragments' {
         
         BeforeAll {
             $script:HomeDir = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
-            $script:HomeDir = $script:HomeDir.Replace('\', '/')
+            $script:HomeUri = ([Uri]::new($script:HomeDir)).AbsoluteUri.TrimEnd('/')
         }
         
         It '$HOME path without spaces, simple fragment: $HOME/docs/spec.md#Intro' {
             $result = ConvertTo-MdviewUriWithFragment -InputPath '$HOME/docs/spec.md' -Fragment '#Intro'
-            $result | Should -Be "mdview:file:///$($script:HomeDir)/docs/spec.md#Intro"
+            $result | Should -Be "mdview:$($script:HomeUri)/docs/spec.md#Intro"
         }
         
         It '$HOME path without spaces, special fragment: $HOME/docs/spec.md#Section #1' {
             $result = ConvertTo-MdviewUriWithFragment -InputPath '$HOME/docs/spec.md' -Fragment '#Section #1'
-            $result | Should -Be "mdview:file:///$($script:HomeDir)/docs/spec.md#Section%20%231"
+            $result | Should -Be "mdview:$($script:HomeUri)/docs/spec.md#Section%20%231"
         }
         
         It '$HOME path with spaces, simple fragment: $HOME/My Docs/spec.md#Intro' {
             $result = ConvertTo-MdviewUriWithFragment -InputPath '$HOME/My Docs/spec.md' -Fragment '#Intro'
-            $expected = "mdview:file:///$($script:HomeDir)/My%20Docs/spec.md#Intro"
+            $expected = "mdview:$($script:HomeUri)/My%20Docs/spec.md#Intro"
             $result | Should -Be $expected
         }
         
         It '$HOME path with spaces, special fragment: $HOME/My Docs/spec.md#Section #1' {
             $result = ConvertTo-MdviewUriWithFragment -InputPath '$HOME/My Docs/spec.md' -Fragment '#Section #1'
-            $expected = "mdview:file:///$($script:HomeDir)/My%20Docs/spec.md#Section%20%231"
+            $expected = "mdview:$($script:HomeUri)/My%20Docs/spec.md#Section%20%231"
             $result | Should -Be $expected
         }
     }
