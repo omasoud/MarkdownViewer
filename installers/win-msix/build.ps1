@@ -12,7 +12,7 @@ param(
     [ValidateSet('x64', 'arm64')]
     [string]$Architecture = 'x64',
     
-    [string]$Version = '1.0.0.0',
+    [string]$Version = '1.0.1.0',
     
     [string]$PwshZipPath = '',  # Optional: path to PowerShell zip for bundling
     
