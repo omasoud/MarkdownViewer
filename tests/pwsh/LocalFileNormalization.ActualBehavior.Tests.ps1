@@ -1,18 +1,23 @@
 # LocalFileNormalization.ActualBehavior.Tests.ps1
 # Tests that verify the FULL PIPELINE produces correct file: URLs.
-# Pipeline: ConvertFrom-Markdown → script.js URL resolution → final mdview: URL
+# Pipeline: Repair-MarkdownLinks → ConvertFrom-Markdown → Repair-HtmlLinks → URL resolution
 #
-# These tests assert IDEAL behavior. Failures indicate bugs to fix.
-# When bugs are fixed, all tests should pass.
+# These tests assert IDEAL behavior. All tests should pass when the fix is implemented.
 
 #Requires -Version 7.0
 
 BeforeAll {
     $ErrorActionPreference = 'Stop'
     
+    # Import the module with the repair functions
+    $ScriptRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    $ModulePath = Join-Path $ScriptRoot 'src\win\MarkdownViewer.psm1'
+    Import-Module $ModulePath -Force -Global
+    
     <#
     .SYNOPSIS
-        Extracts the href attribute from HTML produced by ConvertFrom-Markdown.
+        Extracts the href attribute from HTML produced by the full pipeline.
+        Uses Repair-MarkdownLinks before ConvertFrom-Markdown and Repair-HtmlLinks after.
     #>
     function Get-MarkdownLinkHref {
         [CmdletBinding()]
@@ -25,7 +30,11 @@ BeforeAll {
         )
         
         $markdown = "[$LinkText]($LinkTarget)"
+        
+        # Full pipeline: repair markdown → convert → repair HTML
+        $markdown = Repair-MarkdownLinks -Markdown $markdown
         $html = (ConvertFrom-Markdown -InputObject $markdown).Html
+        $html = Repair-HtmlLinks -Html $html
         
         if ($html -match '<a\s+href="([^"]*)"') {
             return $Matches[1]
@@ -35,7 +44,7 @@ BeforeAll {
     
     <#
     .SYNOPSIS
-        Simulates the full pipeline: ConvertFrom-Markdown + script.js URL resolution.
+        Simulates the full pipeline: Repair → ConvertFrom-Markdown → Repair → URL resolution.
         Returns the final resolved URL (without mdview: prefix for comparison).
     #>
     function Get-ResolvedLinkUrl {

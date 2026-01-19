@@ -164,12 +164,19 @@ try {
 
     $css = Get-Content -Raw -LiteralPath $StylePath
     $js = Get-Content -Raw -LiteralPath $ScriptPath
-    $html = (ConvertFrom-Markdown -Path $p).Html
+    
+    # Read markdown, repair local file links, then convert to HTML
+    $md = Get-Content -Raw -LiteralPath $p
+    $md = Repair-MarkdownLinks -Markdown $md
+    $html = (ConvertFrom-Markdown -InputObject $md).Html
 
 
     # --- HTML SANITIZATION (Defense-in-Depth) ---
     # Uses the module function which properly handles content in code blocks
     $html = Invoke-HtmlSanitization -Html $html
+    
+    # Post-process HTML to fix any remaining link encoding issues
+    $html = Repair-HtmlLinks -Html $html
 
     # Detect remote images in the rendered HTML
     $hasRemoteImages = Test-RemoteImages -Html $html

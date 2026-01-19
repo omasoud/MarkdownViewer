@@ -1,14 +1,14 @@
 # LocalFileNormalizationWithFragments.ActualBehavior.Tests.ps1
-# Tests for the ACTUAL behavior of ConvertFrom-Markdown + URL resolution with fragments.
+# Tests for the ACTUAL behavior of the full pipeline with fragments.
 #
-# This file tests the full pipeline: ConvertFrom-Markdown (renders href) + URL resolution.
-# Tests assert IDEAL behavior - failures document bugs that need fixing.
+# Pipeline: Repair-MarkdownLinks → ConvertFrom-Markdown → Repair-HtmlLinks → URL resolution
+# Tests assert IDEAL behavior - all tests should pass when fix is implemented.
 #
 # Key findings from testing:
 # 1. Simple fragments (#section-1) work fine with forward-slash paths
-# 2. Unencoded special characters in fragments (#Section #1) break links (space in href)
+# 2. Unencoded special characters in fragments (#Section #1) need encoding
 # 3. Pre-encoded fragments (#Section%20%231) work correctly
-# 4. Backslash paths have the same issues as non-fragment tests (%5C encoding)
+# 4. Backslash paths are normalized by Repair-MarkdownLinks
 
 #Requires -Version 7.0
 
@@ -22,7 +22,7 @@ BeforeAll {
 
     <#
     .SYNOPSIS
-        Extracts the href attribute from HTML produced by ConvertFrom-Markdown.
+        Extracts the href attribute from HTML produced by the full pipeline.
     .RETURNS
         The href value, or $null if no anchor was created.
     #>
@@ -34,7 +34,11 @@ BeforeAll {
         )
         
         $markdown = "[test]($LinkTarget)"
+        
+        # Full pipeline
+        $markdown = Repair-MarkdownLinks -Markdown $markdown
         $html = (ConvertFrom-Markdown -InputObject $markdown).Html
+        $html = Repair-HtmlLinks -Html $html
         
         if ($html -match '<a\s+href="([^"]*)"') {
             return $Matches[1]
@@ -46,7 +50,7 @@ BeforeAll {
     .SYNOPSIS
         Simulates the full URL resolution pipeline with a base URL.
     .DESCRIPTION
-        Gets the href from ConvertFrom-Markdown, then resolves against base URL.
+        Gets the href from the full pipeline, then resolves against base URL.
         Returns the final resolved URL or $null if not a link.
     #>
     function script:Get-ResolvedLinkUrl {
