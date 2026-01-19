@@ -39,8 +39,8 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
 - Code syntax highlighting
 - Linked local `.md` files supported
 - Secure by default (CSP + sanitization; MOTW; network blocked; optional remote images)
-
-**Open source (GitHub):** [github.com/omasoud/MarkdownViewer](https://github.com/omasoud/MarkdownViewer)
+---
+**Open source (GitHub):** [github.com/omasoud/MarkdownViewer](https://github.com/omasoud/MarkdownViewer) <span style=""float: right;"">Version {0}</span>
 ";
 
         // --- 2) HTML TEMPLATE (Rendered View) ---
@@ -180,6 +180,7 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
   <div class='footer'>
     <strong>Open source (GitHub):</strong>
     <a href='https://github.com/omasoud/MarkdownViewer'>github.com/omasoud/MarkdownViewer</a>
+    <span style='float:right;'>Version {1}</span>
   </div>
 </body>
 </html>";
@@ -306,7 +307,7 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
                 }
             };
 
-            browser.DocumentText = string.Format(HtmlTemplate, iconBase64);
+            browser.DocumentText = string.Format(HtmlTemplate, iconBase64, GetVersionString());
             split.Panel1.Controls.Add(browser);
 
             // --- RIGHT PANE: Source view ---
@@ -321,7 +322,7 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
                 WordWrap = true,
                 ScrollBars = RichTextBoxScrollBars.None,
                 DetectUrls = true,
-                Text = MarkdownContent,
+                Text = string.Format(MarkdownContent, GetVersionString()),
                 TabStop = false,
                 HideSelection = true,
                 Cursor = Cursors.Arrow,
@@ -484,6 +485,15 @@ MarkView renders local `.md` files in your browser — fast, clean, and safe.
             {
                 // intentionally ignore (help dialog should never crash)
             }
+        }
+
+        private static string GetVersionString()
+        {
+            var version = Assembly.GetExecutingAssembly().GetName().Version;
+            // Show major.minor.build (skip revision if 0)
+            return version.Revision == 0
+                ? $"{version.Major}.{version.Minor}.{version.Build}"
+                : version.ToString();
         }
 
     }
