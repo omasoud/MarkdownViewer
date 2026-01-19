@@ -523,6 +523,144 @@ function Repair-HtmlLinks {
 }
 
 
+<#
+.SYNOPSIS
+    Gets the default browser's ProgId from Windows registry.
+.DESCRIPTION
+    Reads the user's default browser association for https (preferred) or http.
+.OUTPUTS
+    The ProgId string (e.g., "ChromeHTML", "MSEdgeHTM", "FirefoxURL").
+#>
+function Get-DefaultBrowserProgId {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param()
+    
+    $keys = @(
+        'HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice',
+        'HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice'
+    )
+    
+    foreach ($k in $keys) {
+        try {
+            $p = Get-ItemProperty -Path $k -Name ProgId -ErrorAction Stop
+            if ($p.ProgId) { return $p.ProgId }
+        } catch { }
+    }
+    
+    throw "Could not determine default browser ProgId from HKCU UrlAssociations."
+}
+
+
+<#
+.SYNOPSIS
+    Gets the shell open command for a ProgId.
+.DESCRIPTION
+    Reads the shell\open\command from HKCR for the specified ProgId.
+.PARAMETER ProgId
+    The ProgId to look up (e.g., "ChromeHTML").
+.OUTPUTS
+    The command string with environment variables expanded.
+#>
+function Get-ProgIdOpenCommand {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)]
+        [string] $ProgId
+    )
+    
+    $cmdKey = "Registry::HKEY_CLASSES_ROOT\$ProgId\shell\open\command"
+    try {
+        $cmd = (Get-ItemProperty -Path $cmdKey -Name '(default)' -ErrorAction Stop).'(default)'
+        return [Environment]::ExpandEnvironmentVariables($cmd)
+    } catch {
+        throw "Failed to read open command for ProgId '$ProgId' at '$cmdKey'."
+    }
+}
+
+
+<#
+.SYNOPSIS
+    Extracts the executable path from a shell open command.
+.DESCRIPTION
+    Parses the .exe path from commands like:
+    - "C:\Path\browser.exe" -- "%1"
+    - C:\Path\browser.exe -- "%1"
+.PARAMETER OpenCommand
+    The shell open command string.
+.OUTPUTS
+    The full path to the executable.
+#>
+function Get-ExePathFromOpenCommand {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)]
+        [string] $OpenCommand
+    )
+    
+    $cmd = $OpenCommand.Trim()
+    
+    $exe = $null
+    if ($cmd -match '^\s*"([^"]+?\.exe)"') {
+        $exe = $Matches[1]
+    } elseif ($cmd -match '^\s*([^\s]+?\.exe)') {
+        $exe = $Matches[1]
+    }
+    
+    if (-not $exe) {
+        throw "Could not parse an .exe from open command: $OpenCommand"
+    }
+    
+    if (-not (Test-Path -LiteralPath $exe)) {
+        throw "Parsed exe does not exist: $exe`nOpen command: $OpenCommand"
+    }
+    
+    return $exe
+}
+
+
+<#
+.SYNOPSIS
+    Gets the path to the user's default web browser executable.
+.DESCRIPTION
+    Resolves the default browser from registry associations and returns the exe path.
+.OUTPUTS
+    The full path to the browser executable.
+#>
+function Get-DefaultBrowserExePath {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param()
+    
+    $progId = Get-DefaultBrowserProgId
+    $openCmd = Get-ProgIdOpenCommand -ProgId $progId
+    return Get-ExePathFromOpenCommand -OpenCommand $openCmd
+}
+
+
+<#
+.SYNOPSIS
+    Launches the default browser with a URL.
+.DESCRIPTION
+    Bypasses ShellExecute URL parsing by launching the browser directly.
+    This preserves URL fragments that would otherwise be stripped.
+.PARAMETER Url
+    The URL to open (typically a file:// URL with fragment).
+#>
+function Start-DefaultBrowser {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Url
+    )
+    
+    $exe = Get-DefaultBrowserExePath
+    Start-Process -FilePath $exe -ArgumentList $Url
+}
+
+
 # Export functions
 Export-ModuleMember -Function @(
     'Invoke-HtmlSanitization'
@@ -531,4 +669,9 @@ Export-ModuleMember -Function @(
     'Test-Motw'
     'Repair-MarkdownLinks'
     'Repair-HtmlLinks'
+    'Get-DefaultBrowserProgId'
+    'Get-ProgIdOpenCommand'
+    'Get-ExePathFromOpenCommand'
+    'Get-DefaultBrowserExePath'
+    'Start-DefaultBrowser'
 )

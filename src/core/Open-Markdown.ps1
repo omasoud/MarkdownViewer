@@ -301,10 +301,14 @@ $html
         Write-Doc -outPath $outRemote -allowRemoteImages:$true -hasRemoteImages:$hasRemoteImages
     }
 
-    # When there's a fragment, we must use the file:// URI so the browser handles #fragment correctly.
-    # Using a plain path like "C:\...\file.html#section" causes Windows to look for a file literally named that.
-    $launch = if ($frag) { $uLocal + $frag } else { $outLocal }
-    Start-Process $launch
+    # Launch the HTML file
+    # When there's a fragment, launch the browser directly to preserve it
+    # (ShellExecute strips fragments). Otherwise use simple Start-Process.
+    if ($frag) {
+        Start-DefaultBrowser -Url ($uLocal + $frag)
+    } else {
+        Start-Process $outLocal
+    }
 }
 catch {
     $msg = $_.Exception.Message
