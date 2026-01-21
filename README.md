@@ -1,6 +1,6 @@
 # Markdown Viewer
 
-A simple tool to view Markdown files rendered in your browser on Windows.
+A simple tool to view Markdown files rendered in your browser on Windows. Other platforms will be added later; the tech stack is cross-platform.
 
 ## Description
 
@@ -12,14 +12,14 @@ When you open a Markdown file, the app uses PowerShell's `ConvertFrom-Markdown` 
 
 ## Installation
 
-### Option 1: Microsoft Store (MSIX) — Coming Soon
+### Option 1: Microsoft Store (MSIX)
 
 PowerShell 7 is bundled in the package—no separate installation required.
 
-1. Install from the Microsoft Store (link coming soon)
-2. The app automatically registers as a handler for `.md` and `.markdown` files
+1. Install from the [Microsoft Store](https://apps.microsoft.com/detail/9MSWK3Q0JZ5N?hl=en-us&gl=US&ocid=pdpshare)
+2. The app will optionally show the user how to make it the defailt handler for `.md` and `.markdown` files
 
-**Architecture support:** Both x64 and ARM64 packages are available.
+**Architecture support:** x64 package is available (ARM64 at a future release)
 
 ### Option 1b: Sideload MSIX (Developer)
 
