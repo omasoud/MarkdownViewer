@@ -1,8 +1,15 @@
 # BrowserLaunch.Tests.ps1 - Pester tests for browser launch utility functions
 # Tests Get-DefaultBrowserProgId, Get-ProgIdOpenCommand,
 # Get-ExePathFromOpenCommand, Get-DefaultBrowserExePath, Start-DefaultBrowser
+# Windows-only: Tests registry-based browser detection
 
 #Requires -Version 7.0
+
+# Skip entire file on non-Windows platforms
+if (-not $IsWindows) {
+    Write-Host "Skipping $(Split-Path -Leaf $PSCommandPath): Windows-only tests (registry-based browser detection)" -ForegroundColor Yellow
+    return
+}
 
 BeforeAll {
     $ScriptRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)

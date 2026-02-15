@@ -492,7 +492,8 @@ Describe 'Test-RemoteImages' {
     }
 }
 
-Describe 'Get-FileBaseHref' {
+Describe 'Get-FileBaseHref' -Skip:(-not $IsWindows) {
+    # Windows-only: Tests Windows path formats (C:\, UNC paths)
     
     Context 'Standard Windows paths' {
         It 'converts C:\path\file.md correctly' {
@@ -537,7 +538,8 @@ Describe 'Get-FileBaseHref' {
     }
 }
 
-Describe 'Test-Motw' {
+Describe 'Test-Motw' -Skip:(-not $IsWindows) {
+    # Windows-only: MOTW (Zone.Identifier) is an NTFS alternate data stream feature
     
     BeforeAll {
         $testDir = Join-Path ([IO.Path]::GetTempPath()) 'MarkdownViewer_Tests'
@@ -1176,7 +1178,8 @@ Describe 'ConvertFrom-Markdown Anchor ID Mismatch' {
     }
 }
 
-Describe 'MSIX Staged Payload Structure' -Tag 'Integration' {
+Describe 'MSIX Staged Payload Structure' -Tag 'Integration' -Skip:(-not $IsWindows) {
+    # Windows-only: MSIX is a Windows packaging format
     # These tests validate the MSIX staging structure without requiring a full build
     # Run after staging with: Invoke-Pester -Path .\tests\MarkdownViewer.Tests.ps1 -Tag Integration
     
@@ -1310,7 +1313,8 @@ Describe 'MSIX Staged Payload Structure' -Tag 'Integration' {
     }
 }
 
-Describe 'MSIX Package Contents' -Tag 'Integration', 'MsixValidation' {
+Describe 'MSIX Package Contents' -Tag 'Integration', 'MsixValidation' -Skip:(-not $IsWindows) {
+    # Windows-only: MSIX is a Windows packaging format
     # These tests validate the ACTUAL MSIX package contents by extracting and inspecting
     # This catches issues where staging is correct but MSBuild fails to include content
     # 

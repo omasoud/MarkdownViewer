@@ -1,10 +1,17 @@
 # LocalFileNormalization.ActualBehavior.Tests.ps1
 # Tests that verify the FULL PIPELINE produces correct file: URLs.
 # Pipeline: Repair-MarkdownLinks → ConvertFrom-Markdown → Repair-HtmlLinks → URL resolution
+# Windows-only: Uses Get-FileBaseHref and tests Windows paths (C:\, UNC)
 #
 # These tests assert IDEAL behavior. All tests should pass when the fix is implemented.
 
 #Requires -Version 7.0
+
+# Skip entire file on non-Windows platforms
+if (-not $IsWindows) {
+    Write-Host "Skipping $(Split-Path -Leaf $PSCommandPath): Windows-only tests (Windows paths/module)" -ForegroundColor Yellow
+    return
+}
 
 BeforeAll {
     $ErrorActionPreference = 'Stop'

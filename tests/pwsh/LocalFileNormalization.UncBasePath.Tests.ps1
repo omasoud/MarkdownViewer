@@ -1,5 +1,6 @@
 # LocalFileNormalization.UncBasePath.Tests.ps1
 # Tests for link normalization when the markdown file is opened from a UNC path.
+# Windows-only: UNC paths are a Windows-specific concept
 #
 # When a file is accessed via UNC path in PowerShell (e.g., \\localhost\c$\repo\file.md),
 # PowerShell's Split-Path may return a PSProvider-prefixed path like:
@@ -8,6 +9,12 @@
 # This test file documents bugs where the PSProvider prefix leaks into the base href.
 
 #Requires -Version 7.0
+
+# Skip entire file on non-Windows platforms
+if (-not $IsWindows) {
+    Write-Host "Skipping $(Split-Path -Leaf $PSCommandPath): Windows-only tests (UNC paths)" -ForegroundColor Yellow
+    return
+}
 
 BeforeAll {
     $ErrorActionPreference = 'Stop'
