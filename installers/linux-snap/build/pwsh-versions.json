@@ -1,0 +1,20 @@
+{
+    "comment": "Pinned PowerShell version for Linux Snap packaging. Update this file to use a different version.",
+    "version": "7.5.4",
+    "releaseDate": "2025-10-20",
+    "archives": {
+        "amd64": {
+            "url": "https://github.com/PowerShell/PowerShell/releases/download/v7.5.4/powershell-7.5.4-linux-x64.tar.gz",
+            "sha256": ""
+        },
+        "arm64": {
+            "url": "https://github.com/PowerShell/PowerShell/releases/download/v7.5.4/powershell-7.5.4-linux-arm64.tar.gz",
+            "sha256": "4b32d4cb86a43dfb83d5602d0294295bf22fafbf9e0785d1aaef81938cda92f8"
+        }
+    },
+    "notes": [
+        "SHA256 hashes from official GitHub release page",
+        "To update: 1) Change version/URLs, 2) Get hashes from release page, 3) Update hashes",
+        "Verify hashes: sha256sum <file.tar.gz>"
+    ]
+}

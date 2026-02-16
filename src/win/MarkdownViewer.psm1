@@ -3,7 +3,12 @@
 $ErrorActionPreference = 'Stop'
 
 # Import cross-platform shared functions
-Import-Module (Join-Path $PSScriptRoot '..\core\MarkdownViewer.Shared.psm1') -Force
+# In MSIX/installed layout, the shared module is co-located; in dev layout it's in ..\core\
+$sharedPath = Join-Path $PSScriptRoot 'MarkdownViewer.Shared.psm1'
+if (-not (Test-Path $sharedPath)) {
+    $sharedPath = Join-Path $PSScriptRoot '..\core\MarkdownViewer.Shared.psm1'
+}
+Import-Module $sharedPath -Force
 
 
 <#

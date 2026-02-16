@@ -1,0 +1,44 @@
+name: markview
+version: '1.0.0'
+summary: View Markdown files rendered in your browser
+description: |
+  MarkView renders Markdown files as styled HTML and opens them in your
+  default web browser. Features include syntax highlighting, dark mode,
+  theme variations, and support for linked markdown files.
+
+base: core24
+confinement: strict
+grade: stable
+platforms:
+  amd64:
+  arm64:
+
+apps:
+  markview:
+    command: bin/markview
+    desktop: meta/gui/markview.desktop
+    plugs:
+      - home
+      - desktop
+      - desktop-legacy
+      - x11
+      - wayland
+      - browser-support
+
+parts:
+  pwsh:
+    plugin: dump
+    source: pwsh/
+    organize:
+      '*': pwsh/
+
+  markview:
+    plugin: dump
+    source: staged/
+    stage-packages:
+      - zenity
+      - xdg-utils
+
+layout:
+  /usr/share/zenity:
+    bind: $SNAP/usr/share/zenity

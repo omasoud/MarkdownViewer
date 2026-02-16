@@ -401,7 +401,7 @@ The Linux module must export the same function list as the Windows module.
 
 ### 4.3 Create Icon
 
-- [ ] 4.3.1 Convert `src/core/icons/markdown.ico` to PNG (256x256) for Linux
+- [x] 4.3.1 Convert `src/core/icons/markdown.ico` to PNG (256x256) for Linux
   ```bash
   # Using ImageMagick
   convert src/core/icons/markdown.ico[0] -resize 256x256 src/linux/markview.png
@@ -410,11 +410,11 @@ The Linux module must export the same function list as the Windows module.
 
 ### 4.4 Verification
 
-- [ ] 4.4.1 Test launcher from command line:
+- [x] 4.4.1 Test launcher from command line:
   ```bash
   ./src/linux/markview README.md
   ```
-- [ ] 4.4.2 Verify markdown renders in default browser
+- [x] 4.4.2 Verify markdown renders in default browser
 
 ---
 
@@ -424,12 +424,12 @@ The Linux module must export the same function list as the Windows module.
 
 ### 5.1 Create Snap Directory Structure
 
-- [ ] 5.1.1 Create `installers/linux-snap/` directory
-- [ ] 5.1.2 Create subdirectories: `snap/`, `scripts/`
+- [x] 5.1.1 Create `installers/linux-snap/` directory
+- [x] 5.1.2 Create subdirectories: `snap/`, `scripts/`
 
 ### 5.2 Create snapcraft.yaml
 
-- [ ] 5.2.1 Create `installers/linux-snap/snap/snapcraft.yaml`:
+- [x] 5.2.1 Create `installers/linux-snap/snap/snapcraft.yaml`:
   ```yaml
   name: markview
   version: '1.0.0'
@@ -489,7 +489,7 @@ The Linux module must export the same function list as the Windows module.
 
 ### 5.3 Create Build Script
 
-- [ ] 5.3.1 Create `installers/linux-snap/build.sh`:
+- [x] 5.3.1 Create `installers/linux-snap/build.sh`:
   ```bash
   #!/bin/bash
   set -e
@@ -565,7 +565,7 @@ The Linux module must export the same function list as the Windows module.
 
 ### 5.4 Adapt Trimming Scripts for Linux
 
-- [ ] 5.4.1 Create `installers/linux-snap/scripts/Trim-PwshBundle-Linux.ps1`:
+- [x] 5.4.1 Create `installers/linux-snap/scripts/Trim-PwshBundle-Linux.ps1`:
   - Remove non-en-US locales
   - Remove `ref/`, `preview/` directories
   - Keep only `Microsoft.PowerShell.Management` + `Microsoft.PowerShell.Utility` modules
@@ -574,7 +574,7 @@ The Linux module must export the same function list as the Windows module.
   - Remove `createdump`, `mscordaccore*.dll`, etc.
   - Verify with adapted `Verify-MarkViewPwsh.ps1`
 
-- [ ] 5.4.2 Create `installers/linux-snap/scripts/Verify-MarkViewPwsh-Linux.ps1`:
+- [x] 5.4.2 Create `installers/linux-snap/scripts/Verify-MarkViewPwsh-Linux.ps1`:
   - Check required cmdlets: `Add-Type`, `ConvertFrom-Markdown`, `ConvertTo-Json`, `Get-Content`, `Import-Module`, `Start-Process`, `Test-Path`
   - Import `MarkdownViewer.psm1` and verify it loads
   - Smoke-test `ConvertFrom-Markdown`
@@ -608,10 +608,10 @@ The Linux module must export the same function list as the Windows module.
 
 ### 5.6 Verification
 
-- [ ] 5.6.1 Build snap: `cd installers/linux-snap && ./build.sh`
-- [ ] 5.6.2 Install locally: `sudo snap install markview_*.snap --dangerous`
-- [ ] 5.6.3 Test command: `markview README.md`
-- [ ] 5.6.4 Test desktop integration: Right-click `.md` file → Open With → MarkView
+- [x] 5.6.1 Build snap: `cd installers/linux-snap && ./build.sh` (stage-only tested; snapcraft not installed)
+- [ ] 5.6.2 Install locally: `sudo snap install markview_*.snap --dangerous` (deferred — requires snapcraft)
+- [ ] 5.6.3 Test command: `markview README.md` (deferred — requires snap install)
+- [ ] 5.6.4 Test desktop integration: Right-click `.md` file → Open With → MarkView (deferred — requires desktop)
 
 ---
 
@@ -669,7 +669,7 @@ The Linux module must export the same function list as the Windows module.
 
 ### 6.2 Snap Build Tests
 
-- [ ] 6.2.1 Create `tests/pwsh/SnapBuild.Tests.ps1`:
+- [x] 6.2.1 Create `tests/pwsh/SnapBuild.Tests.ps1`:
   - Verify staged directory structure
   - Verify `.desktop` file has correct MIME types
   - Verify launcher script is executable
@@ -677,14 +677,14 @@ The Linux module must export the same function list as the Windows module.
 
 ### 6.3 Run Full Test Suite
 
-- [ ] 6.3.1 Linux: `Invoke-Pester tests -Output Minimal` — target 260+ passed, 0 failed
-- [ ] 6.3.2 Windows: `Invoke-Pester tests -Output Minimal` — target 428 passed, 0 failed (unchanged)
+- [x] 6.3.1 Linux: `Invoke-Pester tests -Output Minimal` — **302 passed, 0 failed, 53 skipped** ✅
+- [x] 6.3.2 Windows: user confirmed tests pass ✅
 
 ### 6.4 Manual E2E Testing
 
-- [ ] 6.4.1 Command line: `markview README.md` — opens in browser
-- [ ] 6.4.2 Double-click `.md` in file manager — opens in browser
-- [ ] 6.4.3 Click linked `.md` file in rendered page — opens via `mdview:` protocol
+- [x] 6.4.1 Command line: `markview README.md` — opens in browser (tested with src/linux/markview)
+- [ ] 6.4.2 Double-click `.md` in file manager — opens in browser (deferred — requires desktop + snap install)
+- [ ] 6.4.3 Click linked `.md` file in rendered page — opens via `mdview:` protocol (deferred — requires desktop)
 - [ ] 6.4.4 Theme toggle works
 - [ ] 6.4.5 Syntax highlighting works
 - [ ] 6.4.6 Remote images opt-in works
