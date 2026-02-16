@@ -1,0 +1,30 @@
+#!/bin/bash
+# MarkView - Markdown Viewer for Linux
+# Launches the PowerShell engine to render markdown in the browser
+
+set -e
+
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+
+# In snap, pwsh is at $SNAP/pwsh/pwsh
+# In dev/installed layout, pwsh is either bundled or system-installed
+if [ -n "$SNAP" ] && [ -x "$SNAP/pwsh/pwsh" ]; then
+    PWSH="$SNAP/pwsh/pwsh"
+elif [ -x "$SCRIPT_DIR/../pwsh/pwsh" ]; then
+    PWSH="$SCRIPT_DIR/../pwsh/pwsh"
+else
+    PWSH="pwsh"
+fi
+
+# Resolve the app directory (Open-Markdown.ps1 location)
+if [ -n "$SNAP" ]; then
+    APP_DIR="$SNAP/app"
+elif [ -d "$SCRIPT_DIR/../app" ]; then
+    APP_DIR="$SCRIPT_DIR/../app"
+else
+    # Development layout: src/linux/markview -> src/core/Open-Markdown.ps1
+    APP_DIR="$SCRIPT_DIR/../core"
+fi
+
+exec "$PWSH" -NoProfile -ExecutionPolicy Bypass \
+    -File "$APP_DIR/Open-Markdown.ps1" -Path "$1"

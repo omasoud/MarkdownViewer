@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=MarkView
+GenericName=Markdown Viewer
+Comment=View Markdown files rendered in your browser
+Exec=markview %f
+Icon=markview
+Terminal=false
+Categories=Utility;TextEditor;Viewer;
+MimeType=text/markdown;text/x-markdown;application/x-markdown;x-scheme-handler/mdview;
+Keywords=markdown;md;viewer;preview;
+StartupNotify=false

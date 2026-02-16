@@ -13,8 +13,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# Import the shared module
-# The module can be co-located with this script (ad-hoc/MSIX install) or in a sibling directory (development)
+# Import the platform module
+# The module can be co-located with this script (ad-hoc/MSIX/Snap install) or in a sibling directory (development)
 if (-not $ModulePath) {
     $ModulePath = Join-Path $PSScriptRoot 'MarkdownViewer.psm1'
 }
@@ -23,7 +23,8 @@ if (Test-Path $ModulePath) {
     Import-Module $ModulePath -Force
 } else {
     # Fallback: look for module relative to repo structure (for development from src/core)
-    $devModulePath = Join-Path (Split-Path -Parent $PSScriptRoot) 'win\MarkdownViewer.psm1'
+    $platformDir = if ($IsWindows) { 'win' } else { 'linux' }
+    $devModulePath = Join-Path (Split-Path -Parent $PSScriptRoot) "$platformDir/MarkdownViewer.psm1"
     if (Test-Path $devModulePath) {
         Import-Module $devModulePath -Force
     } else {
@@ -33,80 +34,17 @@ if (Test-Path $ModulePath) {
 
 # Also check for icon in icons subdirectory (development structure)
 if (-not (Test-Path $IconPath)) {
-    $devIconPath = Join-Path $PSScriptRoot 'icons\markdown.ico'
+    $devIconPath = Join-Path $PSScriptRoot 'icons/markdown.ico'
     if (Test-Path $devIconPath) {
         $IconPath = $devIconPath
     }
 }
 
-Add-Type -AssemblyName System.Windows.Forms | Out-Null
-[System.Windows.Forms.Application]::EnableVisualStyles() # Required for TaskDialog
+Initialize-PlatformUI
 	
 
-# Note: Test-Motw and Get-FileBaseHref are now provided by the MarkdownViewer module
-
-function Show-MotwWarning {
-    param([string]$FilePath)
-    
-    $fileName = [IO.Path]::GetFileName($FilePath)
-    
-    $owner = New-Object System.Windows.Forms.Form
-    $owner.TopMost = $true
-    
-    $page = New-Object System.Windows.Forms.TaskDialogPage
-    $page.Caption = "Security Warning - MarkView"
-    $page.Heading = "This file was downloaded from the internet"
-    $page.Text = "$fileName`n`nIt may contain malicious content."
-    $page.Icon = [System.Windows.Forms.TaskDialogIcon]::Warning
-    
-    $btnOpen = New-Object System.Windows.Forms.TaskDialogButton("Open")
-    $btnUnblock = New-Object System.Windows.Forms.TaskDialogButton("Unblock && Open")
-    $btnCancel = New-Object System.Windows.Forms.TaskDialogButton("Cancel")
-    
-    $page.Buttons.Add($btnOpen)
-    $page.Buttons.Add($btnUnblock)
-    $page.Buttons.Add($btnCancel)
-    $page.DefaultButton = $btnCancel
-    
-    $result = [System.Windows.Forms.TaskDialog]::ShowDialog($owner.Handle, $page)
-    $owner.Dispose()
-    [System.Windows.Forms.Application]::DoEvents() # Required 
-    
-    if ($result -eq $btnUnblock) {
-        return "Unblock"
-    }
-    elseif ($result -eq $btnOpen) {
-        return "Open"
-    }
-    else {
-        return "Cancel"
-    }
-}
-
-function Show-FileNotFound {
-    param(
-        [Parameter(Mandatory)][string]$FilePath,
-        [string]$FromLink = ''
-    )
-
-    $owner = New-Object System.Windows.Forms.Form
-    $owner.TopMost = $true
-
-    $page = New-Object System.Windows.Forms.TaskDialogPage
-    $page.Caption = "MarkView"
-    $page.Heading = "File not found"
-    $page.Text = if ($FromLink) {
-        "The linked Markdown file could not be found:`n`n$FilePath`n`nLink: $FromLink"
-    } else {
-        "The Markdown file could not be found:`n`n$FilePath"
-    }
-    $page.Icon = [System.Windows.Forms.TaskDialogIcon]::Warning
-    $page.Buttons.Add([System.Windows.Forms.TaskDialogButton]::OK)
-
-    [System.Windows.Forms.TaskDialog]::ShowDialog($owner.Handle, $page) | Out-Null
-    $owner.Dispose()
-    [System.Windows.Forms.Application]::DoEvents()
-}
+# Note: Test-Motw, Get-FileBaseHref, Show-MotwWarning, Show-FileNotFound,
+# and Show-ErrorDialog are now provided by the platform module
 
 
 try {
@@ -152,7 +90,9 @@ try {
         $result = Show-MotwWarning -FilePath $p
 		
         if ($result -eq "Unblock") {
-            Unblock-File -LiteralPath $p
+            if ($IsWindows) {
+                Unblock-File -LiteralPath $p
+            }
         }
         elseif ($result -ne "Open") {
             exit 0
@@ -189,8 +129,9 @@ try {
     }
 
     # Create a stable MD5 hash of the full path (but only keep the first 8 characters) so the temp filename is stable for this specific file
-    # We use ToLower() because Windows paths are case-insensitive
-    $bytes = [System.Text.Encoding]::UTF8.GetBytes($p.ToLower())
+    # Windows paths are case-insensitive; Linux paths are case-sensitive
+    $pathForHash = if ($IsWindows) { $p.ToLower() } else { $p }
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($pathForHash)
     $hashBytes = [System.Security.Cryptography.MD5]::Create().ComputeHash($bytes)
     $hash = [BitConverter]::ToString($hashBytes).Replace("-", "").Substring(0, 8)
 
@@ -316,17 +257,5 @@ catch {
         $msg += "`r`n`r`n" + $_.InvocationInfo.PositionMessage
     }
     
-    $owner = New-Object System.Windows.Forms.Form
-    $owner.TopMost = $true
-    
-    $page = New-Object System.Windows.Forms.TaskDialogPage
-    $page.Caption = "MarkView"
-    $page.Heading = "Error opening file"
-    $page.Text = $msg
-    $page.Icon = [System.Windows.Forms.TaskDialogIcon]::Error
-    $page.Buttons.Add([System.Windows.Forms.TaskDialogButton]::OK)
-    
-    [System.Windows.Forms.TaskDialog]::ShowDialog($owner.Handle, $page) | Out-Null
-    $owner.Dispose()
-    [System.Windows.Forms.Application]::DoEvents()
+    Show-ErrorDialog -Message $msg
 }

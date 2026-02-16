@@ -115,7 +115,7 @@ Invoke-Pester tests -Output Minimal
 
 ### 1.1 Create Shared Module
 
-- [ ] 1.1.1 Create `src/core/MarkdownViewer.Shared.psm1` with these functions (copied from `src/win/MarkdownViewer.psm1`):
+- [x] 1.1.1 Create `src/core/MarkdownViewer.Shared.psm1` with these functions (copied from `src/win/MarkdownViewer.psm1`):
   - `Invoke-HtmlSanitization` — pure regex, cross-platform
   - `Test-RemoteImages` — pure regex, cross-platform
   - `Repair-MarkdownLinks` — Windows path cases are harmless no-ops on Linux
@@ -125,7 +125,7 @@ Invoke-Pester tests -Output Minimal
 
 ### 1.2 Update Windows Module
 
-- [ ] 1.2.1 Update `src/win/MarkdownViewer.psm1`:
+- [x] 1.2.1 Update `src/win/MarkdownViewer.psm1`:
   - Import `../core/MarkdownViewer.Shared.psm1` at top
   - Remove the 6 functions that moved to shared module
   - Re-export shared functions alongside Windows-specific ones
@@ -135,18 +135,18 @@ Invoke-Pester tests -Output Minimal
 
 Move UI functions from `src/core/Open-Markdown.ps1` into platform modules:
 
-- [ ] 1.3.1 Add to `src/win/MarkdownViewer.psm1`:
+- [x] 1.3.1 Add to `src/win/MarkdownViewer.psm1`:
   - `Initialize-PlatformUI` — calls `Add-Type -AssemblyName System.Windows.Forms` + `EnableVisualStyles()`
   - `Show-MotwWarning` — WinForms TaskDialog (move from Open-Markdown.ps1)
   - `Show-FileNotFound` — WinForms TaskDialog (move from Open-Markdown.ps1)
   - `Show-ErrorDialog` — WinForms TaskDialog (extract from catch block)
 
-- [ ] 1.3.2 Update export list in `src/win/MarkdownViewer.psm1` to include the 4 new functions
+- [x] 1.3.2 Update export list in `src/win/MarkdownViewer.psm1` to include the 4 new functions
 
 ### 1.4 Verification
 
 - [ ] 1.4.1 Run `Invoke-Pester tests/MarkdownViewer.Tests.ps1 -Output Minimal` on Windows — all existing tests pass
-- [ ] 1.4.2 Run `Invoke-Pester tests/MarkdownViewer.Tests.ps1 -Output Minimal` on Linux — cross-platform tests pass
+- [x] 1.4.2 Run `Invoke-Pester tests/MarkdownViewer.Tests.ps1 -Output Minimal` on Linux — cross-platform tests pass
 
 ---
 
@@ -156,16 +156,16 @@ Move UI functions from `src/core/Open-Markdown.ps1` into platform modules:
 
 ### 2.1 Create Linux Module Structure
 
-- [ ] 2.1.1 Create `src/linux/` directory
-- [ ] 2.1.2 Create `src/linux/MarkdownViewer.psm1`
+- [x] 2.1.1 Create `src/linux/` directory
+- [x] 2.1.2 Create `src/linux/MarkdownViewer.psm1`
 
 ### 2.2 Implement Linux-Specific Functions
 
 The Linux module must export the same function list as the Windows module.
 
-- [ ] 2.2.1 Import shared module: `Import-Module (Join-Path $PSScriptRoot '../core/MarkdownViewer.Shared.psm1') -Force`
+- [x] 2.2.1 Import shared module: `Import-Module (Join-Path $PSScriptRoot '../core/MarkdownViewer.Shared.psm1') -Force`
 
-- [ ] 2.2.2 `Get-FileBaseHref` — simplified for Linux paths:
+- [x] 2.2.2 `Get-FileBaseHref` — simplified for Linux paths:
   ```powershell
   function Get-FileBaseHref {
       param([Parameter(Mandatory)][string] $FilePath)
@@ -179,7 +179,7 @@ The Linux module must export the same function list as the Windows module.
   }
   ```
 
-- [ ] 2.2.3 `Test-Motw` — stub returning `$null` (no MOTW on Linux):
+- [x] 2.2.3 `Test-Motw` — stub returning `$null` (no MOTW on Linux):
   ```powershell
   function Test-Motw {
       param([Parameter(Mandatory)][string] $FilePath)
@@ -187,7 +187,7 @@ The Linux module must export the same function list as the Windows module.
   }
   ```
 
-- [ ] 2.2.4 `Start-DefaultBrowser` — use `xdg-open`:
+- [x] 2.2.4 `Start-DefaultBrowser` — use `xdg-open`:
   ```powershell
   function Start-DefaultBrowser {
       param([Parameter(Mandatory)][string] $Url)
@@ -195,14 +195,14 @@ The Linux module must export the same function list as the Windows module.
   }
   ```
 
-- [ ] 2.2.5 `Initialize-PlatformUI` — no-op on Linux:
+- [x] 2.2.5 `Initialize-PlatformUI` — no-op on Linux:
   ```powershell
   function Initialize-PlatformUI {
       # No WinForms initialization needed on Linux
   }
   ```
 
-- [ ] 2.2.6 Dialog functions using `zenity` with stderr fallback:
+- [x] 2.2.6 Dialog functions using `zenity` with stderr fallback:
   ```powershell
   function Show-MotwWarning {
       param([string]$FilePath)
@@ -251,9 +251,11 @@ The Linux module must export the same function list as the Windows module.
   function Get-DefaultBrowserExePath { throw "Not supported on Linux" }
   ```
 
+  **Decision:** Omitted from Linux module — these are Windows-only registry functions not called by the engine.
+
 ### 2.3 Export List
 
-- [ ] 2.3.1 Ensure export list matches Windows module exactly:
+- [x] 2.3.1 Ensure export list matches Windows module exactly:
   ```powershell
   Export-ModuleMember -Function @(
       # From shared module (re-export)
@@ -279,13 +281,13 @@ The Linux module must export the same function list as the Windows module.
 
 ### 2.4 Verification
 
-- [ ] 2.4.1 Create `tests/pwsh/LinuxModule.Tests.ps1` with tests for:
+- [x] 2.4.1 Create `tests/pwsh/LinuxModule.Tests.ps1` with tests for:
   - `Get-FileBaseHref` with Linux paths (`/home/user/docs/file.md` → `file:///home/user/docs/`)
   - `Test-Motw` returns `$null`
   - Shared functions are exported
   - Export list matches Windows module
 
-- [ ] 2.4.2 Run Linux module tests: `Invoke-Pester tests/pwsh/LinuxModule.Tests.ps1 -Output Minimal`
+- [x] 2.4.2 Run Linux module tests: `Invoke-Pester tests/pwsh/LinuxModule.Tests.ps1 -Output Minimal`
 
 ---
 
@@ -295,7 +297,7 @@ The Linux module must export the same function list as the Windows module.
 
 ### 3.1 Update Module Discovery
 
-- [ ] 3.1.1 Update lines 12-27 of `Open-Markdown.ps1` to handle platform-specific dev paths:
+- [x] 3.1.1 Update lines 12-27 of `Open-Markdown.ps1` to handle platform-specific dev paths:
   ```powershell
   if (-not $ModulePath) {
       $ModulePath = Join-Path $PSScriptRoot 'MarkdownViewer.psm1'
@@ -317,23 +319,23 @@ The Linux module must export the same function list as the Windows module.
 
 ### 3.2 Replace Inline WinForms with Module Functions
 
-- [ ] 3.2.1 Remove `Add-Type -AssemblyName System.Windows.Forms` line
-- [ ] 3.2.2 Remove `[System.Windows.Forms.Application]::EnableVisualStyles()` line
-- [ ] 3.2.3 Add call to `Initialize-PlatformUI` after module import
-- [ ] 3.2.4 Remove inline `Show-MotwWarning` function (now in module)
-- [ ] 3.2.5 Remove inline `Show-FileNotFound` function (now in module)
-- [ ] 3.2.6 Replace catch block's inline TaskDialog with `Show-ErrorDialog -Message $msg`
+- [x] 3.2.1 Remove `Add-Type -AssemblyName System.Windows.Forms` line
+- [x] 3.2.2 Remove `[System.Windows.Forms.Application]::EnableVisualStyles()` line
+- [x] 3.2.3 Add call to `Initialize-PlatformUI` after module import
+- [x] 3.2.4 Remove inline `Show-MotwWarning` function (now in module)
+- [x] 3.2.5 Remove inline `Show-FileNotFound` function (now in module)
+- [x] 3.2.6 Replace catch block's inline TaskDialog with `Show-ErrorDialog -Message $msg`
 
 ### 3.3 Platform-Specific Guards
 
-- [ ] 3.3.1 Path hash case-sensitivity — update the MD5 hash line:
+- [x] 3.3.1 Path hash case-sensitivity — update the MD5 hash line:
   ```powershell
   # Windows paths are case-insensitive; Linux paths are case-sensitive
   $pathForHash = if ($IsWindows) { $p.ToLower() } else { $p }
   $bytes = [System.Text.Encoding]::UTF8.GetBytes($pathForHash)
   ```
 
-- [ ] 3.3.2 Wrap `Unblock-File` in platform guard:
+- [x] 3.3.2 Wrap `Unblock-File` in platform guard:
   ```powershell
   if ($result -eq "Unblock") {
       if ($IsWindows) {
@@ -345,8 +347,8 @@ The Linux module must export the same function list as the Windows module.
 
 ### 3.4 Verification
 
-- [ ] 3.4.1 Run on Linux: `pwsh src/core/Open-Markdown.ps1 -Path README.md` — opens in browser
-- [ ] 3.4.2 Run existing Pester tests on both platforms — all cross-platform tests pass
+- [x] 3.4.1 Run on Linux: `pwsh src/core/Open-Markdown.ps1 -Path README.md` — opens in browser
+- [x] 3.4.2 Run existing Pester tests on both platforms — all cross-platform tests pass
 
 ---
 
@@ -356,7 +358,7 @@ The Linux module must export the same function list as the Windows module.
 
 ### 4.1 Create Launcher Script
 
-- [ ] 4.1.1 Create `src/linux/markview`:
+- [x] 4.1.1 Create `src/linux/markview`:
   ```bash
   #!/bin/bash
   # MarkView - Markdown Viewer for Linux
@@ -376,11 +378,11 @@ The Linux module must export the same function list as the Windows module.
       -File "$SCRIPT_DIR/Open-Markdown.ps1" -Path "$1"
   ```
 
-- [ ] 4.1.2 Make executable: `chmod +x src/linux/markview`
+- [x] 4.1.2 Make executable: `chmod +x src/linux/markview`
 
 ### 4.2 Create Desktop Entry
 
-- [ ] 4.2.1 Create `src/linux/markview.desktop`:
+- [x] 4.2.1 Create `src/linux/markview.desktop`:
   ```ini
   [Desktop Entry]
   Version=1.0
