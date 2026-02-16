@@ -143,8 +143,22 @@ try {
         $name = $name.Substring(0, $keep) + ".." + $name.Substring($name.Length - $keep)
     }
     $baseName = "viewmd_$($name)_$hash"
-    $outLocal = Join-Path ([IO.Path]::GetTempPath()) "$baseName.html"
-    $outRemote = Join-Path ([IO.Path]::GetTempPath()) ($baseName + "_remote.html")
+
+    # On Linux, browsers installed as snaps (e.g. Firefox on Ubuntu 22.04+)
+    # cannot access hidden directories (dot-prefixed) or /tmp due to strict
+    # confinement. The snap 'home' plug only exposes non-hidden paths under
+    # $HOME, so we use ~/MarkView/ as the output directory.
+    $outDir = if ($IsWindows) {
+        [IO.Path]::GetTempPath()
+    } else {
+        $cacheDir = Join-Path $HOME 'MarkView'
+        if (-not (Test-Path $cacheDir)) {
+            New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
+        }
+        $cacheDir
+    }
+    $outLocal = Join-Path $outDir "$baseName.html"
+    $outRemote = Join-Path $outDir ($baseName + "_remote.html")
 
     $uLocal = ([Uri]::new($outLocal)).AbsoluteUri
     $uRemote = ([Uri]::new($outRemote)).AbsoluteUri    
@@ -242,10 +256,13 @@ $html
         Write-Doc -outPath $outRemote -allowRemoteImages:$true -hasRemoteImages:$hasRemoteImages
     }
 
-    # Launch the HTML file
-    # When there's a fragment, launch the browser directly to preserve it
-    # (ShellExecute strips fragments). Otherwise use simple Start-Process.
-    if ($frag) {
+    # Launch the HTML file in the default browser.
+    # On Windows without a fragment, Start-Process uses ShellExecute which works.
+    # On Linux, Start-Process tries to exec the file directly, so always use
+    # Start-DefaultBrowser which calls xdg-open.
+    # When there's a fragment, we must use Start-DefaultBrowser on all platforms
+    # because ShellExecute strips fragments.
+    if ($frag -or -not $IsWindows) {
         Start-DefaultBrowser -Url ($uLocal + $frag)
     } else {
         Start-Process $outLocal
