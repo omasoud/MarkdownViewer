@@ -5,6 +5,11 @@ description: |
   MarkView renders Markdown files as styled HTML and opens them in your
   default web browser. Features include syntax highlighting, dark mode,
   theme variations, and support for linked markdown files.
+title: MarkView
+license: MIT
+contact: https://github.com/nicholasgasior/MarkdownViewer/issues
+source-code: https://github.com/nicholasgasior/MarkdownViewer
+icon: staged/meta/gui/markview.png
 
 base: core24
 confinement: strict
@@ -26,18 +31,11 @@ apps:
       - browser-support
 
 parts:
-  pwsh:
-    plugin: dump
-    source: pwsh/
-    organize:
-      '*': pwsh/
-
   markview:
     plugin: dump
     source: staged/
     stage-packages:
       - zenity
-      - xdg-utils
 
 layout:
   /usr/share/zenity:

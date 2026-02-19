@@ -69,8 +69,8 @@ Describe 'Snap Package Structure' -Skip:($IsWindows) {
             $yamlContent | Should -Match 'zenity'
         }
 
-        It 'includes xdg-utils as stage package' {
-            $yamlContent | Should -Match 'xdg-utils'
+        It 'does not include xdg-utils (uses snapctl user-open instead)' {
+            $yamlContent | Should -Not -Match 'xdg-utils'
         }
     }
 
@@ -224,12 +224,12 @@ Describe 'Snap Package Structure' -Skip:($IsWindows) {
             Join-Path $snapDir 'staged/app/markdown.ico' | Should -Exist
         }
 
-        It 'trimmed pwsh directory exists' {
-            Join-Path $snapDir 'pwsh' | Should -Exist
+        It 'trimmed pwsh directory exists in staged' {
+            Join-Path $snapDir 'staged/pwsh' | Should -Exist
         }
 
         It 'trimmed pwsh binary exists and is executable' {
-            $pwshBin = Join-Path $snapDir 'pwsh/pwsh'
+            $pwshBin = Join-Path $snapDir 'staged/pwsh/pwsh'
             $pwshBin | Should -Exist
             $mode = (Get-Item $pwshBin).UnixMode
             $mode | Should -Match 'x'
@@ -240,17 +240,15 @@ Describe 'Snap Package Structure' -Skip:($IsWindows) {
                 -ScriptPath (Join-Path $snapDir 'staged/app/Open-Markdown.ps1') `
                 -ModulePath (Join-Path $snapDir 'staged/app/MarkdownViewer.psm1') `
                 -SharedModulePath (Join-Path $snapDir 'staged/app/MarkdownViewer.Shared.psm1') `
-                -PwshDir (Join-Path $snapDir 'pwsh') 2>&1
+                -PwshDir (Join-Path $snapDir 'staged/pwsh') 2>&1
             $LASTEXITCODE | Should -Be 0
         }
 
         AfterAll {
             # Clean up staging artifacts
             $stageDir = Join-Path $snapDir 'staged'
-            $pwshDir = Join-Path $snapDir 'pwsh'
             $cacheDir = Join-Path $snapDir '.cache'
             if (Test-Path $stageDir) { Remove-Item $stageDir -Recurse -Force }
-            if (Test-Path $pwshDir) { Remove-Item $pwshDir -Recurse -Force }
             # Keep .cache to avoid re-downloading
         }
     }

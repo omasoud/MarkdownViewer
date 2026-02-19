@@ -67,7 +67,8 @@ function Test-Motw {
 .SYNOPSIS
     Launches the default browser with a URL.
 .DESCRIPTION
-    Uses xdg-open to launch the default browser on Linux.
+    In a snap, uses 'snapctl user-open' (portal-based, works with strict confinement).
+    Otherwise uses xdg-open.
 .PARAMETER Url
     The URL to open.
 #>
@@ -77,8 +78,14 @@ function Start-DefaultBrowser {
         [Parameter(Mandatory)]
         [string] $Url
     )
-    
-    Start-Process 'xdg-open' -ArgumentList $Url
+
+    if ($env:MARKVIEW_SNAP -eq '1') {
+        # snapctl user-open goes through the desktop portal, so it can open
+        # the host browser even under strict confinement.
+        Start-Process 'snapctl' -ArgumentList 'user-open', $Url
+    } else {
+        Start-Process 'xdg-open' -ArgumentList $Url
+    }
 }
 
 

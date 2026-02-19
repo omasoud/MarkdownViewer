@@ -10,6 +10,12 @@ SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 # In dev/installed layout, pwsh is either bundled or system-installed
 if [ -n "$SNAP" ] && [ -x "$SNAP/pwsh/pwsh" ]; then
     PWSH="$SNAP/pwsh/pwsh"
+    # Snap: use real home so output files are accessible to browsers.
+    # $HOME in strict confinement points to ~/snap/<name>/x1/ which
+    # snap-confined browsers (Firefox, Chromium) cannot read.
+    export HOME="$SNAP_REAL_HOME"
+    # Tell the pwsh module we're in a snap (for snapctl user-open)
+    export MARKVIEW_SNAP=1
 elif [ -x "$SCRIPT_DIR/../pwsh/pwsh" ]; then
     PWSH="$SCRIPT_DIR/../pwsh/pwsh"
 else

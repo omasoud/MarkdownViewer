@@ -153,9 +153,8 @@ if [ ! -f "$CACHED_TARBALL" ]; then
     fi
 fi
 
-# Extract pwsh
-PWSH_DIR="$SCRIPT_DIR/pwsh"
-rm -rf "$PWSH_DIR"
+# Extract pwsh directly into staged/pwsh/ (single dump part for snapcraft)
+PWSH_DIR="$STAGE_DIR/pwsh"
 mkdir -p "$PWSH_DIR"
 echo "  Extracting..."
 tar xzf "$CACHED_TARBALL" -C "$PWSH_DIR"
@@ -191,15 +190,17 @@ echo "Staging complete."
 echo ""
 
 # Show sizes
-echo "Staged sizes:"
-du -sh "$STAGE_DIR" | awk '{print "  App:  "$1}'
-du -sh "$PWSH_DIR"  | awk '{print "  Pwsh: "$1}'
+du -sh "$STAGE_DIR/app" | awk '{print "  App:  "$1}'
+du -sh "$STAGE_DIR/pwsh" | awk '{print "  Pwsh: "$1}'
+du -sh "$STAGE_DIR" | awk '{print "  Total: "$1}'
 echo ""
 
 if [ "$STAGE_ONLY" = true ]; then
     echo "Stage-only mode; skipping snapcraft."
     echo "To build the snap manually:"
     echo "  cd $SCRIPT_DIR && snapcraft --destructive-mode"
+    echo "Then move the .snap to output/:"
+    echo "  mkdir -p output && mv *.snap output/"
     exit 0
 fi
 
@@ -212,10 +213,14 @@ if ! command -v snapcraft &>/dev/null; then
     exit 0
 fi
 
-echo "Building snap..."
+echo "Building snap for $ARCH..."
 cd "$SCRIPT_DIR"
-snapcraft --destructive-mode
+snapcraft --destructive-mode --platform "$ARCH"
+
+# Move .snap to output/ for consistency with win-msix
+mkdir -p "$SCRIPT_DIR/output"
+mv -f "$SCRIPT_DIR"/*.snap "$SCRIPT_DIR/output/" 2>/dev/null || true
 
 echo ""
 echo "Build complete!"
-ls -la "$SCRIPT_DIR"/*.snap 2>/dev/null
+ls -la "$SCRIPT_DIR/output/"*.snap 2>/dev/null
