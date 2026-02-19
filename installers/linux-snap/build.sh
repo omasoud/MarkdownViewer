@@ -3,6 +3,8 @@
 # Stages engine payload, downloads/trims bundled pwsh, and creates Snap package.
 # Supports amd64 and arm64 architectures.
 #
+# Requirements: pwsh 7+, snapcraft, wget, sha256sum
+#
 # Usage:
 #   ./build.sh              # Build for current architecture
 #   ./build.sh arm64        # Build for arm64
@@ -52,18 +54,16 @@ if [ ! -f "$PWSH_CONFIG" ]; then
     exit 1
 fi
 
-# Extract version and SHA from config (using pwsh for JSON parsing, fallback to grep)
-if command -v pwsh &>/dev/null; then
-    PWSH_VERSION=$(pwsh -NoProfile -Command "(Get-Content '$PWSH_CONFIG' -Raw | ConvertFrom-Json).version")
-    PWSH_URL=$(pwsh -NoProfile -Command "(Get-Content '$PWSH_CONFIG' -Raw | ConvertFrom-Json).archives.'$ARCH'.url")
-    PWSH_SHA256=$(pwsh -NoProfile -Command "(Get-Content '$PWSH_CONFIG' -Raw | ConvertFrom-Json).archives.'$ARCH'.sha256")
-else
-    # Fallback: extract with grep/sed (less robust)
-    PWSH_VERSION=$(grep -o '"version": *"[^"]*"' "$PWSH_CONFIG" | head -1 | sed 's/.*"\([^"]*\)"/\1/')
-    echo "WARNING: pwsh not available for JSON parsing; URL/SHA extraction may be imprecise"
-    PWSH_URL="https://github.com/PowerShell/PowerShell/releases/download/v${PWSH_VERSION}/powershell-${PWSH_VERSION}-linux-${ARCH/amd64/x64}.tar.gz"
-    PWSH_SHA256=""
+# pwsh is required for JSON parsing and trimming
+if ! command -v pwsh &>/dev/null; then
+    echo "ERROR: pwsh not found. Install PowerShell 7+ before running this script."
+    echo "  https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-linux"
+    exit 1
 fi
+
+PWSH_VERSION=$(pwsh -NoProfile -Command "(Get-Content '$PWSH_CONFIG' -Raw | ConvertFrom-Json).version")
+PWSH_URL=$(pwsh -NoProfile -Command "(Get-Content '$PWSH_CONFIG' -Raw | ConvertFrom-Json).archives.'$ARCH'.url")
+PWSH_SHA256=$(pwsh -NoProfile -Command "(Get-Content '$PWSH_CONFIG' -Raw | ConvertFrom-Json).archives.'$ARCH'.sha256")
 
 echo "PowerShell version: $PWSH_VERSION"
 echo ""
@@ -158,27 +158,19 @@ PWSH_DIR="$STAGE_DIR/pwsh"
 mkdir -p "$PWSH_DIR"
 echo "  Extracting..."
 tar xzf "$CACHED_TARBALL" -C "$PWSH_DIR"
+chmod +x "$PWSH_DIR/pwsh" 2>/dev/null || true
 
 # Trim pwsh using the PowerShell trimming script
-if command -v pwsh &>/dev/null; then
-    echo "  Trimming PowerShell bundle..."
-    pwsh -NoProfile -File "$SCRIPT_DIR/scripts/Trim-PwshBundle-Linux.ps1" -PwshRoot "$PWSH_DIR"
-elif [ -x "$PWSH_DIR/pwsh" ]; then
-    echo "  Trimming PowerShell bundle (using extracted pwsh)..."
-    "$PWSH_DIR/pwsh" -NoProfile -File "$SCRIPT_DIR/scripts/Trim-PwshBundle-Linux.ps1" -PwshRoot "$PWSH_DIR"
-else
-    echo "  WARNING: Cannot trim; pwsh not available. Bundle will be larger than necessary."
-fi
+echo "  Trimming PowerShell bundle..."
+pwsh -NoProfile -File "$SCRIPT_DIR/scripts/Trim-PwshBundle-Linux.ps1" -PwshRoot "$PWSH_DIR"
 
 # Verify trimmed bundle
-if command -v pwsh &>/dev/null; then
-    echo "  Verifying trimmed bundle..."
-    pwsh -NoProfile -File "$SCRIPT_DIR/scripts/Verify-MarkViewPwsh-Linux.ps1" \
-        -ScriptPath "$STAGE_DIR/app/Open-Markdown.ps1" \
-        -ModulePath "$STAGE_DIR/app/MarkdownViewer.psm1" \
-        -SharedModulePath "$STAGE_DIR/app/MarkdownViewer.Shared.psm1" \
-        -PwshDir "$PWSH_DIR"
-fi
+echo "  Verifying trimmed bundle..."
+pwsh -NoProfile -File "$SCRIPT_DIR/scripts/Verify-MarkViewPwsh-Linux.ps1" \
+    -ScriptPath "$STAGE_DIR/app/Open-Markdown.ps1" \
+    -ModulePath "$STAGE_DIR/app/MarkdownViewer.psm1" \
+    -SharedModulePath "$STAGE_DIR/app/MarkdownViewer.Shared.psm1" \
+    -PwshDir "$PWSH_DIR"
 
 echo "  PowerShell runtime ready at: $PWSH_DIR"
 
