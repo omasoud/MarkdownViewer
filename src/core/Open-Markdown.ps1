@@ -197,8 +197,18 @@ try {
     $highlightThemeLink = ''
     $highlightScript = ''
     if ((Test-Path -LiteralPath $HighlightJsPath) -and (Test-Path -LiteralPath $HighlightThemePath)) {
-        $highlightJsUri = ([Uri]::new($HighlightJsPath)).AbsoluteUri
-        $highlightThemeUri = ([Uri]::new($HighlightThemePath)).AbsoluteUri
+        if ($IsWindows) {
+            # Windows: use file:// URIs (same-origin works fine)
+            $highlightJsUri = ([Uri]::new($HighlightJsPath)).AbsoluteUri
+            $highlightThemeUri = ([Uri]::new($HighlightThemePath)).AbsoluteUri
+        } else {
+            # Linux: copy assets alongside the HTML so browsers (especially
+            # snap-confined Firefox) can load them from the same directory.
+            Copy-Item -LiteralPath $HighlightJsPath    -Destination $outDir -Force
+            Copy-Item -LiteralPath $HighlightThemePath -Destination $outDir -Force
+            $highlightJsUri = [IO.Path]::GetFileName($HighlightJsPath)
+            $highlightThemeUri = [IO.Path]::GetFileName($HighlightThemePath)
+        }
         $highlightThemeLink = "<link rel=`"stylesheet`" href=`"$highlightThemeUri`">"
         $highlightScript = "<script src=`"$highlightJsUri`" defer></script>"
     }
