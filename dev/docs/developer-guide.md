@@ -321,6 +321,43 @@ Start-Process "ms-markdown-viewer:file=C:\path\to\your\file.md"
 
 You can also right-click any `.md` file in Explorer and select "Open with > Markdown Viewer".
 
+### Manual Local-File Link Test
+
+The local-file-normalization test verifies that all variations of markdown links to local files (relative paths, absolute paths, UNC paths, `file://` URLs, paths with spaces, fragment anchors) work correctly when clicked in the browser.
+
+**Test files are in** `tests/local-file-normalization/` but must be deployed to specific locations on disk (e.g. `C:\repo\`, `C:\My Docs\`) because the links use absolute paths.
+
+**Deploy the test files** (run from an **elevated** PowerShell — writes to `C:\`):
+
+```powershell
+# Deploy local files (C:\repo\, C:\, C:\My Docs\)
+.\dev\scripts\test\Deploy-LinkTests.ps1
+
+# Also deploy to a UNC share (for cases 9-10, 13-14, 18-20)
+.\dev\scripts\test\Deploy-LinkTests.ps1 -UncShare '\\myserver\share'
+```
+
+**Run the test:**
+
+```powershell
+# Open the test file with the engine
+pwsh -NoProfile -File "src\core\Open-Markdown.ps1" -Path "C:\repo\subdir\manual-test.md"
+```
+
+Then click each link in the rendered table and verify:
+1. Each `[specN]` link opens the correct spec file
+2. Each `[fragN]` link (`#section-1`) scrolls to the "section-1" heading
+3. Each `[fragNs]` link (`#Section %231`) scrolls to the "Section #1" heading
+
+**Clean up when done:**
+
+```powershell
+.\dev\scripts\test\Deploy-LinkTests.ps1 -Clean
+
+# If you deployed UNC files
+.\dev\scripts\test\Deploy-LinkTests.ps1 -Clean -UncShare '\\myserver\share'
+```
+
 ## Creating Installers
 
 ### Ad-hoc Installer (Per-User)
