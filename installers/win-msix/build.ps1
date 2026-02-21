@@ -217,6 +217,7 @@ function Build-SingleArchMsix {
     Copy-Item (Join-Path $CoreDir 'highlight-theme.css') $appDir
     Copy-Item (Join-Path $CoreDir 'icons\markdown.ico') $appDir
     Copy-Item (Join-Path $WinDir 'MarkdownViewer.psm1') $appDir
+    Copy-Item (Join-Path $CoreDir 'MarkdownViewer.Shared.psm1') $appDir
     Write-Host "Engine files staged" -ForegroundColor Green
     
     # Bundle PowerShell

@@ -206,12 +206,12 @@ if (-not (Test-Path $stageDir)) {
     $stageDir = Join-Path $OutputDir 'stage'
 }
 
-$hostDll = Join-Path $stageDir 'MarkdownViewerHost.dll'
-if (Test-Path $hostDll) {
+$hostExePath = Join-Path $stageDir 'MarkdownViewerHost.exe'
+if (Test-Path $hostExePath) {
     try {
         # Use ildasm or dotnet tool to check references
         # For simplicity, we'll read the assembly metadata
-        $assemblyBytes = [System.IO.File]::ReadAllBytes($hostDll)
+        $assemblyBytes = [System.IO.File]::ReadAllBytes($hostExePath)
         $assemblyText = [System.Text.Encoding]::ASCII.GetString($assemblyBytes)
         
         $forbiddenPatterns = @(
@@ -240,7 +240,7 @@ if (Test-Path $hostDll) {
         Write-TestSkipped -Name "Static dependency scan" -Reason "Could not analyze: $_"
     }
 } else {
-    Write-TestSkipped -Name "Static dependency scan" -Reason "Host DLL not found: $hostDll"
+    Write-TestSkipped -Name "Static dependency scan" -Reason "Host EXE not found: $hostExePath"
 }
 
 #endregion
