@@ -490,6 +490,7 @@ else {
     Copy-Item (Join-Path $CoreDir 'highlight-theme.css') $AppDir
     Copy-Item (Join-Path $CoreDir 'icons\markdown.ico') $AppDir
     Copy-Item (Join-Path $WinDir 'MarkdownViewer.psm1') $AppDir
+    Copy-Item (Join-Path $CoreDir 'MarkdownViewer.Shared.psm1') $AppDir
     Write-Host "Engine files staged" -ForegroundColor Green
     
     # Bundle PowerShell (if not skipped)
