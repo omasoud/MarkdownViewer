@@ -20,3 +20,6 @@ dev/docs/fragment-utils.md
 installers/linux-snap/.cache
 installers/linux-snap/.craft
 installers/linux-snap/staged
+installers/linux-snap/parts
+installers/linux-snap/prime
+installers/linux-snap/stage
