@@ -40,6 +40,7 @@ This guide covers building, testing, and developing Markdown Viewer on both Wind
   - [Debugging the Host EXE (Windows)](#debugging-the-host-exe-windows)
   - [Viewing Generated HTML](#viewing-generated-html)
 - [Common Development Tasks](#common-development-tasks)
+  - [Bumping the Version](#bumping-the-version)
 - [Troubleshooting](#troubleshooting)
   - [Windows Troubleshooting](#windows-troubleshooting)
   - [Linux Troubleshooting](#linux-troubleshooting)
@@ -226,7 +227,7 @@ cd installers/linux-snap
 4. Trims the PowerShell bundle to reduce snap size
 5. Runs snapcraft to produce the `.snap` file
 
-**Output:** `installers/linux-snap/output/markview_1.0.0_<arch>.snap`
+**Output:** `installers/linux-snap/output/markview_<version>_<arch>.snap`
 
 **Prerequisites:**
 - `pwsh` 7+ (for JSON parsing and trimming scripts)
@@ -514,7 +515,7 @@ After building and installing the snap:
 
 ```bash
 # Install the locally-built snap
-sudo snap install installers/linux-snap/output/markview_1.0.0_arm64.snap --dangerous
+sudo snap install installers/linux-snap/output/markview_1.0.1_arm64.snap --dangerous
 
 # Open a markdown file
 markview tests/highlight-test.md
@@ -639,7 +640,7 @@ The standalone PowerShell script for environments without Visual Studio:
 |-----------|-------------|
 | `-Configuration` | `Debug` or `Release` (default: Release) |
 | `-Architecture` | `x64` or `arm64` (default: x64, ignored with -BuildAll) |
-| `-Version` | Package version (default: 1.0.0.0) |
+| `-Version` | Package version (default: read from csproj) |
 | `-SkipBuild` | Don't rebuild Host EXE |
 | `-SkipPwsh` | Don't bundle PowerShell runtime |
 | `-BuildAll` | Build both x64 and ARM64 packages |
@@ -653,7 +654,7 @@ The MSIX is unsigned by default. Use `sign.ps1` for dev signing:
 
 ```powershell
 # Create certificate and sign a package
-.\installers\win-msix\sign.ps1 -MsixPath ".\output\MarkdownViewer_1.0.0.0_x64.msix" -Sign
+.\installers\win-msix\sign.ps1 -MsixPath ".\output\MarkdownViewer_1.0.1.0_x64.msix" -Sign
 
 # Create certificate only (to be used later)
 .\installers\win-msix\sign.ps1 -CreateCertOnly
@@ -713,7 +714,7 @@ staged/
 
 **Install locally-built snap:**
 ```bash
-sudo snap install output/markview_1.0.0_arm64.snap --dangerous
+sudo snap install output/markview_1.0.1_arm64.snap --dangerous
 ```
 
 **Updating the pinned PowerShell version:**
@@ -758,6 +759,41 @@ Open these in a text editor to inspect the generated HTML.
 ---
 
 ## Common Development Tasks
+
+### Bumping the Version
+
+The canonical version is the `<Version>` property in `src/host/MarkdownViewerHost/MarkdownViewerHost.csproj` (3-part, e.g. `1.0.1`). All other version references are derived from it.
+
+**Version scheme:**
+- **3-part** (`1.0.1`): canonical `<Version>`, `snapcraft.yaml`
+- **4-part** (`1.0.1.0`): MSIX identity, assembly, filenames (appends `.0`)
+
+**Steps:**
+
+1. Edit the `<Version>` element in `src/host/MarkdownViewerHost/MarkdownViewerHost.csproj`
+2. Run the consistency script with `-Fix` to propagate to all derived files:
+   ```powershell
+   .\dev\scripts\Test-VersionConsistency.ps1 -Fix
+   ```
+3. Verify everything is consistent:
+   ```powershell
+   .\dev\scripts\Test-VersionConsistency.ps1
+   ```
+
+**Files checked/updated by the script:**
+
+| File | Property | Format |
+|------|----------|--------|
+| `MarkdownViewerHost.csproj` | `<FileVersion>`, `<AssemblyVersion>` | 4-part |
+| `Package.appxmanifest` | `<Identity Version>` | 4-part |
+| `MarkdownViewer.wapproj` | `<PackageVersion>` | 4-part |
+| `build.ps1` | `-Version` default | 4-part |
+| `snapcraft.yaml` | `version` | 3-part |
+| `Test-PackagedActivation.ps1` | `-Version` default | 4-part |
+| `Invoke-AllTests.ps1` | MSIX filename pattern | 4-part |
+| `MarkdownViewer.Tests.ps1` | MSIX filename pattern | 4-part |
+
+**Not app versions:** `markview.desktop` `Version=1.0` is the Desktop Entry spec version, and `pwsh-versions.json` is the bundled PowerShell runtime version — neither should be changed during a version bump.
 
 ### Adding a New Language Alias for Syntax Highlighting
 
