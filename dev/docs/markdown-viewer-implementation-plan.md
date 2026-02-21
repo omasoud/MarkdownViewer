@@ -6,6 +6,8 @@ This document outlines the implementation plan for Markdown Viewer features:
 - **Phase A (Complete):** highlight.js syntax highlighting integration
 - **Phase B (Complete):** MSIX packaging and Host launcher for Microsoft Store distribution
 - **Phase C (Current):** Enhancement of MSIX Packaging and Host Launcher
+- **Phase D (In Progress):** MSBuild-Driven WAP Packaging Pipeline
+- **Phase E (Complete):** Fragment Navigation (`_fragment` App Contract & Scrolling)
 
 **Key Documents:**
 - [markdown-viewer-architecture.md](markdown-viewer-architecture.md) - Architecture overview
@@ -892,3 +894,199 @@ To build the WAP project, you need Visual Studio with the **Windows Application 
    - The DesktopBridge SDK provides `Microsoft.DesktopBridge.props` and `.targets`
 
 Alternatively, use `build.ps1` which uses `makeappx.exe` directly without requiring the WAP SDK.
+
+---
+
+# Phase E: Fragment Navigation (`_fragment` App Contract & Scrolling) (Complete)
+
+## Overview
+
+Standardize fragment delivery for `mdview:` protocol links across all platforms using a `_fragment` query parameter. This removes dependence on `#fragment` surviving portal/scheme-handler boundaries and provides a clean, deterministic contract that works for click navigation, paste-in-address-bar, terminal launches, and file associations.
+
+**Goals:**
+1. `mdview:` links carry the fragment as `?_fragment=<id>` (survives portal/shell stripping of `#`)
+2. `Open-Markdown.ps1` recovers `_fragment` from the query and delivers it to the rendered HTML as `?_fragment=`
+3. `script.js` scrolls to the target element on page load via `?_fragment=` on the HTML URL
+4. All platforms use the same code paths — no platform gating
+5. No localStorage fallback — strict contract only (add later only if a real browser drops query strings on `file:` URLs)
+
+**Non-goals (explicitly dropped):**
+- Backward compatibility with `mdview:…#fragment` inputs (HTML is transient, short-lived)
+- localStorage-based fragment passing (removed — adds complexity, collision risk, and test burden)
+
+**Key files:**
+| File | Role |
+|------|------|
+| `src/core/script.js` | Encodes `_fragment` into `mdview:` links; scrolls on load via query param; removes `_fragment` from URL after scroll |
+| `src/core/Open-Markdown.ps1` | Parses `_fragment` from incoming URI; passes it to HTML URL via `Start-DefaultBrowser` |
+| `tests/MarkdownViewer.Tests.ps1` | Pester tests for `_fragment` parsing in Open-Markdown |
+| `tests/pwsh/BrowserLaunch.Tests.ps1` | Tests for fragment launch integration |
+| `dev/docs/markdown-viewer-architecture.md` | Architecture doc updated with `_fragment` contract |
+
+---
+
+## `_fragment` Contract Rules
+
+These rules are the single source of truth for fragment handling. All phases implement these rules.
+
+1. **Value:** `_fragment` carries the **raw element id without leading `#`**.
+2. **Encoding (producer):** JS uses `encodeURIComponent(id)`; PowerShell uses `[Uri]::EscapeDataString($id)`.
+3. **Decoding (consumer):** PowerShell uses `[Uri]::UnescapeDataString($val)`; JS uses `URLSearchParams` (auto-decodes).
+4. **Empty value:** If the decoded value is empty, ignore — no scroll.
+5. **Existing query strings:** If the resolved URL already contains `?…`, append `&_fragment=…`. If it already contains `_fragment`, overwrite it.
+6. **`#hash` on input:** If the source href has `#fragment`, strip it and move the value to `?_fragment=`. Do **not** preserve or pass through `#hash`.
+7. **Launch rule:** When `_fragment` is present, the HTML **must** be opened as a URL (`file:///…?_fragment=…`) via `Start-DefaultBrowser`, never as a filesystem path via `Start-Process`. On Windows, `Start-Process $path` with `?` in the string is treated as part of the filename and fails.
+
+---
+
+## E.1 Encode `_fragment` in `mdview:` Links (script.js)
+
+**File:** `src/core/script.js` — `rewriteMarkdownLinks()` function
+
+### E.1.1 Move fragment from `#` to `?_fragment=` in rewritten links
+
+- [x] E.1.1.1 When a local `.md` link has a `#fragment`, strip the hash from the resolved URL and append `?_fragment=<encoded-id>` instead
+- [x] E.1.1.2 Handle existing query strings: if the resolved `file:` URL already has `?…`, append `&_fragment=…` instead of `?_fragment=…`
+- [x] E.1.1.3 If the resolved URL already has a `_fragment` param, overwrite it (single source of truth)
+- [x] E.1.1.4 Remove the existing localStorage `click` event listener that stores `mdview_scroll` — no longer needed
+- [x] E.1.1.5 Remove the existing localStorage `mdview_scroll` consumer (scroll-on-load block) — replaced by `_fragment` query param scroll
+
+### E.1.2 Smoke tests (Pester — script.js content)
+
+- [x] E.1.2.1 Test: `script.js` contains `_fragment` string
+- [x] E.1.2.2 Test: `script.js` contains `encodeURIComponent`
+- [x] E.1.2.3 Test: `script.js` does NOT contain `localStorage.setItem("mdview_scroll"`
+
+---
+
+## E.2 Parse `_fragment` in Open-Markdown.ps1
+
+**File:** `src/core/Open-Markdown.ps1` — URI parsing block
+
+### E.2.1 Extract `_fragment` from the query string
+
+- [x] E.2.1.1 After stripping the `mdview:` prefix and parsing as `[Uri]`, extract `_fragment` from `$u.Query`
+- [x] E.2.1.2 Strip the query string from the URI before extracting `$u.LocalPath`
+- [x] E.2.1.3 Remove the existing `$frag = $u.Fragment` fallback
+- [x] E.2.1.4 Remove the `$hash = $raw.IndexOf('#')` fallback for literal paths with `#`
+
+### E.2.2 Unit tests (Pester)
+
+- [x] E.2.2.1 Test: `mdview:file:///path/doc.md?_fragment=section-1` → `$frag` = `#section-1`
+- [x] E.2.2.2 Test: `mdview:file:///path/doc.md?_fragment=Section%20%231` → URL-decoded correctly
+- [x] E.2.2.3 Test: `mdview:file:///C:/docs/spec.md?_fragment=intro` → Windows path handled
+- [x] E.2.2.4 Test: No fragment → `$frag` = `''`
+- [x] E.2.2.5 Test: Empty `_fragment=` → `$frag` = `''`
+- [x] E.2.2.6 Test: Both `?_fragment=foo` and `#bar` → `_fragment` wins
+
+---
+
+## E.3 Deliver Fragment to HTML & Scroll on Load
+
+### E.3.1 Open HTML as URL with `_fragment` (Open-Markdown.ps1)
+
+- [x] E.3.1.1 When `$frag` is non-empty, launch via `Start-DefaultBrowser` with HTML URL + `?_fragment=<encoded>`
+- [x] E.3.1.2 When `$frag` is empty and on Windows, keep `Start-Process $outLocal` (existing behavior)
+- [x] E.3.1.3 When `$frag` is empty and on Linux, keep `Start-DefaultBrowser -Url $uLocal` (existing behavior)
+
+### E.3.2 Scroll to `_fragment` on page load (script.js)
+
+- [x] E.3.2.1 Read `_fragment` from HTML page's URL via `URLSearchParams`
+- [x] E.3.2.2 After DOM ready and `fixMismatchedAnchors()`, scroll to element via `scrollIntoView()`
+- [x] E.3.2.3 Add retry loop (3 attempts, 200ms apart) for late DOM injection by highlight.js
+- [x] E.3.2.4 After successful scroll, clean address bar with `history.replaceState`
+
+### E.3.3 Smoke tests
+
+- [x] E.3.3.1 Test: `script.js` contains `URLSearchParams`
+- [x] E.3.3.2 Test: `script.js` contains `history.replaceState`
+
+---
+
+## E.4 Test Suite & Regressions
+
+- [x] E.4.1 Run `Invoke-Pester tests -Output Minimal` — all existing tests pass (307 passed, 0 failed)
+- [ ] E.4.2 Run xUnit host tests if dotnet SDK is available (optional)
+- [x] E.4.3 Fix any regressions introduced by the changes
+
+---
+
+## E.5 Documentation Updates
+
+**File:** `dev/docs/markdown-viewer-architecture.md`
+
+- [x] E.5.1 Add "Fragment Handling (`_fragment` Contract)" section
+- [x] E.5.2 Document contract rules (encoding, decoding, precedence, launch rule)
+- [x] E.5.3 Update data-flow diagram to show `_fragment` query-param path
+- [x] E.5.4 Remove/update references to `#fragment` being passed through `mdview:` links
+- [x] E.5.5 Remove/update references to localStorage-based fragment passing
+
+---
+
+## E.6 Snap Rebuild & Manual Verification (Linux)
+
+- [x] E.6.1 Rebuild snap: `cd installers/linux-snap && ./build.sh arm64`
+- [x] E.6.2 Install: `sudo snap install output/markview_1.0.0_arm64.snap --dangerous`
+- [ ] E.6.3 Manual test: open markdown with TOC links → verify scroll (requires desktop environment)
+
+---
+
+## Data Flow (End-to-End)
+
+```
+User clicks link in rendered HTML
+        │
+        ▼
+script.js rewriteMarkdownLinks()
+  href="docs/spec.md#section-1"
+        │  strip #, encode as ?_fragment=
+        ▼
+  href="mdview:file:///path/docs/spec.md?_fragment=section-1"
+        │
+        ▼
+Browser/Portal invokes protocol handler
+  (?_fragment survives — only #fragment is stripped by portals)
+        │
+        ▼
+Open-Markdown.ps1 receives:
+  mdview:file:///path/docs/spec.md?_fragment=section-1
+        │  regex match _fragment from query
+        │  $frag = "#section-1"
+        │  strip query → resolve file path → /path/docs/spec.md
+        │  render markdown → viewmd_spec_ABCD1234.html
+        ▼
+Start-DefaultBrowser (always URL, never path when fragment present):
+  file:///home/user/MarkView/viewmd_spec_ABCD1234.html?_fragment=section-1
+        │
+        ▼
+Browser loads HTML, script.js runs:
+  1. fixMismatchedAnchors()
+  2. URLSearchParams → _fragment = "section-1"
+  3. document.getElementById("section-1").scrollIntoView()
+  4. history.replaceState() — clean address bar
+```
+
+---
+
+## Risk Mitigation (Phase E)
+
+| Risk | Mitigation |
+|------|------------|
+| `?_fragment` on `file:` URL rejected by browser CSP | `base-uri file:` already allows file: URLs with query strings |
+| `_fragment` value contains special chars | `encodeURIComponent` in JS, `[Uri]::EscapeDataString` in PS; consumer URL-decodes once |
+| Late DOM (highlighting adds elements after scroll) | Retry loop with setTimeout (3 attempts, 200ms apart) |
+| Windows `Start-Process` misinterprets `?` in path | Contract rule: when `_fragment` present, always use `Start-DefaultBrowser` (URL), never `Start-Process` (path) |
+| Source URL already has query string | JS checks for existing `?` and uses `&_fragment=` accordingly |
+| `System.Web.HttpUtility` not available | Query parsing uses regex + `[Uri]::UnescapeDataString` (both in .NET BCL, always available) |
+
+---
+
+## Success Criteria (Phase E)
+
+1. Clicking a `[link](other.md#section)` in rendered HTML scrolls to `#section` in the target doc
+2. Pasting `mdview:file:///path/doc.md?_fragment=section` in a terminal opens and scrolls correctly
+3. No-fragment links continue to work (no regression)
+4. All Pester tests pass
+5. Snap + Firefox on Linux scrolls to correct section
+6. Windows ad-hoc install scrolls to correct section
+7. Architecture doc reflects the `_fragment` contract

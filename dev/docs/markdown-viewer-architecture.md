@@ -2,7 +2,7 @@
 
 ## Overview
 
-Markdown Viewer is a Windows application that renders Markdown files as styled HTML in the user's default web browser. It is designed as a lightweight tool supporting both per-user ad-hoc installation and MSIX packaging for Microsoft Store distribution.
+Markdown Viewer is a cross-platform application (Windows and Linux) that renders Markdown files as styled HTML in the user's default web browser. It is designed as a lightweight tool supporting multiple installation methods: per-user ad-hoc installation and MSIX packaging on Windows, and snap packaging on Linux.
 
 ## High-Level Architecture
 
@@ -12,19 +12,20 @@ Markdown Viewer is a Windows application that renders Markdown files as styled H
 │  (Double-click .md file, Context menu, or mdview: protocol link)            │
 └──────────────────────────────────────┬──────────────────────────────────────┘
                                        │
-                    ┌──────────────────┴──────────────────┐
-                    │                                      │
-                    ▼                                      ▼
-┌─────────────────────────────────┐    ┌─────────────────────────────────────┐
-│     Ad-hoc: viewmd.vbs          │    │     MSIX: MarkdownViewerHost.exe    │
-│  - Windows Script Host wrapper  │    │  - .NET Framework 4.8.1 GUI app     │
-│  - Launches pwsh silently       │    │  - Receives file/protocol activation│
-│  - Uses system pwsh             │    │  - Launches bundled pwsh            │
-└─────────────────┬───────────────┘    └─────────────────┬───────────────────┘
-                  │                                      │
-                  └──────────────────┬───────────────────┘
-                                     │
-                                     ▼
+          ┌────────────────────────────┼────────────────────────────┐
+          │                            │                            │
+          ▼                            ▼                            ▼
+┌───────────────────────┐ ┌───────────────────────────┐ ┌───────────────────────┐
+│ Ad-hoc: viewmd.vbs    │ │ MSIX: MarkdownViewerHost  │ │ Linux: markview       │
+│ (Windows)             │ │ (Windows)                 │ │ (Linux)               │
+│ - WSH silent launcher │ │ - .NET 4.8.1 GUI app      │ │ - Bash launcher       │
+│ - Uses system pwsh    │ │ - File/protocol activation│ │ - Uses system/bundled  │
+│                       │ │ - Launches bundled pwsh   │ │   pwsh                │
+└───────────┬───────────┘ └─────────────┬─────────────┘ └───────────┬───────────┘
+            │                           │                           │
+            └───────────────────────────┼───────────────────────────┘
+                                        │
+                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                       Open-Markdown.ps1 (Core Engine)                       │
 │  - Parses input path (file:, mdview: protocols, fragments)                  │
@@ -32,7 +33,7 @@ Markdown Viewer is a Windows application that renders Markdown files as styled H
 │  - Converts Markdown → HTML via ConvertFrom-Markdown                        │
 │  - Sanitizes HTML (removes dangerous elements/attributes)                   │
 │  - Injects CSS, JS, CSP, highlight.js, favicon into HTML document           │
-│  - Writes temp HTML file(s) to %TEMP%                                       │
+│  - Writes temp HTML file(s) to %TEMP% (Win) or ~/MarkView/ (Linux)          │
 │  - Launches default browser                                                 │
 └──────────────────────────────────┬──────────────────────────────────────────┘
                                    │
@@ -63,7 +64,7 @@ Markdown Viewer is a Windows application that renders Markdown files as styled H
 
 ### 1. Entry Points
 
-#### Ad-hoc: viewmd.vbs
+#### Windows Ad-hoc: viewmd.vbs
 
 **Purpose:** Silent launcher that avoids console window flashes.
 
@@ -79,7 +80,7 @@ cmd = "pwsh -NoProfile -ExecutionPolicy Bypass -File ""...\Open-Markdown.ps1"" -
 CreateObject("WScript.Shell").Run cmd, 0, False
 ```
 
-#### MSIX: MarkdownViewerHost.exe
+#### Windows MSIX: MarkdownViewerHost.exe
 
 **Purpose:** .NET Framework 4.8.1 host application for MSIX activation handling.
 
@@ -97,6 +98,22 @@ CreateObject("WScript.Shell").Run cmd, 0, False
 - Target: net481 (Full Trust desktop bridge, not packaged UWP)
 - Uses Windows.ApplicationModel.AppInstance for packaged activation
 - Uses System.Windows.Forms for help dialog
+
+#### Linux: markview (Bash Launcher)
+
+**Purpose:** Shell entry point for Linux that locates pwsh and launches the engine.
+
+**Location:** `src/linux/markview`
+
+**Flow:**
+1. Resolves its own install directory (`MARKVIEW_ROOT`)
+2. Locates `pwsh` — bundled (snap) or system (`/usr/local/bin/pwsh`, `/opt/microsoft/powershell/7/pwsh`)
+3. Invokes `Open-Markdown.ps1` with the input path
+4. Handles both file paths and `mdview:` URIs
+
+**Snap vs Source:**
+- **Snap:** `pwsh` is bundled at `$SNAP/pwsh/pwsh`; `snapctl user-open` launches the browser
+- **Source:** System `pwsh`; `xdg-open` launches the browser
 
 ### 2. Core Engine: Open-Markdown.ps1
 
@@ -116,23 +133,54 @@ CreateObject("WScript.Shell").Run cmd, 0, False
 | Output | Writes temp HTML and launches browser |
 
 **Generated Files:**
-- `%TEMP%\viewmd_<name>_<hash>.html` - Local-only images version
-- `%TEMP%\viewmd_<name>_<hash>_remote.html` - Remote images enabled (if needed)
+- Windows: `%TEMP%\viewmd_<name>_<hash>.html` — Local-only images version
+- Windows: `%TEMP%\viewmd_<name>_<hash>_remote.html` — Remote images enabled (if needed)
+- Linux: `~/MarkView/viewmd_<name>_<hash>.html` — Local-only images version
+- Linux: `~/MarkView/viewmd_<name>_<hash>_remote.html` — Remote images enabled (if needed)
 
-### 3. Shared Module: MarkdownViewer.psm1
+### 3. Platform Modules
 
-**Purpose:** Reusable functions extracted for testability.
+The module system uses a three-layer architecture:
+
+#### Shared Module: MarkdownViewer.Shared.psm1
+
+**Purpose:** Cross-platform functions used by both Windows and Linux.
+
+**Location:** `src/core/MarkdownViewer.Shared.psm1`
+
+**Exported Functions:**
+
+| Function | Purpose |
+|----------|--------|
+| `Invoke-HtmlSanitization` | Removes dangerous HTML elements and event handlers |
+| `Test-RemoteImages` | Detects `https://`, `http://`, `//` in `<img>` tags |
+| `Get-FileBaseHref` | Converts file path to `file://` URL |
+| `Start-DefaultBrowser` | Cross-platform browser launch (calls platform-specific implementation) |
+
+#### Windows Module: MarkdownViewer.psm1
+
+**Purpose:** Windows-specific functions.
 
 **Location:** `src/win/MarkdownViewer.psm1`
 
 **Exported Functions:**
 
 | Function | Purpose |
-|----------|---------|
-| `Invoke-HtmlSanitization` | Removes dangerous HTML elements and event handlers |
-| `Test-RemoteImages` | Detects `https://`, `http://`, `//` in `<img>` tags |
-| `Get-FileBaseHref` | Converts file path to `file://` URL |
+|----------|--------|
 | `Test-Motw` | Reads Zone.Identifier alternate data stream |
+| `Start-DefaultBrowser` | Launches browser via `Start-Process` |
+
+#### Linux Module: MarkdownViewer.psm1
+
+**Purpose:** Linux-specific functions.
+
+**Location:** `src/linux/MarkdownViewer.psm1`
+
+**Exported Functions:**
+
+| Function | Purpose |
+|----------|--------|
+| `Start-DefaultBrowser` | Launches browser via `xdg-open` or `snapctl user-open` |
 
 ### 4. Client-Side: style.css
 
@@ -216,11 +264,11 @@ const LANG_MAP = {
 4. Call `hljs.highlightElement()` for each valid block
 5. Set `highlighted` flag to prevent re-execution on theme toggle
 
-### 7. Ad-hoc Mode Installation: install.ps1
+### 7. Ad-hoc Mode Installation: install.ps1 (Windows)
 
 **Purpose:** Per-user installation without admin privileges.
 
-**Location:** `install.ps1`
+**Location:** `installers/win-adhoc/install.ps1`
 
 **Actions:**
 1. Ensures PowerShell 7 (pwsh) is available
@@ -242,6 +290,7 @@ const LANG_MAP = {
 ├── *.runtimeconfig.json       # .NET configuration
 ├── app/                       # Engine payload
 │   ├── Open-Markdown.ps1
+│   ├── MarkdownViewer.Shared.psm1
 │   ├── MarkdownViewer.psm1
 │   ├── script.js
 │   ├── style.css
@@ -368,6 +417,49 @@ Both modes handle `mdview:` URIs identically at the engine level - the only diff
 - **Ad-hoc:** Windows invokes `viewmd.vbs "mdview:file:///..."` directly
 - **MSIX:** Windows delivers `ProtocolActivatedEventArgs` via `AppInstance.GetActivatedEventArgs()`
 
+## Snap Packaging (Linux)
+
+### Package Structure
+
+```
+<Snap>/
+├── markview                   # Bash launcher (entry point)
+├── markview.desktop           # Freedesktop desktop entry
+├── markview.png               # Application icon
+├── app/                       # Engine payload
+│   ├── Open-Markdown.ps1
+│   ├── MarkdownViewer.Shared.psm1
+│   ├── MarkdownViewer.psm1   # Linux platform module
+│   ├── script.js
+│   ├── style.css
+│   ├── highlight.min.js
+│   ├── highlight-theme.css
+│   └── icons/
+├── pwsh/                      # Bundled PowerShell 7 (trimmed)
+│   ├── pwsh
+│   └── ...
+└── meta/                      # Snap metadata
+    └── snap.yaml
+```
+
+### Activation Flow (Snap)
+
+1. User double-clicks `.md` file, runs `markview file.md`, or clicks `mdview:` link
+2. Desktop environment invokes `markview` launcher via desktop entry
+3. Launcher resolves bundled `pwsh` at `$SNAP/pwsh/pwsh`
+4. Launches: `pwsh -NoProfile -File $SNAP/app/Open-Markdown.ps1 -Path <input>`
+5. Engine renders HTML to `~/MarkView/` (within `$SNAP_USER_DATA`)
+6. Browser launched via `snapctl user-open` (respects snap strict confinement)
+
+### Confinement
+
+The snap uses **strict confinement** with these interfaces:
+- `home` — read access to user's home directory for markdown files
+- `desktop` — access to desktop environment for browser launch
+- `network` — not connected (no network access)
+
+**Portal stripping:** On Linux, `xdg-open` and `snapctl user-open` pass URIs through the XDG Desktop Portal, which strips `#fragment` from URIs. The `_fragment` query parameter contract was designed specifically to work around this limitation.
+
 ## Security Architecture
 
 ### Content Security Policy (CSP)
@@ -398,15 +490,18 @@ Applied before output, removes:
 
 ### Mark-of-the-Web (MOTW)
 
-Files downloaded from Internet (Zone 3+) trigger a warning dialog:
+Files downloaded from Internet (Zone 3+) trigger a warning dialog (Windows only):
 - **Open** - View once (warns again next time)
 - **Unblock & Open** - Remove zone identifier permanently
 - **Cancel** - Abort
 
+**Note:** Linux has no MOTW equivalent. Downloaded files open without a warning.
+
 ## Data Flow
 
 ```
-Input: C:\docs\README.md  (or mdview:file:///C:/docs/README.md?_fragment=intro)
+Input: C:\docs\README.md  (or /home/user/docs/README.md)
+       or mdview:file:///C:/docs/README.md?_fragment=intro
          │
          ▼
     ┌─────────────┐
@@ -415,7 +510,7 @@ Input: C:\docs\README.md  (or mdview:file:///C:/docs/README.md?_fragment=intro)
          │
          ▼
     ┌─────────────┐
-    │ MOTW Check  │ ─── Zone.Identifier ADS
+    │ MOTW Check  │ ─── Zone.Identifier ADS (Windows only; skipped on Linux)
     └─────────────┘
          │
          ▼
@@ -435,14 +530,14 @@ Input: C:\docs\README.md  (or mdview:file:///C:/docs/README.md?_fragment=intro)
          │
          ▼
     ┌─────────────┐
-    │ Write HTML  │ ─── %TEMP%\viewmd_README_A1B2C3D4.html
+    │ Write HTML  │ ─── %TEMP%\viewmd_…html (Win) or ~/MarkView/viewmd_…html (Linux)
     └─────────────┘
          │
          ▼
     ┌───────────────┐
     │ Launch        │ ─── file:///…/viewmd_README_A1B2C3D4.html?_fragment=intro
-    │               │     (URL via Start-DefaultBrowser when _fragment present;
-    │               │      path via Start-Process otherwise on Windows)
+    │               │     (Start-DefaultBrowser: xdg-open/snapctl on Linux,
+    │               │      Start-Process or COM on Windows)
     └───────────────┘
          │
          ▼
@@ -463,7 +558,8 @@ MarkdownViewer/
 │
 ├── src/
 │   ├── core/                        # Cross-platform engine + assets
-│   │   ├── Open-Markdown.ps1        # Main PowerShell script
+│   │   ├── Open-Markdown.ps1        # Main PowerShell engine
+│   │   ├── MarkdownViewer.Shared.psm1 # Shared cross-platform module
 │   │   ├── script.js                # Client-side JavaScript
 │   │   ├── style.css                # Client-side CSS
 │   │   ├── highlight.min.js         # highlight.js bundle
@@ -472,39 +568,57 @@ MarkdownViewer/
 │   │       ├── markdown.ico
 │   │       └── markdown-light.ico
 │   │
-│   ├── win/                         # Windows-specific
-│   │   ├── MarkdownViewer.psm1      # Shared module
+│   ├── win/                         # Windows platform
+│   │   ├── MarkdownViewer.psm1      # Windows-specific module
 │   │   ├── viewmd.vbs               # Ad-hoc launcher
 │   │   └── uninstall.vbs            # Silent uninstall helper
 │   │
-│   └── host/                        # MSIX Host EXE
+│   ├── linux/                       # Linux platform
+│   │   ├── MarkdownViewer.psm1      # Linux-specific module
+│   │   ├── markview                 # Bash launcher script
+│   │   ├── markview.desktop         # Freedesktop desktop entry
+│   │   └── markview.png             # Application icon (256x256)
+│   │
+│   └── host/                        # MSIX Host EXE (Windows)
 │       └── MarkdownViewerHost/
 │           ├── MarkdownViewerHost.csproj
 │           └── Program.cs
 │
 ├── installers/
-│   ├── win-adhoc/                   # Per-user ad-hoc installer
+│   ├── win-adhoc/                   # Per-user ad-hoc installer (Windows)
 │   │   ├── INSTALL.cmd
 │   │   ├── UNINSTALL.cmd
 │   │   ├── install.ps1
 │   │   └── uninstall.ps1
 │   │
-│   └── win-msix/                    # MSIX packaging
-│       ├── Package/
-│       │   ├── AppxManifest.xml
-│       │   └── Assets/
-│       └── build.ps1
+│   ├── win-msix/                    # MSIX packaging (Windows)
+│   │   ├── MarkdownViewer.wapproj
+│   │   ├── Package.appxmanifest
+│   │   ├── sign.ps1
+│   │   └── build/
+│   │       ├── stage.ps1
+│   │       ├── pwsh-versions.json
+│   │       └── Directory.Build.targets
+│   │
+│   └── linux-snap/                  # Snap packaging (Linux)
+│       ├── snap/snapcraft.yaml
+│       ├── build.sh                 # Stage + trim + build snap
+│       └── scripts/                 # Trimming & verification
 │
 ├── tests/
-│   ├── MarkdownViewer.Tests.ps1     # Pester tests
+│   ├── MarkdownViewer.Tests.ps1     # Core Pester tests
 │   ├── MarkdownViewerHost.Tests/    # xUnit tests
+│   ├── pwsh/                        # Additional Pester tests
+│   │   ├── BrowserLaunch.Tests.ps1
+│   │   ├── Build.Tests.ps1
+│   │   ├── Stage.Tests.ps1
+│   │   ├── LocalFileNormalization.Tests.ps1
+│   │   └── ...
 │   ├── highlight-test.md
 │   └── theme-variation-test.md
 │
 └── dev/
     ├── scripts/             # Build/dev scripts
-    │   ├── highlight.min.js     # Source highlight.js bundle
-    │   └── highlight-theme.css  # Source theme CSS
     └── docs/                # Development documentation
         ├── markdown-viewer-architecture.md (this file)
         ├── markdown-viewer-implementation-plan.md
@@ -516,25 +630,32 @@ MarkdownViewer/
 
 ### PowerShell Tests (Pester 5.x)
 
-Located in `tests/MarkdownViewer.Tests.ps1`.
+Located in `tests/MarkdownViewer.Tests.ps1` and `tests/pwsh/*.Tests.ps1`.
 
 **Test Coverage:**
 - HTML sanitization (dangerous tags, event handlers, URIs)
 - Remote image detection
 - File path to URL conversion
-- MOTW detection
+- MOTW detection (Windows)
 - Syntax highlighting (asset files, LANG_MAP, CSP, HTML template, installer)
 - Theme variations
+- `_fragment` contract (parsing, encoding, browser launch)
+- Local-file link normalization
+- Snap build and staging (Linux)
 
 **Running Tests:**
 ```powershell
+# Windows
 Import-Module Pester -RequiredVersion 5.7.1 -Force
-Invoke-Pester "tests\MarkdownViewer.Tests.ps1" -Output Minimal
+Invoke-Pester "tests" -Output Minimal
+
+# Linux
+pwsh -NoProfile -Command "Import-Module Pester -RequiredVersion 5.7.1 -Force; Invoke-Pester tests -Output Minimal"
 ```
 
 ### C# Tests (xUnit)
 
-Located in `tests/MarkdownViewerHost.Tests/`.
+Located in `tests/MarkdownViewerHost.Tests/` (Windows only — requires .NET SDK).
 
 ```powershell
 dotnet test "tests\MarkdownViewerHost.Tests"
@@ -602,8 +723,12 @@ Browser loads HTML, script.js runs:
 ## Dependencies
 
 - **PowerShell 7 (pwsh):**
-  - Ad-hoc: System installation (auto-prompted)
-  - MSIX: Bundled in package
+  - Windows ad-hoc: System installation (auto-prompted)
+  - Windows MSIX: Bundled in package
+  - Linux snap: Bundled in snap
+  - Linux source: System installation
 - **Windows Script Host:** Built into Windows (ad-hoc only)
 - **Default Web Browser:** Chrome, Edge, Firefox, etc.
 - **highlight.js:** Bundled (~1MB UMD build) for syntax highlighting
+- **xdg-open:** Linux desktop standard for launching default browser (Linux source only; snap uses `snapctl user-open`)
+- **zenity:** Optional dialog toolkit for Linux warnings (falls back to terminal output)
