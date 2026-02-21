@@ -1178,6 +1178,41 @@ Describe 'ConvertFrom-Markdown Anchor ID Mismatch' {
     }
 }
 
+Describe '_fragment App Contract - JavaScript (script.js smoke tests)' {
+    BeforeAll {
+        $jsPath = Join-Path $PSScriptRoot '..\src\core\script.js'
+        $jsContent = Get-Content -Raw -LiteralPath $jsPath
+    }
+
+    Context '_fragment encoding in mdview: links' {
+        It 'contains _fragment string' {
+            $jsContent | Should -Match '_fragment'
+        }
+
+        It 'uses encodeURIComponent for fragment encoding' {
+            $jsContent | Should -Match 'encodeURIComponent'
+        }
+
+        It 'does not use localStorage for mdview_scroll' {
+            $jsContent | Should -Not -Match 'localStorage\.setItem\(\s*"mdview_scroll"'
+        }
+    }
+
+    Context '_fragment scroll on page load' {
+        It 'reads scrollTarget from embedded mdviewer_config (primary)' {
+            $jsContent | Should -Match 'mdviewer_config.*scrollTarget'
+        }
+
+        It 'falls back to URLSearchParams for _fragment (Windows)' {
+            $jsContent | Should -Match 'URLSearchParams'
+        }
+
+        It 'uses history.replaceState to clean address bar after scroll' {
+            $jsContent | Should -Match 'history\.replaceState'
+        }
+    }
+}
+
 Describe 'MSIX Staged Payload Structure' -Tag 'Integration' -Skip:(-not $IsWindows) {
     # Windows-only: MSIX is a Windows packaging format
     # These tests validate the MSIX staging structure without requiring a full build

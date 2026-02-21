@@ -23,3 +23,4 @@ installers/linux-snap/staged
 installers/linux-snap/parts
 installers/linux-snap/prime
 installers/linux-snap/stage
+dev/docs/app-contract-and-scrolling-recommendation.md

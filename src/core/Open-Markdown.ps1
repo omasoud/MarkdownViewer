@@ -57,16 +57,20 @@ try {
 
     if ($raw -match '^(?i)file:') {
         $u = [Uri]$raw
-        $frag = $u.Fragment  # includes leading '#', or empty
-        $raw = $u.LocalPath
-    }
-    else {
-        # If someone passes a literal path containing '#', treat it as fragment.
-        $hash = $raw.IndexOf('#')
-        if ($hash -ge 0) {
-            $frag = $raw.Substring($hash)
-            $raw = $raw.Substring(0, $hash)
+
+        # Extract _fragment from query string (cross-platform safe, no System.Web dependency).
+        # _fragment is the app-contract transport for scroll targets — #hash is not used.
+        if ($u.Query -match '[?&]_fragment=([^&#]*)') {
+            $decoded = [Uri]::UnescapeDataString($Matches[1])
+            if ($decoded) { $frag = '#' + $decoded }
         }
+
+        # Build a clean URI (scheme + authority + path only) so LocalPath
+        # is not polluted by query string characters.
+        $clean = [UriBuilder]::new($u)
+        $clean.Query = $null
+        $clean.Fragment = $null
+        $raw = $clean.Uri.LocalPath
     }
 
     # $raw is the path after decoding (no fragment)
@@ -226,6 +230,7 @@ try {
             remoteEnabled = $allowRemoteImages
             hasRemoteImgs = $hasRemoteImages
             mdDirBase     = $base
+            scrollTarget  = if ($frag) { $frag.TrimStart('#') } else { $null }
         }
         $cfg = $cfgObj | ConvertTo-Json -Compress
         $js2 = "window.mdviewer_config=$cfg;`n" + $js
@@ -269,13 +274,17 @@ $html
     }
 
     # Launch the HTML file in the default browser.
-    # On Windows without a fragment, Start-Process uses ShellExecute which works.
+    # When _fragment is present, we MUST open as a URL (file:///…?_fragment=…)
+    # via Start-DefaultBrowser, not as a filesystem path. On Windows,
+    # Start-Process treats '?' as part of the filename and fails.
     # On Linux, Start-Process tries to exec the file directly, so always use
     # Start-DefaultBrowser which calls xdg-open.
-    # When there's a fragment, we must use Start-DefaultBrowser on all platforms
-    # because ShellExecute strips fragments.
     if ($frag -or -not $IsWindows) {
-        Start-DefaultBrowser -Url ($uLocal + $frag)
+        $launchUrl = $uLocal
+        if ($frag) {
+            $launchUrl += '?_fragment=' + [Uri]::EscapeDataString($frag.TrimStart('#'))
+        }
+        Start-DefaultBrowser -Url $launchUrl
     } else {
         Start-Process $outLocal
     }

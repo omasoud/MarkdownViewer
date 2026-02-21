@@ -108,7 +108,7 @@ CreateObject("WScript.Shell").Run cmd, 0, False
 
 | Function | Description |
 |----------|-------------|
-| Path Resolution | Handles `file:`, `mdview:` protocols and `#fragment` parsing |
+| Path Resolution | Handles `file:`, `mdview:` protocols and `_fragment` query-param parsing |
 | Security Check | Detects MOTW (Mark-of-the-Web) and prompts user |
 | Markdown Conversion | Uses `ConvertFrom-Markdown` cmdlet |
 | HTML Sanitization | Calls module function to remove dangerous content |
@@ -171,7 +171,8 @@ CreateObject("WScript.Shell").Run cmd, 0, False
 | Theme Variations | Manages 5 color scheme variations per theme (Default, Warm, Cool, etc.) |
 | Remote Images | Manages opt-in for remote image loading, page switching |
 | Anchor Rewrite | Fixes in-page `#anchor` links for file:// context |
-| Markdown Links | Rewrites local `.md` links to use `mdview:` protocol |
+| Markdown Links | Rewrites local `.md` links to `mdview:` protocol with `_fragment` query param |
+| Fragment Scroll | Reads `?_fragment=` from HTML URL on load, scrolls to target element |
 | Syntax Highlighting | Applies highlight.js to fenced code blocks with language tags |
 
 **localStorage Keys:**
@@ -324,15 +325,23 @@ Activation              │                                                     
 
 **Link Rewriting (script.js):**
 
-The client-side JavaScript rewrites local markdown links to use the `mdview:` protocol:
+The client-side JavaScript rewrites local markdown links to use the `mdview:` protocol. Fragments are moved from `#hash` to `?_fragment=` so they survive portal/scheme-handler boundaries that strip `#`:
 
 ```javascript
-// Input:  <a href="./install.md">Installation</a>
-// Output: <a href="mdview:file:///C:/docs/install.md">Installation</a>
+// Input:  <a href="./install.md#setup">Installation</a>
+// Output: <a href="mdview:file:///C:/docs/install.md?_fragment=setup">Installation</a>
 
-if (abs.toLowerCase().startsWith("file:") && isMarkdownHref(abs)) {
-    a.setAttribute("href", "mdview:" + abs);
+var url = new URL(abs);
+var fragId = "";
+if (url.hash) {
+    fragId = url.hash.substring(1);
+    url.hash = "";
 }
+var final = url.href;
+if (fragId) {
+    final += (final.indexOf("?") === -1 ? "?" : "&") + "_fragment=" + encodeURIComponent(fragId);
+}
+a.setAttribute("href", "mdview:" + final);
 ```
 
 This ensures that clicking a relative link to another markdown file triggers the proper activation flow rather than trying to load the raw `.md` file in the browser.
@@ -341,10 +350,10 @@ This ensures that clicking a relative link to another markdown file triggers the
 
 ```
 mdview:file:///C:/path/to/document.md
-mdview:file:///C:/path/to/document.md#section-anchor
+mdview:file:///C:/path/to/document.md?_fragment=section-anchor
 ```
 
-The engine strips the `mdview:` prefix and handles the remaining `file:` URI, including any `#fragment`.
+The engine strips the `mdview:` prefix, extracts `_fragment` from the query string, resolves the local file, and passes `?_fragment=` through to the rendered HTML URL so `script.js` can scroll to the target element.
 
 ### Activation Flow: Ad-hoc vs MSIX
 
@@ -397,11 +406,11 @@ Files downloaded from Internet (Zone 3+) trigger a warning dialog:
 ## Data Flow
 
 ```
-Input: C:\docs\README.md
+Input: C:\docs\README.md  (or mdview:file:///C:/docs/README.md?_fragment=intro)
          │
          ▼
     ┌─────────────┐
-    │ Parse Path  │ ─── Handle mdview:, file:, #fragments
+    │ Parse Path  │ ─── Strip mdview:, extract _fragment from query, resolve file:
     └─────────────┘
          │
          ▼
@@ -430,9 +439,17 @@ Input: C:\docs\README.md
     └─────────────┘
          │
          ▼
-    ┌─────────────┐
-    │ Launch      │ ─── Start-Process (default browser)
-    └─────────────┘
+    ┌───────────────┐
+    │ Launch        │ ─── file:///…/viewmd_README_A1B2C3D4.html?_fragment=intro
+    │               │     (URL via Start-DefaultBrowser when _fragment present;
+    │               │      path via Start-Process otherwise on Windows)
+    └───────────────┘
+         │
+         ▼
+    ┌───────────────┐
+    │ Browser/JS    │ ─── script.js reads ?_fragment=, scrolls to element,
+    │               │     cleans URL via history.replaceState
+    └───────────────┘
 ```
 
 ## File Structure
@@ -532,6 +549,55 @@ The application uses localStorage in the browser for user preferences:
 | `mdviewer_theme_mode` | `"system"`, `"invert"` | Theme follows OS or inverts it |
 | `mdviewer_remote_images_<hash>` | `"0"`, `"1"` | Per-document remote image setting |
 | `mdviewer_remote_images_ack_<hash>` | `"1"` | User acknowledged remote images prompt |
+
+## Fragment Handling (`_fragment` Contract)
+
+When a rendered markdown page contains links to other `.md` files with anchors (`[link](other.md#section)`), the fragment must survive the full activation round-trip. Browsers and desktop portals (especially on Linux) strip `#fragment` from URIs passed to external protocol handlers. The `_fragment` contract solves this by transporting the fragment as a query parameter.
+
+### Contract Rules
+
+1. **Value:** `_fragment` carries the raw element id without leading `#`.
+2. **Encoding (producer):** JS uses `encodeURIComponent(id)`; PowerShell uses `[Uri]::EscapeDataString($id)`.
+3. **Decoding (consumer):** PowerShell uses `[Uri]::UnescapeDataString($val)`; JS uses `URLSearchParams` (auto-decodes).
+4. **Empty value:** If the decoded value is empty, ignore — no scroll.
+5. **Existing query strings:** If the URL already contains `?…`, append `&_fragment=…`.
+6. **`#hash` on input:** Strip it and move the value to `_fragment`. Do not preserve `#hash`.
+7. **Launch rule:** When `_fragment` is present, open the HTML as a URL (`file:///…?_fragment=…`) via `Start-DefaultBrowser`, never as a filesystem path.
+
+### End-to-End Flow
+
+```
+User clicks link in rendered HTML
+        │
+        ▼
+script.js rewriteMarkdownLinks()
+  href="docs/spec.md#section-1"
+        │  strip #, encode as ?_fragment=
+        ▼
+  href="mdview:file:///path/docs/spec.md?_fragment=section-1"
+        │
+        ▼
+Browser/Portal invokes protocol handler
+  (?_fragment survives — only #fragment is stripped by portals)
+        │
+        ▼
+Open-Markdown.ps1 receives:
+  mdview:file:///path/docs/spec.md?_fragment=section-1
+        │  regex match _fragment from query
+        │  $frag = "#section-1"
+        │  strip query → resolve file path
+        │  render markdown → viewmd_spec_ABCD1234.html
+        ▼
+Start-DefaultBrowser:
+  file:///…/viewmd_spec_ABCD1234.html?_fragment=section-1
+        │
+        ▼
+Browser loads HTML, script.js runs:
+  1. fixMismatchedAnchors()
+  2. URLSearchParams → _fragment = "section-1"
+  3. document.getElementById("section-1").scrollIntoView()
+  4. history.replaceState() — clean address bar
+```
 
 ## Dependencies
 

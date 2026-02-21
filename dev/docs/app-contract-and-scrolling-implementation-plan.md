@@ -48,20 +48,20 @@ These rules are the single source of truth for fragment handling. All phases imp
 
 ### 1.1 Move fragment from `#` to `?_fragment=` in rewritten links
 
-- [ ] 1.1.1 When a local `.md` link has a `#fragment`, strip the hash from the resolved URL and append `?_fragment=<encoded-id>` instead
+- [x] 1.1.1 When a local `.md` link has a `#fragment`, strip the hash from the resolved URL and append `?_fragment=<encoded-id>` instead
   - Before: `mdview:file:///path/to/doc.md#section-1`
   - After:  `mdview:file:///path/to/doc.md?_fragment=section-1`
   - Use `encodeURIComponent(url.hash.substring(1))` for encoding
-- [ ] 1.1.2 Handle existing query strings: if the resolved `file:` URL already has `?…`, append `&_fragment=…` instead of `?_fragment=…`
-- [ ] 1.1.3 If the resolved URL already has a `_fragment` param, overwrite it (single source of truth)
-- [ ] 1.1.4 Remove the existing localStorage `click` event listener that stores `mdview_scroll` — no longer needed
-- [ ] 1.1.5 Remove the existing localStorage `mdview_scroll` consumer (scroll-on-load block) — replaced by `_fragment` query param scroll
+- [x] 1.1.2 Handle existing query strings: if the resolved `file:` URL already has `?…`, append `&_fragment=…` instead of `?_fragment=…`
+- [x] 1.1.3 If the resolved URL already has a `_fragment` param, overwrite it (single source of truth)
+- [x] 1.1.4 Remove the existing localStorage `click` event listener that stores `mdview_scroll` — no longer needed
+- [x] 1.1.5 Remove the existing localStorage `mdview_scroll` consumer (scroll-on-load block) — replaced by `_fragment` query param scroll
 
 ### 1.2 Smoke tests (Pester — script.js content)
 
-- [ ] 1.2.1 Test: `script.js` contains `_fragment` string
-- [ ] 1.2.2 Test: `script.js` contains `encodeURIComponent`
-- [ ] 1.2.3 Test: `script.js` does NOT contain `localStorage.setItem("mdview_scroll"`
+- [x] 1.2.1 Test: `script.js` contains `_fragment` string
+- [x] 1.2.2 Test: `script.js` contains `encodeURIComponent`
+- [x] 1.2.3 Test: `script.js` does NOT contain `localStorage.setItem("mdview_scroll"`
 
 ---
 
@@ -73,27 +73,27 @@ These rules are the single source of truth for fragment handling. All phases imp
 
 Use a cross-platform-safe approach — no `System.Web.HttpUtility` dependency (not guaranteed in all pwsh environments). Use `[Uri]::UnescapeDataString` + simple string parsing.
 
-- [ ] 2.1.1 After stripping the `mdview:` prefix and parsing as `[Uri]`, extract `_fragment` from `$u.Query`:
+- [x] 2.1.1 After stripping the `mdview:` prefix and parsing as `[Uri]`, extract `_fragment` from `$u.Query`:
   ```powershell
   # Parse _fragment from query string (cross-platform safe, no System.Web dependency)
   if ($u.Query -match '[?&]_fragment=([^&#]*)') {
       $frag = '#' + [Uri]::UnescapeDataString($Matches[1])
   }
   ```
-- [ ] 2.1.2 Strip the query string from the URI before extracting `$u.LocalPath` (so `Test-Path` sees a clean path). Build a clean URI from scheme + authority + path only.
-- [ ] 2.1.3 Remove the existing `$frag = $u.Fragment` fallback — `_fragment` is the only supported transport
-- [ ] 2.1.4 Remove the `$hash = $raw.IndexOf('#')` fallback for literal paths with `#` — not a supported contract input
+- [x] 2.1.2 Strip the query string from the URI before extracting `$u.LocalPath` (so `Test-Path` sees a clean path). Build a clean URI from scheme + authority + path only.
+- [x] 2.1.3 Remove the existing `$frag = $u.Fragment` fallback — `_fragment` is the only supported transport
+- [x] 2.1.4 Remove the `$hash = $raw.IndexOf('#')` fallback for literal paths with `#` — not a supported contract input
 
 ### 2.2 Unit tests (Pester)
 
 These tests validate the _fragment parsing logic extracted from Open-Markdown.ps1's URI handling block.
 
-- [ ] 2.2.1 Test: `mdview:file:///path/doc.md?_fragment=section-1` → `$frag` = `#section-1`, file path = `/path/doc.md`
-- [ ] 2.2.2 Test: `mdview:file:///path/doc.md?_fragment=Section%20%231` → `$frag` = `#Section #1` (URL-decoded)
-- [ ] 2.2.3 Test: `mdview:file:///C:/docs/spec.md?_fragment=intro` → `$frag` = `#intro`, path = `C:\docs\spec.md` (Windows)
-- [ ] 2.2.4 Test: `mdview:file:///path/doc.md` (no fragment at all) → `$frag` = `''`
-- [ ] 2.2.5 Test: `mdview:file:///path/doc.md?_fragment=` (empty value) → `$frag` = `''` (ignored)
-- [ ] 2.2.6 Test: URI with both `?_fragment=foo` and `#bar` → `_fragment` wins, `#bar` ignored
+- [x] 2.2.1 Test: `mdview:file:///path/doc.md?_fragment=section-1` → `$frag` = `#section-1`, file path = `/path/doc.md`
+- [x] 2.2.2 Test: `mdview:file:///path/doc.md?_fragment=Section%20%231` → `$frag` = `#Section #1` (URL-decoded)
+- [x] 2.2.3 Test: `mdview:file:///C:/docs/spec.md?_fragment=intro` → `$frag` = `#intro`, path = `C:\docs\spec.md` (Windows)
+- [x] 2.2.4 Test: `mdview:file:///path/doc.md` (no fragment at all) → `$frag` = `''`
+- [x] 2.2.5 Test: `mdview:file:///path/doc.md?_fragment=` (empty value) → `$frag` = `''` (ignored)
+- [x] 2.2.6 Test: URI with both `?_fragment=foo` and `#bar` → `_fragment` wins, `#bar` ignored
 
 ---
 
@@ -103,33 +103,33 @@ These tests validate the _fragment parsing logic extracted from Open-Markdown.ps
 
 **File:** `src/core/Open-Markdown.ps1` — browser launch block
 
-- [ ] 3.1.1 When `$frag` is non-empty, launch via `Start-DefaultBrowser` with the HTML URL + `?_fragment=<encoded>`:
+- [x] 3.1.1 When `$frag` is non-empty, launch via `Start-DefaultBrowser` with the HTML URL + `?_fragment=<encoded>`:
   ```powershell
   $htmlUrl = $uLocal + '?_fragment=' + [Uri]::EscapeDataString($frag.TrimStart('#'))
   Start-DefaultBrowser -Url $htmlUrl
   ```
   **Critical:** Must use `Start-DefaultBrowser` (URL), not `Start-Process $outLocal` (path), because `?` in a path argument is misinterpreted on Windows.
-- [ ] 3.1.2 When `$frag` is empty and on Windows, keep `Start-Process $outLocal` (existing behavior, no change)
-- [ ] 3.1.3 When `$frag` is empty and on Linux, keep `Start-DefaultBrowser -Url $uLocal` (existing behavior, no change)
+- [x] 3.1.2 When `$frag` is empty and on Windows, keep `Start-Process $outLocal` (existing behavior, no change)
+- [x] 3.1.3 When `$frag` is empty and on Linux, keep `Start-DefaultBrowser -Url $uLocal` (existing behavior, no change)
 
 ### 3.2 Scroll to `_fragment` on page load (script.js)
 
 **File:** `src/core/script.js`
 
-- [ ] 3.2.1 Read `_fragment` from the HTML page's URL:
+- [x] 3.2.1 Read `_fragment` from the HTML page's URL:
   ```js
   var params = new URLSearchParams(window.location.search);
   var scrollTarget = params.get("_fragment");
   ```
-- [ ] 3.2.2 After DOM is ready **and after** `fixMismatchedAnchors()` has run, scroll to the element:
+- [x] 3.2.2 After DOM is ready **and after** `fixMismatchedAnchors()` has run, scroll to the element:
   ```js
   if (scrollTarget) {
       var el = document.getElementById(scrollTarget);
       if (el) el.scrollIntoView();
   }
   ```
-- [ ] 3.2.3 Add a retry loop (3 attempts, 200ms apart) to handle late DOM injection by highlight.js
-- [ ] 3.2.4 After successful scroll, clean the address bar with `history.replaceState`:
+- [x] 3.2.3 Add a retry loop (3 attempts, 200ms apart) to handle late DOM injection by highlight.js
+- [x] 3.2.4 After successful scroll, clean the address bar with `history.replaceState`:
   ```js
   var cleanUrl = window.location.pathname;
   history.replaceState(null, "", cleanUrl);
@@ -138,8 +138,8 @@ These tests validate the _fragment parsing logic extracted from Open-Markdown.ps
 
 ### 3.3 Smoke tests
 
-- [ ] 3.3.1 Test: `script.js` contains `URLSearchParams`
-- [ ] 3.3.2 Test: `script.js` contains `history.replaceState`
+- [x] 3.3.1 Test: `script.js` contains `URLSearchParams`
+- [x] 3.3.2 Test: `script.js` contains `history.replaceState`
 
 ---
 
@@ -147,9 +147,9 @@ These tests validate the _fragment parsing logic extracted from Open-Markdown.ps
 
 ### 4.1 Run and fix all tests
 
-- [ ] 4.1.1 Run `Invoke-Pester tests -Output Minimal` — all existing tests must pass
+- [x] 4.1.1 Run `Invoke-Pester tests -Output Minimal` — all existing tests must pass (307 passed, 0 failed)
 - [ ] 4.1.2 Run xUnit host tests if dotnet SDK is available: `dotnet test tests/MarkdownViewerHost.Tests/` (optional — depends on dev environment)
-- [ ] 4.1.3 Fix any regressions introduced by the changes
+- [x] 4.1.3 Fix any regressions introduced by the changes
 
 ---
 
@@ -159,11 +159,11 @@ These tests validate the _fragment parsing logic extracted from Open-Markdown.ps
 
 **File:** `dev/docs/markdown-viewer-architecture.md`
 
-- [ ] 5.1.1 Add a "Fragment Handling (`_fragment` Contract)" section describing the end-to-end flow
-- [ ] 5.1.2 Document the contract rules (encoding, decoding, precedence, launch rule)
-- [ ] 5.1.3 Update the data-flow / activation diagram (if one exists) to show `_fragment` query-param path
-- [ ] 5.1.4 Remove or update any references to `#fragment` being passed through `mdview:` links
-- [ ] 5.1.5 Remove or update any references to localStorage-based fragment passing
+- [x] 5.1.1 Add a "Fragment Handling (`_fragment` Contract)" section describing the end-to-end flow
+- [x] 5.1.2 Document the contract rules (encoding, decoding, precedence, launch rule)
+- [x] 5.1.3 Update the data-flow / activation diagram (if one exists) to show `_fragment` query-param path
+- [x] 5.1.4 Remove or update any references to `#fragment` being passed through `mdview:` links
+- [x] 5.1.5 Remove or update any references to localStorage-based fragment passing
 
 ---
 
@@ -171,9 +171,9 @@ These tests validate the _fragment parsing logic extracted from Open-Markdown.ps
 
 ### 6.1 Rebuild and test
 
-- [ ] 6.1.1 Rebuild snap: `cd installers/linux-snap && ./build.sh arm64`
-- [ ] 6.1.2 Install: `sudo snap install output/markview_1.0.0_arm64.snap --dangerous`
-- [ ] 6.1.3 Manual test: open a markdown file with TOC links → click a `mdview:` link with fragment → verify scroll to correct section
+- [x] 6.1.1 Rebuild snap: `cd installers/linux-snap && ./build.sh arm64`
+- [x] 6.1.2 Install: `sudo snap install output/markview_1.0.0_arm64.snap --dangerous`
+- [ ] 6.1.3 Manual test: open a markdown file with TOC links → click a `mdview:` link with fragment → verify scroll to correct section (requires desktop environment)
 
 ---
 

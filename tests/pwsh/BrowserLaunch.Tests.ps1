@@ -156,11 +156,10 @@ Describe 'Start-DefaultBrowser' {
 }
 
 Describe 'Fragment Launch Integration' {
-    # Tests the launch decision logic from Open-Markdown.ps1
+    # Tests the launch decision logic and _fragment contract from Open-Markdown.ps1
     
     Context 'Launch decision logic' {
         It 'Should use Start-DefaultBrowser when fragment exists' {
-            # The simplified logic: if fragment exists, use direct browser launch
             $frag = '#section-1'
             $useDirectLaunch = [bool]$frag
             $useDirectLaunch | Should -BeTrue
@@ -179,22 +178,122 @@ Describe 'Fragment Launch Integration' {
         }
     }
     
-    Context 'URL construction' {
-        It 'Should correctly format file:// URL with fragment' {
-            $filePath = 'C:\Users\test\doc.html'
+    Context '_fragment URL construction' {
+        It 'Should append ?_fragment= with encoded value' {
+            $uLocal = 'file:///C:/Users/test/MarkView/viewmd_doc_ABCD1234.html'
             $frag = '#section-1'
-            $uri = 'file:///' + ($filePath -replace '\\', '/')
-            $fullUrl = $uri + $frag
-            
-            $fullUrl | Should -Be 'file:///C:/Users/test/doc.html#section-1'
+            $launchUrl = $uLocal + '?_fragment=' + [Uri]::EscapeDataString($frag.TrimStart('#'))
+            $launchUrl | Should -Be 'file:///C:/Users/test/MarkView/viewmd_doc_ABCD1234.html?_fragment=section-1'
         }
-        
-        It 'Should preserve URL-encoded fragments' {
-            $uri = 'file:///C:/Users/test/doc.html'
-            $frag = '#Section%201'
-            $fullUrl = $uri + $frag
-            
-            $fullUrl | Should -Be 'file:///C:/Users/test/doc.html#Section%201'
+
+        It 'Should encode special characters in fragment value' {
+            $uLocal = 'file:///home/user/MarkView/viewmd_doc_12345678.html'
+            $frag = '#Section #1'
+            $launchUrl = $uLocal + '?_fragment=' + [Uri]::EscapeDataString($frag.TrimStart('#'))
+            $launchUrl | Should -Be 'file:///home/user/MarkView/viewmd_doc_12345678.html?_fragment=Section%20%231'
+        }
+
+        It 'Should not append _fragment when frag is empty' {
+            $uLocal = 'file:///C:/Users/test/doc.html'
+            $frag = ''
+            $launchUrl = $uLocal
+            if ($frag) {
+                $launchUrl += '?_fragment=' + [Uri]::EscapeDataString($frag.TrimStart('#'))
+            }
+            $launchUrl | Should -Be $uLocal
+        }
+    }
+}
+
+Describe '_fragment URI Parsing Contract' {
+    # Tests the _fragment extraction logic used in Open-Markdown.ps1.
+    # This exercises the actual regex + [Uri] / [UriBuilder] code path.
+
+    Context 'Parse _fragment from mdview: URI' {
+        It 'Extracts _fragment from simple URI' {
+            $input = 'mdview:file:///path/doc.md?_fragment=section-1'
+            $raw = $input -replace '^(?i)mdview:', ''
+            $u = [Uri]$raw
+            $frag = ''
+            if ($u.Query -match '[?&]_fragment=([^&#]*)') {
+                $decoded = [Uri]::UnescapeDataString($Matches[1])
+                if ($decoded) { $frag = '#' + $decoded }
+            }
+            $clean = [UriBuilder]::new($u)
+            $clean.Query = $null
+            $clean.Fragment = $null
+            $localPath = $clean.Uri.LocalPath
+
+            $frag | Should -Be '#section-1'
+            $localPath | Should -Be '/path/doc.md'
+        }
+
+        It 'URL-decodes encoded fragment value' {
+            $input = 'mdview:file:///path/doc.md?_fragment=Section%20%231'
+            $raw = $input -replace '^(?i)mdview:', ''
+            $u = [Uri]$raw
+            $frag = ''
+            if ($u.Query -match '[?&]_fragment=([^&#]*)') {
+                $decoded = [Uri]::UnescapeDataString($Matches[1])
+                if ($decoded) { $frag = '#' + $decoded }
+            }
+            $frag | Should -Be '#Section #1'
+        }
+
+        It 'Returns empty frag when no _fragment param' {
+            $input = 'mdview:file:///path/doc.md'
+            $raw = $input -replace '^(?i)mdview:', ''
+            $u = [Uri]$raw
+            $frag = ''
+            if ($u.Query -match '[?&]_fragment=([^&#]*)') {
+                $decoded = [Uri]::UnescapeDataString($Matches[1])
+                if ($decoded) { $frag = '#' + $decoded }
+            }
+            $frag | Should -Be ''
+        }
+
+        It 'Ignores empty _fragment value' {
+            $input = 'mdview:file:///path/doc.md?_fragment='
+            $raw = $input -replace '^(?i)mdview:', ''
+            $u = [Uri]$raw
+            $frag = ''
+            if ($u.Query -match '[?&]_fragment=([^&#]*)') {
+                $decoded = [Uri]::UnescapeDataString($Matches[1])
+                if ($decoded) { $frag = '#' + $decoded }
+            }
+            $frag | Should -Be ''
+        }
+
+        It '_fragment wins over #hash when both present' {
+            $input = 'mdview:file:///path/doc.md?_fragment=foo#bar'
+            $raw = $input -replace '^(?i)mdview:', ''
+            $u = [Uri]$raw
+            $frag = ''
+            if ($u.Query -match '[?&]_fragment=([^&#]*)') {
+                $decoded = [Uri]::UnescapeDataString($Matches[1])
+                if ($decoded) { $frag = '#' + $decoded }
+            }
+            $frag | Should -Be '#foo'
+        }
+    }
+
+    Context 'Windows drive-letter paths' -Skip:(-not $IsWindows) {
+        It 'Extracts path and _fragment from Windows URI' {
+            $input = 'mdview:file:///C:/docs/spec.md?_fragment=intro'
+            $raw = $input -replace '^(?i)mdview:', ''
+            $u = [Uri]$raw
+            $frag = ''
+            if ($u.Query -match '[?&]_fragment=([^&#]*)') {
+                $decoded = [Uri]::UnescapeDataString($Matches[1])
+                if ($decoded) { $frag = '#' + $decoded }
+            }
+            $clean = [UriBuilder]::new($u)
+            $clean.Query = $null
+            $clean.Fragment = $null
+            $localPath = $clean.Uri.LocalPath
+
+            $frag | Should -Be '#intro'
+            $localPath | Should -Be 'C:\docs\spec.md'
         }
     }
 }
