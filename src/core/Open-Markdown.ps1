@@ -204,10 +204,12 @@ try {
         } else {
             # Linux: copy assets alongside the HTML so browsers (especially
             # snap-confined Firefox) can load them from the same directory.
+            # Use file:// URIs to the copies (not relative paths, because
+            # <base href> points at the markdown source directory).
             Copy-Item -LiteralPath $HighlightJsPath    -Destination $outDir -Force
             Copy-Item -LiteralPath $HighlightThemePath -Destination $outDir -Force
-            $highlightJsUri = [IO.Path]::GetFileName($HighlightJsPath)
-            $highlightThemeUri = [IO.Path]::GetFileName($HighlightThemePath)
+            $highlightJsUri = ([Uri]::new((Join-Path $outDir ([IO.Path]::GetFileName($HighlightJsPath))))).AbsoluteUri
+            $highlightThemeUri = ([Uri]::new((Join-Path $outDir ([IO.Path]::GetFileName($HighlightThemePath))))).AbsoluteUri
         }
         $highlightThemeLink = "<link rel=`"stylesheet`" href=`"$highlightThemeUri`">"
         $highlightScript = "<script src=`"$highlightJsUri`" defer></script>"
