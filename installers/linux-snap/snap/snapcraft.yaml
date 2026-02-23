@@ -1,5 +1,5 @@
 name: markview
-version: '1.0.1'
+version: '1.2.0'
 summary: View Markdown files rendered in your browser
 description: |
   MarkView renders Markdown files as styled HTML and opens them in your

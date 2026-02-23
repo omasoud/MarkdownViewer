@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
@@ -10,7 +10,7 @@
   <Identity
     Name="omasoud.MarkView"
     Publisher="CN=7D515F91-B0EF-4927-8C46-4D23245ABE47"
-    Version="1.0.1.0"
+    Version="1.2.0.0"
     ProcessorArchitecture="x64" />
 
   <Properties>
