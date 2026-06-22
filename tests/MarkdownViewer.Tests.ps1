@@ -1087,6 +1087,17 @@ Describe 'Syntax Highlighting Feature - HTML Template' {
         It 'checks if highlight assets exist' {
             $scriptContent | Should -Match 'Test-Path.*HighlightJsPath'
         }
+
+        It 'uses content-hashed output asset names for POSIX copied assets' {
+            $scriptContent | Should -Match 'function Copy-OutputAsset'
+            $scriptContent | Should -Match 'SHA256'
+            $scriptContent | Should -Match 'Move-Item.*Destination \$destinationPath'
+        }
+
+        It 'does not overwrite POSIX highlight assets on every render' {
+            $scriptContent | Should -Not -Match 'Copy-Item\s+-LiteralPath\s+\$HighlightJsPath\s+-Destination\s+\$outDir\s+-Force'
+            $scriptContent | Should -Not -Match 'Copy-Item\s+-LiteralPath\s+\$HighlightThemePath\s+-Destination\s+\$outDir\s+-Force'
+        }
     }
 
     Context 'HTML includes highlight assets' {
@@ -1536,4 +1547,3 @@ Describe 'MSIX Package Contents' -Tag 'Integration', 'MsixValidation' -Skip:(-no
         }
     }
 }
-

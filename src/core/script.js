@@ -387,8 +387,8 @@
 
     // Scroll to _fragment target on page load.
     // Primary: read from embedded config (works on all platforms, survives
-    //          portal/xdg-open stripping of URL query params on Linux).
-    // Fallback: read from URL query param (works on Windows where URL is preserved).
+    //          launch services that strip URL query params).
+    // Fallback: read from URL query param when the browser preserves it.
     var scrollTarget = (window.mdviewer_config || {}).scrollTarget ||
         new URLSearchParams(window.location.search).get("_fragment") ||
         null;

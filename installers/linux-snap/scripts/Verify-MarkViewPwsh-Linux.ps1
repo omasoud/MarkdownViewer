@@ -62,8 +62,9 @@ Write-Host ''
 Write-Host '=== Check required cmdlets (engine/inbox) ==='
 $required = @(
     'Add-Type', 'ConvertFrom-Markdown', 'ConvertTo-Json', 'Get-Content',
-    'Import-Module', 'Join-Path', 'New-Object', 'Out-Null', 'Resolve-Path',
-    'Split-Path', 'Start-Process', 'Test-Path'
+    'Import-Module', 'Join-Path', 'New-Item', 'New-Object', 'Out-Null',
+    'Move-Item', 'Remove-Item', 'Resolve-Path', 'Split-Path', 'Start-Process',
+    'Test-Path'
 )
 
 # Note: Unblock-File is Windows-only; not required on Linux
@@ -108,7 +109,8 @@ if (-not $exportedCmds) {
 $requiredExports = @(
     'Invoke-HtmlSanitization', 'Test-RemoteImages', 'Repair-MarkdownLinks',
     'Repair-HtmlLinks', 'Get-FileBaseHref', 'Test-Motw', 'Start-DefaultBrowser',
-    'Initialize-PlatformUI', 'Show-MotwWarning', 'Show-FileNotFound', 'Show-ErrorDialog'
+    'Clear-FileTrustMarker', 'Get-MarkViewOutputDirectory', 'Initialize-PlatformUI',
+    'Show-MotwWarning', 'Show-FileNotFound', 'Show-ErrorDialog'
 )
 $exportedNames = @($exportedCmds | ForEach-Object { $_.Name })
 foreach ($fn in $requiredExports) {
@@ -120,8 +122,19 @@ foreach ($fn in $requiredExports) {
 
 Write-Host '=== Smoke test: ConvertFrom-Markdown ==='
 try {
-    $result = ConvertFrom-Markdown -InputObject '# Test'
-    if ($result.Html -match '<h1') {
+    $markdown = [string]::Join([Environment]::NewLine, @(
+        '# Test',
+        '',
+        '| A | B |',
+        '|---|---|',
+        '| **x** | y |',
+        '',
+        '~~~powershell',
+        'Get-ChildItem',
+        '~~~'
+    ))
+    $result = ConvertFrom-Markdown -InputObject $markdown
+    if ($result.Html -match '<h1' -and $result.Html -match '<table' -and $result.Html -match '<strong>x</strong>') {
         Write-Host '  ConvertFrom-Markdown: OK'
     } else {
         Write-Warning "  ConvertFrom-Markdown produced unexpected output: $($result.Html)"

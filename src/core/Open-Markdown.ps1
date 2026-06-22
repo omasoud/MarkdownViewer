@@ -23,7 +23,15 @@ if (Test-Path $ModulePath) {
     Import-Module $ModulePath -Force
 } else {
     # Fallback: look for module relative to repo structure (for development from src/core)
-    $platformDir = if ($IsWindows) { 'win' } else { 'linux' }
+    $platformDir = if ($IsWindows) {
+        'win'
+    } elseif ($IsMacOS) {
+        'mac'
+    } elseif ($IsLinux) {
+        'linux'
+    } else {
+        throw "Unsupported platform: $([System.Runtime.InteropServices.RuntimeInformation]::OSDescription)"
+    }
     $devModulePath = Join-Path (Split-Path -Parent $PSScriptRoot) "$platformDir/MarkdownViewer.psm1"
     if (Test-Path $devModulePath) {
         Import-Module $devModulePath -Force
@@ -43,8 +51,7 @@ if (-not (Test-Path $IconPath)) {
 Initialize-PlatformUI
 	
 
-# Note: Test-Motw, Get-FileBaseHref, Show-MotwWarning, Show-FileNotFound,
-# and Show-ErrorDialog are now provided by the platform module
+# Note: platform-specific functions are provided by the platform module.
 
 
 try {
@@ -94,9 +101,7 @@ try {
         $result = Show-MotwWarning -FilePath $p
 		
         if ($result -eq "Unblock") {
-            if ($IsWindows) {
-                Unblock-File -LiteralPath $p
-            }
+            Clear-FileTrustMarker -FilePath $p
         }
         elseif ($result -ne "Open") {
             exit 0
@@ -133,7 +138,7 @@ try {
     }
 
     # Create a stable MD5 hash of the full path (but only keep the first 8 characters) so the temp filename is stable for this specific file
-    # Windows paths are case-insensitive; Linux paths are case-sensitive
+    # Windows paths are case-insensitive; POSIX paths are case-sensitive.
     $pathForHash = if ($IsWindows) { $p.ToLower() } else { $p }
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($pathForHash)
     $hashBytes = [System.Security.Cryptography.MD5]::Create().ComputeHash($bytes)
@@ -148,19 +153,7 @@ try {
     }
     $baseName = "viewmd_$($name)_$hash"
 
-    # On Linux, browsers installed as snaps (e.g. Firefox on Ubuntu 22.04+)
-    # cannot access hidden directories (dot-prefixed) or /tmp due to strict
-    # confinement. The snap 'home' plug only exposes non-hidden paths under
-    # $HOME, so we use ~/MarkView/ as the output directory.
-    $outDir = if ($IsWindows) {
-        [IO.Path]::GetTempPath()
-    } else {
-        $cacheDir = Join-Path $HOME 'MarkView'
-        if (-not (Test-Path $cacheDir)) {
-            New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
-        }
-        $cacheDir
-    }
+    $outDir = Get-MarkViewOutputDirectory
     $outLocal = Join-Path $outDir "$baseName.html"
     $outRemote = Join-Path $outDir ($baseName + "_remote.html")
 
@@ -197,6 +190,40 @@ try {
     [System.Security.Cryptography.RandomNumberGenerator]::Fill($nonceBytes)
     $nonce = [Convert]::ToBase64String($nonceBytes)
 
+    function Copy-OutputAsset([string]$sourcePath, [string]$outputDirectory) {
+        $sourceBytes = [IO.File]::ReadAllBytes($sourcePath)
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            $assetHash = [BitConverter]::ToString($sha.ComputeHash($sourceBytes)).Replace('-', '').Substring(0, 12).ToLowerInvariant()
+        }
+        finally {
+            $sha.Dispose()
+        }
+
+        $assetName = '{0}.{1}{2}' -f [IO.Path]::GetFileNameWithoutExtension($sourcePath), $assetHash, [IO.Path]::GetExtension($sourcePath)
+        $destinationPath = Join-Path $outputDirectory $assetName
+
+        if (-not (Test-Path -LiteralPath $destinationPath)) {
+            $tempPath = Join-Path $outputDirectory ('.' + [IO.Path]::GetFileName($destinationPath) + '.' + [Guid]::NewGuid().ToString('N') + '.tmp')
+            try {
+                [IO.File]::WriteAllBytes($tempPath, $sourceBytes)
+                try {
+                    Move-Item -LiteralPath $tempPath -Destination $destinationPath -ErrorAction Stop
+                }
+                catch {
+                    if (-not (Test-Path -LiteralPath $destinationPath)) {
+                        throw
+                    }
+                }
+            }
+            finally {
+                Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        return $destinationPath
+    }
+
     # Generate highlight.js asset URLs (only if both files exist)
     $highlightThemeLink = ''
     $highlightScript = ''
@@ -206,14 +233,14 @@ try {
             $highlightJsUri = ([Uri]::new($HighlightJsPath)).AbsoluteUri
             $highlightThemeUri = ([Uri]::new($HighlightThemePath)).AbsoluteUri
         } else {
-            # Linux: copy assets alongside the HTML so browsers (especially
+            # POSIX platforms: copy assets alongside the HTML so browsers (especially
             # snap-confined Firefox) can load them from the same directory.
-            # Use file:// URIs to the copies (not relative paths, because
-            # <base href> points at the markdown source directory).
-            Copy-Item -LiteralPath $HighlightJsPath    -Destination $outDir -Force
-            Copy-Item -LiteralPath $HighlightThemePath -Destination $outDir -Force
-            $highlightJsUri = ([Uri]::new((Join-Path $outDir ([IO.Path]::GetFileName($HighlightJsPath))))).AbsoluteUri
-            $highlightThemeUri = ([Uri]::new((Join-Path $outDir ([IO.Path]::GetFileName($HighlightThemePath))))).AbsoluteUri
+            # Use content-hashed names and skip existing copies so browsers
+            # holding a previous asset open cannot block future renders.
+            $highlightJsCopy = Copy-OutputAsset -sourcePath $HighlightJsPath -outputDirectory $outDir
+            $highlightThemeCopy = Copy-OutputAsset -sourcePath $HighlightThemePath -outputDirectory $outDir
+            $highlightJsUri = ([Uri]::new($highlightJsCopy)).AbsoluteUri
+            $highlightThemeUri = ([Uri]::new($highlightThemeCopy)).AbsoluteUri
         }
         $highlightThemeLink = "<link rel=`"stylesheet`" href=`"$highlightThemeUri`">"
         $highlightScript = "<script src=`"$highlightJsUri`" defer></script>"
@@ -277,8 +304,8 @@ $html
     # When _fragment is present, we MUST open as a URL (file:///…?_fragment=…)
     # via Start-DefaultBrowser, not as a filesystem path. On Windows,
     # Start-Process treats '?' as part of the filename and fails.
-    # On Linux, Start-Process tries to exec the file directly, so always use
-    # Start-DefaultBrowser which calls xdg-open.
+    # On POSIX platforms, Start-Process tries to exec the file directly, so
+    # always use Start-DefaultBrowser which calls the platform browser opener.
     if ($frag -or -not $IsWindows) {
         $launchUrl = $uLocal
         if ($frag) {

@@ -101,6 +101,40 @@ function Test-Motw {
 
 <#
 .SYNOPSIS
+    Clears the platform trust marker from a file.
+.DESCRIPTION
+    Removes the Windows Mark-of-the-Web zone identifier.
+.PARAMETER FilePath
+    The file path to unblock.
+#>
+function Clear-FileTrustMarker {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $FilePath
+    )
+
+    Unblock-File -LiteralPath $FilePath
+}
+
+
+<#
+.SYNOPSIS
+    Gets the directory used for generated HTML output.
+.OUTPUTS
+    The temporary directory path.
+#>
+function Get-MarkViewOutputDirectory {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param()
+
+    return [IO.Path]::GetTempPath()
+}
+
+
+<#
+.SYNOPSIS
     Gets the default browser's ProgId from Windows registry.
 .DESCRIPTION
     Reads the user's default browser association for https (preferred) or http.
@@ -372,6 +406,8 @@ Export-ModuleMember -Function @(
     # Windows-specific functions
     'Get-FileBaseHref'
     'Test-Motw'
+    'Clear-FileTrustMarker'
+    'Get-MarkViewOutputDirectory'
     'Get-DefaultBrowserProgId'
     'Get-ProgIdOpenCommand'
     'Get-ExePathFromOpenCommand'

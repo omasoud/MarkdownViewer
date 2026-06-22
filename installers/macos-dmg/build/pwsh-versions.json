@@ -1,0 +1,17 @@
+{
+    "comment": "Pinned PowerShell version for macOS DMG packaging. Update this file to use a different version.",
+    "version": "7.6.3",
+    "releaseDate": "2026-06-16",
+    "archives": {
+        "arm64": {
+            "url": "https://github.com/PowerShell/PowerShell/releases/download/v7.6.3/powershell-7.6.3-osx-arm64.tar.gz",
+            "sha256": "f0263c2072fe7d0953781c60497a574bea99b37237f2554a59ce4bad07de8d36"
+        }
+    },
+    "notes": [
+        "SHA256 hash from the official GitHub release page",
+        "First macOS release target is arm64-only",
+        "To update: 1) Change version/URL, 2) Get hash from release page, 3) Update hash",
+        "Verify hash: shasum -a 256 <file.tar.gz>"
+    ]
+}

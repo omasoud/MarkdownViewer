@@ -1,5 +1,5 @@
 # MarkdownViewer.Shared.psm1 - Cross-platform shared functions for Markdown Viewer
-# These functions work identically on Windows and Linux.
+# These functions work identically on Windows, Linux, and macOS.
 
 $ErrorActionPreference = 'Stop'
 

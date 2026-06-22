@@ -3,7 +3,7 @@ BeforeAll {
     $snapDir = Join-Path $repoRoot 'installers/linux-snap'
 }
 
-Describe 'Snap Package Structure' -Skip:($IsWindows) {
+Describe 'Snap Package Structure' -Skip:(-not $IsLinux) {
 
     Describe 'Required files exist' {
         It 'snapcraft.yaml exists' {

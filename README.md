@@ -1,6 +1,6 @@
 # Markdown Viewer
 
-A simple tool to view Markdown files rendered in your browser. Supports Windows and Linux.
+A simple tool to view Markdown files rendered in your browser. Supports Windows, Linux, and macOS.
 
 ## Description
 
@@ -92,10 +92,40 @@ For testing or development without building a snap:
    xdg-mime default markview.desktop text/markdown text/x-markdown x-scheme-handler/mdview
    ```
 
+### macOS: DMG Package (Apple Silicon)
+
+PowerShell 7 is bundled in the app - no separate installation required.
+
+1. Download `MarkView_<version>_arm64.dmg` from the release artifacts.
+2. Open the DMG and drag `MarkView.app` to Applications.
+3. Open a `.md` or `.markdown` file with MarkView from Finder.
+
+**Architecture support:** arm64
+
+Developer builds can be created locally:
+
+```bash
+cd installers/macos-dmg
+./build.sh
+```
+
+The generated DMG is written to `installers/macos-dmg/output/`.
+
+### macOS: Run from Source (Developer)
+
+For testing or development without building the app bundle:
+
+1. Install PowerShell 7.
+2. Clone this repository and run directly:
+   ```bash
+   src/mac/markview path/to/file.md
+   ```
+
 ## Usage
 
 - **Windows:** After installation, double-click any `.md` or `.markdown` file to view it rendered in your default web browser. If the context menu was enabled during installation, right-click on a Markdown file and select "View Markdown".
 - **Linux:** Run `markview file.md` from the terminal, or right-click a `.md` file in your file manager and open with MarkView.
+- **macOS:** Open a Markdown file with `MarkView.app` from Finder, or run `src/mac/markview file.md` from a source checkout.
 - The rendered HTML includes basic styling for readability.
 - **Dark mode support:** Use the "Theme" toggle button in the top-right corner of the page to switch between system theme (follows OS preference) and inverted theme (opposite of system preference).
 - **Theme variations:** Click the theme variation button (e.g., "Light Theme: Default") below the Theme button to choose from 5 color scheme variations for each theme:
@@ -125,6 +155,10 @@ For testing or development without building a snap:
 sudo snap remove markview
 ```
 
+### macOS
+- Drag `MarkView.app` from Applications to Trash.
+- Optional: remove generated HTML/cache files from `~/Library/Caches/MarkView`.
+
 ## Requirements
 
 ### Windows
@@ -140,6 +174,13 @@ sudo snap remove markview
   - **From source:** Install separately (see installation instructions)
 - `xdg-open` for launching the default browser (pre-installed on most desktops)
 - `zenity` for dialog boxes (optional; falls back to terminal warnings)
+
+### macOS
+- macOS 14+ on Apple Silicon
+- PowerShell 7 (pwsh)
+  - **DMG:** Bundled in the app
+  - **From source:** Install separately
+- Xcode Command Line Tools for building the DMG locally
 
 ## Security
 
@@ -160,6 +201,8 @@ This tool includes several security measures for viewing Markdown files safely:
   - **Unblock & Open** — permanently trust this file
   - **Cancel** — don't open
   
+  **macOS quarantine detection:** macOS files with the `com.apple.quarantine` attribute receive the same warning flow. Choosing **Unblock & Open** removes that quarantine attribute.
+
   *Note: Linux has no MOTW equivalent. Downloaded files open without a warning.*
 
 - **Read-only installation:** Installed files are marked read-only to deter casual tampering.
@@ -172,7 +215,7 @@ This tool includes several security measures for viewing Markdown files safely:
 
 - **Not a sandbox:** The app opens HTML in your default browser. While CSP blocks scripts and sanitization removes dangerous elements, a malicious Markdown file could still contain misleading HTML content (e.g., fake login forms). Exercise caution with files from untrusted sources.
 
-- **No code signing:** The scripts are not digitally signed. If you're security-conscious, review the source code before running.
+- **Code signing:** Windows Store/MSIX and macOS release builds should be signed through their platform packaging flows. Source scripts and local developer builds may be unsigned or ad-hoc signed; if you're security-conscious, review the source before running.
 
 ### Reporting issues
 
@@ -201,8 +244,12 @@ MarkdownViewer/
 │   │   ├── markview                 # Bash launcher script
 │   │   ├── markview.desktop         # Freedesktop desktop entry
 │   │   └── markview.png             # Application icon (256x256)
-│   └── host/                        # Windows Host EXE (MSIX)
-│       └── MarkdownViewerHost/      # .NET project
+│   ├── mac/                         # macOS platform module
+│   │   ├── MarkdownViewer.psm1      # macOS-specific functions
+│   │   └── markview                 # Bash launcher script
+│   └── host/                        # Native host applications
+│       ├── MarkdownViewerHost/      # Windows .NET host
+│       └── MarkdownViewerMacHost/   # macOS Swift/AppKit host
 ├── installers/
 │   ├── win-adhoc/                   # Per-user ad-hoc installer
 │   │   ├── INSTALL.cmd
@@ -212,14 +259,19 @@ MarkdownViewer/
 │   ├── win-msix/                    # MSIX packaging
 │   │   ├── Package.appxmanifest
 │   │   └── build.ps1
-│   └── linux-snap/                  # Snap packaging (Linux)
-│       ├── snap/snapcraft.yaml
-│       ├── build.sh                 # Stage + trim + build snap
-│       └── scripts/                 # Trimming & verification
+│   ├── linux-snap/                  # Snap packaging (Linux)
+│   │   ├── snap/snapcraft.yaml
+│   │   ├── build.sh                 # Stage + trim + build snap
+│   │   └── scripts/                 # Trimming & verification
+│   └── macos-dmg/                   # DMG packaging (macOS)
+│       ├── build.sh                 # Stage + trim + build DMG
+│       └── scripts/                 # Icon, signing, trimming, verification
 ├── tests/
 │   ├── MarkdownViewer.Tests.ps1     # Core Pester tests
 │   ├── pwsh/                        # Additional Pester tests
 │   │   ├── LinuxModule.Tests.ps1
+│   │   ├── MacModule.Tests.ps1
+│   │   ├── MacBundle.Tests.ps1
 │   │   ├── SnapBuild.Tests.ps1
 │   │   └── ...                      # Browser, normalization, etc.
 │   └── MarkdownViewerHost.Tests/    # C# xUnit tests

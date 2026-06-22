@@ -3,8 +3,8 @@
 
 #Requires -Version 7.0
 
-# Skip entire file on Windows
-if ($IsWindows) {
+# Skip entire file outside Linux
+if (-not $IsLinux) {
     Write-Host "Skipping $(Split-Path -Leaf $PSCommandPath): Linux-only tests" -ForegroundColor Yellow
     return
 }
@@ -36,6 +36,8 @@ Describe 'Module Exports (Linux)' {
         $exported = (Get-Module MarkdownViewer).ExportedFunctions.Keys
         $exported | Should -Contain 'Get-FileBaseHref'
         $exported | Should -Contain 'Test-Motw'
+        $exported | Should -Contain 'Clear-FileTrustMarker'
+        $exported | Should -Contain 'Get-MarkViewOutputDirectory'
         $exported | Should -Contain 'Start-DefaultBrowser'
         $exported | Should -Contain 'Initialize-PlatformUI'
         $exported | Should -Contain 'Show-MotwWarning'
@@ -128,6 +130,19 @@ Describe 'Initialize-PlatformUI (Linux)' {
     
     It 'Does not throw' {
         { Initialize-PlatformUI } | Should -Not -Throw
+    }
+}
+
+Describe 'Platform Contract (Linux)' {
+
+    It 'Clear-FileTrustMarker does not throw' {
+        { Clear-FileTrustMarker -FilePath '/tmp/any-file.md' } | Should -Not -Throw
+    }
+
+    It 'Get-MarkViewOutputDirectory returns ~/MarkView and creates it' {
+        $result = Get-MarkViewOutputDirectory
+        $result | Should -Be (Join-Path $HOME 'MarkView')
+        $result | Should -Exist
     }
 }
 

@@ -1,12 +1,13 @@
 # Markdown Viewer Developer Guide
 
-This guide covers building, testing, and developing Markdown Viewer on both Windows and Linux.
+This guide covers building, testing, and developing Markdown Viewer on Windows, Linux, and macOS.
 
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
   - [Windows Prerequisites](#windows-prerequisites)
   - [Linux Prerequisites](#linux-prerequisites)
+  - [macOS Prerequisites](#macos-prerequisites)
   - [Installing Pester](#installing-pester)
 - [Project Structure](#project-structure)
 - [Building](#building)
@@ -14,10 +15,12 @@ This guide covers building, testing, and developing Markdown Viewer on both Wind
   - [Windows: Command Line (msbuild)](#windows-command-line-msbuild)
   - [Windows: Build Outputs](#windows-build-outputs)
   - [Linux: Snap Package](#linux-snap-package)
+  - [macOS: DMG Package](#macos-dmg-package)
   - [Cleaning Build Outputs](#cleaning-build-outputs)
 - [Running Tests](#running-tests)
   - [Run All Tests (Windows)](#run-all-tests-windows)
   - [Run All Tests (Linux)](#run-all-tests-linux)
+  - [Run All Tests (macOS)](#run-all-tests-macos)
   - [PowerShell Tests (Pester)](#powershell-tests-pester)
   - [C# Tests (xUnit) — Windows Only](#c-tests-xunit--windows-only)
   - [E2E MSIX Activation Tests — Windows Only](#e2e-msix-activation-tests--windows-only)
@@ -29,21 +32,25 @@ This guide covers building, testing, and developing Markdown Viewer on both Wind
   - [Manual Local-File Link Test (Linux)](#manual-local-file-link-test-linux)
   - [Testing the Installed MSIX (Windows)](#testing-the-installed-msix-windows)
   - [Testing the Installed Snap (Linux)](#testing-the-installed-snap-linux)
+  - [Testing the Installed DMG (macOS)](#testing-the-installed-dmg-macos)
 - [Creating Installers](#creating-installers)
   - [Ad-hoc Installer — Windows](#ad-hoc-installer--windows)
   - [MSIX Package — Windows](#msix-package--windows)
   - [Signing MSIX Packages](#signing-msix-packages)
   - [Installing the MSIX (Sideload)](#installing-the-msix-sideload)
   - [Snap Package — Linux](#snap-package--linux)
+  - [DMG Package — macOS](#dmg-package--macos)
 - [Debugging](#debugging)
   - [Debugging the Engine](#debugging-the-engine)
   - [Debugging the Host EXE (Windows)](#debugging-the-host-exe-windows)
+  - [Debugging the Mac Host (macOS)](#debugging-the-mac-host-macos)
   - [Viewing Generated HTML](#viewing-generated-html)
 - [Common Development Tasks](#common-development-tasks)
   - [Bumping the Version](#bumping-the-version)
 - [Troubleshooting](#troubleshooting)
   - [Windows Troubleshooting](#windows-troubleshooting)
   - [Linux Troubleshooting](#linux-troubleshooting)
+  - [macOS Troubleshooting](#macos-troubleshooting)
 - [Code Style](#code-style)
 - [Contributing](#contributing)
 
@@ -89,9 +96,23 @@ sudo ln -sf /opt/microsoft/powershell/7/pwsh /usr/local/bin/pwsh
 sudo snap install snapcraft --classic
 ```
 
+### macOS Prerequisites
+
+- **PowerShell 7+** (pwsh) — Required for the engine, tests, and packaging scripts
+- **Xcode Command Line Tools** — Required for `swiftc`, `codesign`, `hdiutil`, `sips`, `iconutil`, and `plutil`
+- **Apple Developer Program membership** — Required only for public Developer ID signing and notarization
+
+```bash
+# Xcode Command Line Tools
+xcode-select --install
+
+# Verify required tools
+command -v pwsh swiftc codesign hdiutil sips iconutil plutil
+```
+
 ### Installing Pester
 
-Pester 5.x is required for PowerShell tests on both platforms. The system may have Pester 3.x pre-installed; always import explicitly:
+Pester 5.x is required for PowerShell tests on all platforms. The system may have Pester 3.x pre-installed; always import explicitly:
 
 ```powershell
 # Install Pester 5.x (one-time)
@@ -126,15 +147,22 @@ MarkdownViewer/
 │   │   ├── markview             # Bash launcher script
 │   │   ├── markview.desktop     # Freedesktop desktop entry
 │   │   └── markview.png         # Application icon (256x256)
-│   └── host/                    # MSIX Host EXE (Windows only)
-│       └── MarkdownViewerHost/  # .NET Framework 4.8.1 WinForms project
+│   ├── mac/                     # macOS platform module
+│   │   ├── MarkdownViewer.psm1  # macOS-specific functions
+│   │   └── markview             # Bash launcher script
+│   └── host/                    # Native host applications
+│       ├── MarkdownViewerHost/     # Windows .NET Framework 4.8.1 host
+│       └── MarkdownViewerMacHost/  # macOS Swift/AppKit host
 ├── installers/
 │   ├── win-adhoc/               # Per-user ad-hoc installer (Windows)
 │   ├── win-msix/                # MSIX packaging (Windows)
-│   └── linux-snap/              # Snap packaging (Linux)
-│       ├── snap/snapcraft.yaml  # Snap definition
-│       ├── build.sh             # Stage + trim + build snap
-│       └── scripts/             # Trimming & verification scripts
+│   ├── linux-snap/              # Snap packaging (Linux)
+│   │   ├── snap/snapcraft.yaml  # Snap definition
+│   │   ├── build.sh             # Stage + trim + build snap
+│   │   └── scripts/             # Trimming & verification scripts
+│   └── macos-dmg/               # DMG packaging (macOS)
+│       ├── build.sh             # Stage + trim + build DMG
+│       └── scripts/             # Icon, signing, trimming, verification
 ├── tests/
 │   ├── Invoke-AllTests.ps1      # Run all tests at once (Windows)
 │   ├── MarkdownViewer.Tests.ps1 # Pester tests (engine, module, MSIX structure)
@@ -148,6 +176,8 @@ MarkdownViewer/
 │       ├── BrowserLaunch.Tests.ps1
 │       ├── Build.Tests.ps1
 │       ├── LinuxModule.Tests.ps1
+│       ├── MacModule.Tests.ps1
+│       ├── MacBundle.Tests.ps1
 │       ├── LocalFileNormalization.Tests.ps1
 │       ├── LocalFileNormalizationWithFragments.Tests.ps1
 │       ├── SnapBuild.Tests.ps1
@@ -236,6 +266,35 @@ cd installers/linux-snap
 
 The pinned PowerShell version is configured in `installers/linux-snap/build/pwsh-versions.json`.
 
+### macOS: DMG Package
+
+The macOS package builds `MarkView.app`, bundles a trimmed arm64 PowerShell runtime, ad-hoc signs local developer builds, and creates a DMG:
+
+```bash
+cd installers/macos-dmg
+
+# Build app bundle and DMG
+./build.sh
+
+# Stage app bundle only, useful for development and tests
+./build.sh --stage-only
+
+# Skip runtime trimming while debugging packaging
+./build.sh --stage-only --skip-pwsh-trim
+```
+
+**Build flow:**
+1. Stages engine files from `src/core/` and `src/mac/` into `MarkView.app`
+2. Generates `markview.icns`
+3. Compiles the Swift/AppKit host from `src/host/MarkdownViewerMacHost/`
+4. Downloads pinned PowerShell arm64 archive (cached in `.cache/`)
+5. Verifies SHA256 hash
+6. Trims and verifies the bundled PowerShell runtime
+7. Ad-hoc signs local builds, or Developer ID signs when `MARKVIEW_CODESIGN_IDENTITY` is set
+8. Creates `installers/macos-dmg/output/MarkView_<version>_arm64.dmg`
+
+For public distribution, sign with a Developer ID Application identity, then notarize and staple the DMG with `xcrun notarytool` and `xcrun stapler`.
+
 ### Cleaning Build Outputs
 
 **Windows:**
@@ -263,6 +322,13 @@ cd installers/linux-snap
 rm -rf staged/ parts/ prime/ stage/ output/ .craft/
 ```
 
+**macOS:**
+```bash
+# Clean DMG build artifacts
+cd installers/macos-dmg
+rm -rf staged/ dmg/root/ output/
+```
+
 ---
 
 ## Running Tests
@@ -271,7 +337,7 @@ This project has three levels of tests:
 
 | Test Suite | Framework | Count* | Platform | Purpose |
 |------------|-----------|--------|----------|---------|
-| Pester | PowerShell | ~460 | Both | Engine, module, sanitizer, MSIX/snap structure |
+| Pester | PowerShell | ~480 | All | Engine, module, sanitizer, MSIX/snap/DMG structure |
 | xUnit | C#/.NET | ~43 | Windows | Host EXE activation handling |
 | E2E MSIX | PowerShell | ~8 | Windows | Full packaged app activation (interactive) |
 
@@ -313,9 +379,26 @@ Linux-specific tests include:
 - `tests/pwsh/SnapBuild.Tests.ps1` — Snap packaging structure and build script
 - `tests/pwsh/LocalFileNormalization.ActualBehavior.Tests.ps1` — Linux file normalization
 
-Windows-only tests (auto-skipped on Linux):
+Windows-only tests (auto-skipped on Linux and macOS):
 - `tests/pwsh/Build.Tests.ps1`, `Stage.Tests.ps1` — MSIX build/staging
 - `tests/pwsh/LocalFileNormalization.Tests.ps1`, `LocalFileNormalizationWithFragments.Tests.ps1` — Windows paths
+
+### Run All Tests (macOS)
+
+On macOS, run Pester directly:
+
+```bash
+pwsh -NoProfile -Command '
+    Import-Module Pester -RequiredVersion 5.7.1 -Force
+    Invoke-Pester tests -Output Minimal
+'
+```
+
+macOS-specific tests include:
+- `tests/pwsh/MacModule.Tests.ps1` — macOS `MarkdownViewer.psm1` module
+- `tests/pwsh/MacBundle.Tests.ps1` — app bundle/DMG staging and bundled runtime verification
+
+Linux-only snap tests and Windows-only path/MSIX tests are auto-skipped on macOS.
 
 ### PowerShell Tests (Pester)
 
@@ -338,6 +421,10 @@ Invoke-Pester tests/pwsh -Output Minimal
 # Run only Linux-specific tests
 Invoke-Pester tests/pwsh/LinuxModule.Tests.ps1 -Output Minimal
 Invoke-Pester tests/pwsh/SnapBuild.Tests.ps1 -Output Minimal
+
+# Run only macOS-specific tests
+Invoke-Pester tests/pwsh/MacModule.Tests.ps1 -Output Minimal
+Invoke-Pester tests/pwsh/MacBundle.Tests.ps1 -Output Minimal
 ```
 
 #### Skipped Tests
@@ -346,8 +433,9 @@ Some tests are conditionally skipped:
 
 | Condition | Platform | Tests Skipped | How to Run |
 |-----------|----------|---------------|------------|
-| Not Windows | Linux | ~80 | Run on Windows |
-| Not Linux | Windows | ~40 | Run on Linux |
+| Not Windows | Linux/macOS | ~80 | Run on Windows |
+| Not Linux | Windows/macOS | ~40 | Run on Linux |
+| Not macOS | Windows/Linux | ~20 | Run on macOS |
 | No staging directory | Windows | ~12 | Run `.\installers\win-msix\build.ps1` first |
 | No bundled pwsh | Windows | ~3 | Run build with `-DownloadPwsh` flag |
 | No MSIX file | Windows | ~10 | Run build to create MSIX package |
@@ -413,6 +501,18 @@ src/linux/markview tests/highlight-test.md
 pwsh -NoProfile -File src/core/Open-Markdown.ps1 -Path tests/highlight-test.md
 ```
 
+**macOS:**
+```bash
+# Using the launcher script (dev layout)
+src/mac/markview tests/highlight-test.md
+
+# Or directly via pwsh
+pwsh -NoProfile -File src/core/Open-Markdown.ps1 -Path tests/highlight-test.md
+
+# Using a staged app bundle
+open -a "$PWD/installers/macos-dmg/staged/MarkView.app" "$PWD/tests/highlight-test.md"
+```
+
 This opens the rendered markdown in your default browser.
 
 ### Testing CSS/JS Changes
@@ -421,12 +521,13 @@ CSS and JS changes take effect immediately when you re-run the engine, since the
 
 ### Testing with Module Changes
 
-If you modify a platform module (`src/win/MarkdownViewer.psm1` or `src/linux/MarkdownViewer.psm1`) or the shared module (`src/core/MarkdownViewer.Shared.psm1`):
+If you modify a platform module (`src/win/MarkdownViewer.psm1`, `src/linux/MarkdownViewer.psm1`, or `src/mac/MarkdownViewer.psm1`) or the shared module (`src/core/MarkdownViewer.Shared.psm1`):
 
 ```powershell
 # Force reimport the module before testing
 Import-Module "src/win/MarkdownViewer.psm1" -Force    # Windows
 Import-Module "src/linux/MarkdownViewer.psm1" -Force   # Linux
+Import-Module "src/mac/MarkdownViewer.psm1" -Force     # macOS
 
 # Then run the engine
 pwsh -NoProfile -File src/core/Open-Markdown.ps1 -Path tests/highlight-test.md
@@ -534,7 +635,27 @@ sudo snap remove markview
 - The snap uses **strict** confinement and can only access files under `$HOME`
 - Output HTML files are written to `~/MarkView/` (not `/tmp/`) so browsers can access them
 - Browser launch uses `snapctl user-open` (propagates through XDG Desktop Portal)
-- The portal strips `#fragment` and `?query` from `file:` URLs, which is why the `_fragment` contract embeds `scrollTarget` directly in the HTML config object
+- The portal can strip fragment/query state from launched `file:` URLs, so the engine embeds `scrollTarget` directly in the HTML config object as the primary scroll target
+
+### Testing the Installed DMG (macOS)
+
+After building the DMG:
+
+```bash
+# Mount and install manually, or open the DMG in Finder
+open installers/macos-dmg/output/MarkView_1.2.0_arm64.dmg
+
+# Smoke-test the staged app bundle before copying to Applications
+open -a "$PWD/installers/macos-dmg/staged/MarkView.app" "$PWD/README.md"
+
+# Test the native host directly with an absolute file path
+installers/macos-dmg/staged/MarkView.app/Contents/MacOS/MarkViewHost "$PWD/README.md"
+
+# Test the protocol handler after the app has been installed/registered
+open "mdview:file://$PWD/README.md"
+```
+
+Generated HTML is written to `~/Library/Caches/MarkView`.
 
 ---
 
@@ -723,6 +844,49 @@ sudo snap install output/markview_1.0.1_arm64.snap --dangerous
 3. Update the `sha256` values in the config file
 4. Downloads are cached in `installers/linux-snap/.cache/`
 
+### DMG Package — macOS
+
+Build the macOS DMG with the included build script:
+
+```bash
+cd installers/macos-dmg
+
+# Build the arm64 DMG
+./build.sh
+
+# Stage only, useful for tests and inspection
+./build.sh --stage-only
+```
+
+**App bundle structure (after staging):**
+```
+staged/MarkView.app/
+└── Contents/
+    ├── Info.plist
+    ├── MacOS/MarkViewHost
+    └── Resources/
+        ├── app/                  # Engine payload + macOS platform module
+        ├── pwsh/                 # Bundled & trimmed PowerShell 7
+        └── markview.icns
+```
+
+**Developer ID signing and notarization:**
+
+```bash
+# Build with Developer ID signing
+MARKVIEW_CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./build.sh
+
+# Submit the DMG to Apple notarization
+xcrun notarytool submit output/MarkView_1.2.0_arm64.dmg --keychain-profile markview-notary --wait
+xcrun stapler staple output/MarkView_1.2.0_arm64.dmg
+```
+
+**Updating the pinned PowerShell version:**
+1. Edit `installers/macos-dmg/build/pwsh-versions.json` with the new arm64 macOS archive URL
+2. Get SHA256 hashes from the [PowerShell GitHub release page](https://github.com/PowerShell/PowerShell/releases)
+3. Update the `sha256` value in the config file
+4. Downloads are cached in `installers/macos-dmg/.cache/`
+
 ---
 
 ## Debugging
@@ -746,11 +910,30 @@ Write-Debug "Variable value: $variable"
    - Arguments: `C:\path\to\test.md`
 3. Set breakpoints and press F5
 
+### Debugging the Mac Host (macOS)
+
+The macOS host is a small Swift/AppKit executable:
+
+```bash
+# Compile just the host
+swiftc src/host/MarkdownViewerMacHost/MarkViewHost.swift \
+    -o /tmp/MarkViewHost \
+    -framework AppKit \
+    -framework Foundation
+
+# Build the full app bundle and test host activation
+installers/macos-dmg/build.sh --stage-only
+installers/macos-dmg/staged/MarkView.app/Contents/MacOS/MarkViewHost "$PWD/README.md"
+```
+
+Host errors are shown with `NSAlert`. Engine errors are shown by the PowerShell macOS platform module through `osascript` dialogs.
+
 ### Viewing Generated HTML
 
 The engine writes temporary HTML files:
 - **Windows:** `%TEMP%\viewmd_<name>_<hash>.html`
 - **Linux:** `~/MarkView/viewmd_<name>_<hash>.html`
+- **macOS:** `~/Library/Caches/MarkView/viewmd_<name>_<hash>.html`
 
 The `_remote.html` variant is created when the document has remote images and the user enables them.
 
@@ -789,6 +972,7 @@ The canonical version is the `<Version>` property in `src/host/MarkdownViewerHos
 | `MarkdownViewer.wapproj` | `<PackageVersion>` | 4-part |
 | `build.ps1` | `-Version` default | 4-part |
 | `snapcraft.yaml` | `version` | 3-part |
+| `installers/macos-dmg/build.sh` | derived from csproj | 3-part |
 | `Test-PackagedActivation.ps1` | `-Version` default | 4-part |
 | `Invoke-AllTests.ps1` | MSIX filename pattern | 4-part |
 | `MarkdownViewer.Tests.ps1` | MSIX filename pattern | 4-part |
@@ -833,6 +1017,7 @@ Edit the shared module `src/core/MarkdownViewer.Shared.psm1`, function `Invoke-H
 3. `src/core/Open-Markdown.ps1` — User-facing strings
 4. `src/host/MarkdownViewerHost/Program.cs` — TaskDialog caption
 5. `installers/linux-snap/snap/snapcraft.yaml` — `name`, `title`
+6. `src/host/MarkdownViewerMacHost/Info.plist.template` — `CFBundleDisplayName`, `CFBundleName`
 
 ---
 
@@ -871,14 +1056,38 @@ xdg-settings get default-web-browser
 
 **Snap can't access files outside `$HOME`** — The snap uses strict confinement and can only read files under your home directory. Copy the file to `~/` first.
 
-**Fragment scrolling doesn't work in snap** — The XDG Desktop Portal strips query parameters from `file:` URLs. The engine embeds `scrollTarget` directly in the HTML config object as a workaround. If scrolling still fails, check that the `window.mdviewer_config.scrollTarget` is being set correctly in the generated HTML.
+**Fragment scrolling doesn't work in snap** — The XDG Desktop Portal can strip fragment/query state from launched `file:` URLs. The engine embeds `scrollTarget` directly in the HTML config object as the primary scroll target. If scrolling still fails, check that `window.mdviewer_config.scrollTarget` is being set correctly in the generated HTML.
 
 **`snapcraft` fails with architecture mismatch** — Ensure you're building for the correct platform:
 ```bash
 ./build.sh arm64   # or amd64
 ```
 
-**Pester tests skip with "Windows-only"** — This is expected. Tests gated with `if (-not $IsWindows) { return }` skip on Linux. Run on Windows to execute those tests.
+**Pester tests skip with "Windows-only"** — This is expected. Tests gated with `if (-not $IsWindows) { return }` skip on Linux and macOS. Run on Windows to execute those tests.
+
+### macOS Troubleshooting
+
+**"ConvertFrom-Markdown not found"** — Ensure you have PowerShell 7+ for source runs:
+```bash
+pwsh --version
+```
+
+**DMG build fails with missing Xcode tools** — Install Xcode Command Line Tools:
+```bash
+xcode-select --install
+```
+
+**Bundled PowerShell verification fails after trimming** — Rebuild without trimming to isolate the issue:
+```bash
+installers/macos-dmg/build.sh --stage-only --skip-pwsh-trim
+```
+
+**App opens but no rendered file appears** — Check `~/Library/Caches/MarkView` and run the host directly with an absolute path:
+```bash
+installers/macos-dmg/staged/MarkView.app/Contents/MacOS/MarkViewHost "$PWD/README.md"
+```
+
+**Gatekeeper blocks a downloaded DMG** — Public releases must be signed with Developer ID and notarized. Local developer builds are only ad-hoc signed.
 
 ---
 
@@ -886,6 +1095,7 @@ xdg-settings get default-web-browser
 
 - **PowerShell:** Follow existing patterns, use `$ErrorActionPreference = 'Stop'`
 - **C#:** Follow .NET conventions, nullable enabled
+- **Swift:** Keep the macOS host small and use structured `Process` arguments
 - **JavaScript:** No framework, vanilla JS with IIFEs for isolation
 - **CSS:** CSS custom properties for theming
 - **Bash:** `set -e`, POSIX-compatible where possible
