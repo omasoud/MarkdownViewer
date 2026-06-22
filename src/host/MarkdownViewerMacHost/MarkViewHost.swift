@@ -4,14 +4,16 @@ import Foundation
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var handledActivation = false
 
-    func applicationDidFinishLaunching(_ notification: Notification) {
+    func applicationWillFinishLaunching(_ notification: Notification) {
         NSAppleEventManager.shared().setEventHandler(
             self,
             andSelector: #selector(handleGetURLEvent(_:withReplyEvent:)),
             forEventClass: AEEventClass(kInternetEventClass),
             andEventID: AEEventID(kAEGetURL)
         )
+    }
 
+    func applicationDidFinishLaunching(_ notification: Notification) {
         let args = Array(CommandLine.arguments.dropFirst())
         if !args.isEmpty {
             handleInputs(args)

@@ -7,6 +7,7 @@ BeforeAll {
     $macDir = Join-Path $repoRoot 'installers/macos-dmg'
     $appPath = Join-Path $macDir 'staged/MarkView.app'
     $resourcesPath = Join-Path $appPath 'Contents/Resources'
+    $hostSourcePath = Join-Path $repoRoot 'src/host/MarkdownViewerMacHost/MarkViewHost.swift'
 }
 
 Describe 'macOS App Bundle Structure' -Skip:(-not $IsMacOS) {
@@ -34,6 +35,29 @@ Describe 'macOS App Bundle Structure' -Skip:(-not $IsMacOS) {
             $signScript = Join-Path $macDir 'scripts/Sign-MarkViewApp.sh'
             $signScript | Should -Exist
             (Get-Item $signScript).UnixMode | Should -Match 'x'
+        }
+    }
+
+    Describe 'Swift host protocol activation lifecycle' {
+        BeforeAll {
+            $hostSource = Get-Content -LiteralPath $hostSourcePath -Raw
+        }
+
+        It 'registers mdview Apple Event handling before applicationDidFinishLaunching' {
+            $willIndex = $hostSource.IndexOf('func applicationWillFinishLaunching')
+            $didIndex = $hostSource.IndexOf('func applicationDidFinishLaunching')
+            $handlerIndex = $hostSource.IndexOf('setEventHandler')
+
+            $willIndex | Should -BeGreaterOrEqual 0
+            $didIndex | Should -BeGreaterThan $willIndex
+            $handlerIndex | Should -BeGreaterThan $willIndex
+            $handlerIndex | Should -BeLessThan $didIndex
+        }
+
+        It 'handles kAEGetURL events for mdview links' {
+            $hostSource | Should -Match 'kInternetEventClass'
+            $hostSource | Should -Match 'kAEGetURL'
+            $hostSource | Should -Match 'handleGetURLEvent'
         }
     }
 

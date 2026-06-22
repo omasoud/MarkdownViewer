@@ -623,6 +623,17 @@ pwsh -NoProfile -File src/core/Open-Markdown.ps1 -Path "$HOME/markview-test/repo
 open -a "$PWD/installers/macos-dmg/staged/MarkView.app" "$HOME/markview-test/repo/subdir/manual-test.md"
 ```
 
+When you click `mdview:` links in the rendered browser page, macOS routes those
+links through Launch Services. If an older `/Applications/MarkView.app` is
+installed, the browser may activate that older app instead of the staged app you
+used to open the first page. Replace the installed app with the current build
+before validating browser-click navigation, or test one protocol activation
+explicitly against the staged app:
+
+```bash
+open -a "$PWD/installers/macos-dmg/staged/MarkView.app" "mdview:file://$HOME/markview-test/repo/subdir/docs/spec1.md"
+```
+
 **Test cases covered (7 total):**
 - Case 1: Relative path (`docs/spec1.md`)
 - Case 2: Parent traversal (`../docs/spec3.md`)
