@@ -268,6 +268,9 @@ MarkdownViewer/
 │       └── scripts/                 # Icon, signing, trimming, verification
 ├── tests/
 │   ├── MarkdownViewer.Tests.ps1     # Core Pester tests
+│   ├── local-file-normalization/    # Manual link test sources (Windows)
+│   ├── local-file-normalization-linux/ # Manual link test sources (Linux)
+│   ├── local-file-normalization-macos/ # Manual link test sources (macOS)
 │   ├── pwsh/                        # Additional Pester tests
 │   │   ├── LinuxModule.Tests.ps1
 │   │   ├── MacModule.Tests.ps1

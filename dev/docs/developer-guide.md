@@ -30,6 +30,7 @@ This guide covers building, testing, and developing Markdown Viewer on Windows, 
   - [Testing with Module Changes](#testing-with-module-changes)
   - [Manual Local-File Link Test (Windows)](#manual-local-file-link-test-windows)
   - [Manual Local-File Link Test (Linux)](#manual-local-file-link-test-linux)
+  - [Manual Local-File Link Test (macOS)](#manual-local-file-link-test-macos)
   - [Testing the Installed MSIX (Windows)](#testing-the-installed-msix-windows)
   - [Testing the Installed Snap (Linux)](#testing-the-installed-snap-linux)
   - [Testing the Installed DMG (macOS)](#testing-the-installed-dmg-macos)
@@ -172,6 +173,7 @@ MarkdownViewer/
 │   ├── ActivationDriver/        # COM activation tool for E2E tests (Windows)
 │   ├── local-file-normalization/       # Manual link test sources (Windows)
 │   ├── local-file-normalization-linux/ # Manual link test sources (Linux)
+│   ├── local-file-normalization-macos/ # Manual link test sources (macOS)
 │   └── pwsh/                    # Additional Pester tests
 │       ├── BrowserLaunch.Tests.ps1
 │       ├── Build.Tests.ps1
@@ -187,7 +189,8 @@ MarkdownViewer/
     └── scripts/
         └── test/
             ├── Deploy-LinkTests.ps1         # Deploy link tests (Windows)
-            └── Deploy-LinkTests-Linux.ps1   # Deploy link tests (Linux)
+            ├── Deploy-LinkTests-Linux.ps1   # Deploy link tests (Linux)
+            └── Deploy-LinkTests-macOS.ps1   # Deploy link tests (macOS)
 ```
 
 ---
@@ -594,6 +597,44 @@ Then click each link and verify file opens + fragment scrolling works.
 
 ```bash
 pwsh -NoProfile -File dev/scripts/test/Deploy-LinkTests-Linux.ps1 -Clean
+```
+
+### Manual Local-File Link Test (macOS)
+
+The macOS version tests the same POSIX link patterns as Linux: relative paths, parent traversal, absolute paths, `file:///` URLs, paths with spaces, encoded spaces, and fragment anchors. Windows-only forms such as drive letters and UNC paths are intentionally omitted.
+
+It deploys to `~/markview-test/`, matching normal macOS user-writable locations.
+
+**Deploy the test files:**
+
+```bash
+pwsh -NoProfile -File dev/scripts/test/Deploy-LinkTests-macOS.ps1
+```
+
+**Run the test from source:**
+
+```bash
+pwsh -NoProfile -File src/core/Open-Markdown.ps1 -Path "$HOME/markview-test/repo/subdir/manual-test.md"
+```
+
+**Run the test with the staged app bundle:**
+
+```bash
+open -a "$PWD/installers/macos-dmg/staged/MarkView.app" "$HOME/markview-test/repo/subdir/manual-test.md"
+```
+
+**Test cases covered (7 total):**
+- Case 1: Relative path (`docs/spec1.md`)
+- Case 2: Parent traversal (`../docs/spec3.md`)
+- Cases 3-4: macOS absolute paths (`~/markview-test/spec5.md`, with `%20`-encoded spaces)
+- Cases 5-7: `file:///` URLs with plain path, spaces, and `%20`-encoded spaces
+
+Then click each link and verify file opens + fragment scrolling works.
+
+**Clean up when done:**
+
+```bash
+pwsh -NoProfile -File dev/scripts/test/Deploy-LinkTests-macOS.ps1 -Clean
 ```
 
 ### Testing the Installed MSIX (Windows)

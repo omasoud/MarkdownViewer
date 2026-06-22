@@ -703,6 +703,9 @@ MarkdownViewer/
 ├── tests/
 │   ├── MarkdownViewer.Tests.ps1     # Core Pester tests
 │   ├── MarkdownViewerHost.Tests/    # xUnit tests
+│   ├── local-file-normalization/    # Manual link test sources (Windows)
+│   ├── local-file-normalization-linux/ # Manual link test sources (Linux)
+│   ├── local-file-normalization-macos/ # Manual link test sources (macOS)
 │   ├── pwsh/                        # Additional Pester tests
 │   │   ├── BrowserLaunch.Tests.ps1
 │   │   ├── Build.Tests.ps1

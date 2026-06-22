@@ -1,4 +1,5 @@
 payload/scrap/*
+.DS_Store
 PSScriptAnalyzerSettings.psd1
 .vscode/settings.json
 all.txt
