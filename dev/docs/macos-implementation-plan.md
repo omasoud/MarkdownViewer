@@ -6,7 +6,7 @@ Port MarkView to macOS by adding a macOS platform module (`src/mac/`), making th
 
 The first production distribution target should be direct macOS distribution with a Developer ID signed and notarized DMG. A Mac App Store release is possible later, but it should be treated as a separate track because App Sandbox, file access, browser launch behavior, and the bundled PowerShell runtime need additional validation.
 
-**Target platforms:** macOS 14+ initially, arm64 first, x64 after Intel validation  
+**Target platforms:** macOS 14+ initially, arm64-only for the first public release
 **Primary local baseline:** macOS 26.4 on Apple Silicon arm64, PowerShell 7.6.3  
 **Distribution:** Developer ID signed and notarized DMG, with GitHub Releases as the first download channel  
 **Command:** `markview file.md` for development and optional CLI use  
@@ -312,8 +312,8 @@ The host should implement `NSApplicationDelegate` methods for file and URL activ
 
 The generated app bundle needs Launch Services metadata:
 
-- `CFBundleIdentifier`: final reverse-DNS bundle ID, for example `com.omasoud.MarkdownViewer` or `dev.omasoud.MarkView`.
-- `CFBundleDisplayName`: `MarkView` or `Markdown Viewer`, pending naming decision.
+- `CFBundleIdentifier`: `com.omasoud.MarkView`.
+- `CFBundleDisplayName`: `MarkView`.
 - `CFBundleDocumentTypes`: claim `.md` and `.markdown` as viewer document types.
 - `CFBundleURLTypes`: claim `mdview`.
 - `CFBundleIconFile`: `markview.icns`.
@@ -623,7 +623,7 @@ Create `tests/pwsh/MacBundle.Tests.ps1`:
 |----------|--------|-----------|
 | Platform directory | `src/mac/` | Matches existing short names: `win`, `linux` |
 | First architecture | arm64 | Current development hardware is Apple Silicon |
-| Later architecture | x64 | Still useful for Intel Macs, but needs separate validation |
+| Later architecture | x64 deferred | Still useful for Intel Macs, but not part of the first public Mac release |
 | Runtime | Bundled and trimmed PowerShell | Matches Windows MSIX and Linux snap user experience |
 | Dev launcher | `src/mac/markview` | Fast source testing without building an app bundle |
 | Finder/protocol activation | Native Swift/AppKit host | Required for Launch Services file and URL events |
@@ -636,10 +636,10 @@ Create `tests/pwsh/MacBundle.Tests.ps1`:
 
 ## Open Decisions
 
-- [ ] Final display name: `MarkView`, `Markdown Viewer`, or both (`CFBundleDisplayName` vs marketing name).
-- [ ] Final bundle identifier: for example `com.omasoud.MarkdownViewer` or `dev.omasoud.MarkView`.
+- [x] Final display name: `MarkView`.
+- [x] Final bundle identifier: `com.omasoud.MarkView`.
 - [ ] Minimum supported macOS version.
-- [ ] Whether to publish x64 at first release or after arm64 stabilizes.
+- [x] First public macOS release architecture: arm64-only.
 - [ ] Whether direct distribution should include auto-update support, such as Sparkle, or rely on GitHub Releases initially.
 - [ ] Whether Homebrew Cask should be a release goal for the first public macOS version.
 
