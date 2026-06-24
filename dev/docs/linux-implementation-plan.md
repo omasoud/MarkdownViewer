@@ -20,15 +20,15 @@ Port MarkView to Ubuntu Linux by creating a Linux platform module (`src/linux/`)
 The Microsoft apt repository only provides x64 packages. For ARM64, install via tarball:
 
 ```bash
-# Download and install pwsh 7.5.4 (or latest)
-PWSH_VERSION="7.5.4"
+# Download and install pwsh 7.6.3 (or latest)
+PWSH_VERSION="7.6.3"
 wget -q "https://github.com/PowerShell/PowerShell/releases/download/v${PWSH_VERSION}/powershell-${PWSH_VERSION}-linux-arm64.tar.gz" \
     -O /tmp/pwsh-arm64.tar.gz
 sudo mkdir -p /opt/microsoft/powershell/7
 sudo tar xzf /tmp/pwsh-arm64.tar.gz -C /opt/microsoft/powershell/7
 sudo chmod +x /opt/microsoft/powershell/7/pwsh
 sudo ln -sf /opt/microsoft/powershell/7/pwsh /usr/local/bin/pwsh
-pwsh --version  # Verify: PowerShell 7.5.4
+pwsh --version  # Verify: PowerShell 7.6.3
 ```
 
 For x64, the apt method works:
@@ -533,7 +533,7 @@ The Linux module must export the same function list as the Windows module.
   cp "$REPO_ROOT/src/linux/markview.png" "$STAGE_DIR/meta/gui/"
 
   # Download and trim pwsh (if not cached)
-  PWSH_VERSION="7.5.4"
+  PWSH_VERSION="7.6.3"
   PWSH_TARBALL="pwsh-$ARCH.tar.gz"
   PWSH_CACHE="$SCRIPT_DIR/.cache"
   mkdir -p "$PWSH_CACHE"

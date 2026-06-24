@@ -86,7 +86,7 @@ winget install Microsoft.PowerShell
 sudo apt-get update && sudo apt-get install -y powershell
 
 # Ubuntu arm64 — install pwsh from tarball (apt repo is x64-only)
-PWSH_VERSION="7.5.4"
+PWSH_VERSION="7.6.3"
 wget -q "https://github.com/PowerShell/PowerShell/releases/download/v${PWSH_VERSION}/powershell-${PWSH_VERSION}-linux-arm64.tar.gz" -O /tmp/pwsh.tar.gz
 sudo mkdir -p /opt/microsoft/powershell/7
 sudo tar xzf /tmp/pwsh.tar.gz -C /opt/microsoft/powershell/7

@@ -224,6 +224,40 @@ Describe 'Snap Package Structure' -Skip:(-not $IsLinux) {
             Join-Path $snapDir 'staged/app/markdown.ico' | Should -Exist
         }
 
+        It 'staged snap payload has packable permissions' {
+            $directories = @(
+                'staged',
+                'staged/app',
+                'staged/bin',
+                'staged/meta',
+                'staged/meta/gui',
+                'staged/pwsh'
+            )
+            foreach ($relativePath in $directories) {
+                $path = Join-Path $snapDir $relativePath
+                (Get-Item $path).UnixMode | Should -Match '^d......r.x$' -Because "$relativePath must be world-readable and searchable for snap pack"
+            }
+
+            $readableFiles = @(
+                'staged/app/Open-Markdown.ps1',
+                'staged/meta/gui/markview.desktop',
+                'staged/meta/gui/markview.png'
+            )
+            foreach ($relativePath in $readableFiles) {
+                $path = Join-Path $snapDir $relativePath
+                (Get-Item $path).UnixMode | Should -Match '^-......r..$' -Because "$relativePath must be world-readable for snap pack"
+            }
+
+            $executableFiles = @(
+                'staged/bin/markview',
+                'staged/pwsh/pwsh'
+            )
+            foreach ($relativePath in $executableFiles) {
+                $path = Join-Path $snapDir $relativePath
+                (Get-Item $path).UnixMode | Should -Match '^-......r.x$' -Because "$relativePath must be world-readable and executable for snap pack"
+            }
+        }
+
         It 'trimmed pwsh directory exists in staged' {
             Join-Path $snapDir 'staged/pwsh' | Should -Exist
         }

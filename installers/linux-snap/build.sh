@@ -13,6 +13,11 @@
 
 set -e
 
+# Snap packages must contain world-readable files and searchable directories.
+# Normalize the build umask so restrictive login shells do not produce
+# owner-only staged or snapcraft-generated metadata.
+umask 022
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
@@ -171,6 +176,9 @@ pwsh -NoProfile -File "$SCRIPT_DIR/scripts/Verify-MarkViewPwsh-Linux.ps1" \
     -ModulePath "$STAGE_DIR/app/MarkdownViewer.psm1" \
     -SharedModulePath "$STAGE_DIR/app/MarkdownViewer.Shared.psm1" \
     -PwshDir "$PWSH_DIR"
+
+echo "  Normalizing staged file permissions..."
+chmod -R a+rX "$STAGE_DIR"
 
 echo "  PowerShell runtime ready at: $PWSH_DIR"
 
