@@ -431,6 +431,33 @@ function Repair-HtmlLinks {
             return "$attrName=`"$fixed`""
         })
         
+        # Fix: Convert Pandoc dimension units (e.g. width="4.67in") to pixel integers.
+        # Markdig's GenericAttributes extension converts Pandoc {width="Xin"} to HTML
+        # width="Xin", but browsers expect integer pixel values and misparse inch values
+        # (e.g. "0.35in" → 0px, making images invisible).
+        $result = [regex]::Replace(
+            $result,
+            '(?i)\b(width|height)\s*=\s*"([0-9]*\.?[0-9]+(?:e[+-]?[0-9]+)?)\s*(in|cm|mm|pt|pc|px)"',
+            {
+                param($m)
+                $attr = $m.Groups[1].Value
+                $value = [double]$m.Groups[2].Value
+                $unit = $m.Groups[3].Value.ToLower()
+
+                $px = switch ($unit) {
+                    'in' { $value * 96 }
+                    'cm' { $value * 96 / 2.54 }
+                    'mm' { $value * 96 / 25.4 }
+                    'pt' { $value * 96 / 72 }
+                    'pc' { $value * 96 / 6 }
+                    'px' { $value }
+                }
+
+                $rounded = [int][Math]::Round($px)
+                return "$attr=`"$rounded`""
+            }
+        )
+        
         return $result
     }
 }
