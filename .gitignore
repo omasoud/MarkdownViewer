@@ -29,3 +29,4 @@ installers/macos-dmg/dmg/root
 installers/macos-dmg/staged
 dev/docs/app-contract-and-scrolling-recommendation.md
 local/
+AGENT.md
