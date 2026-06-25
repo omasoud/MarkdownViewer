@@ -18,3 +18,5 @@ dot-net-10-reference.txt
 dev/docs/solution3.txt
 tests/local-file-normalization/
 dev/docs/fragment-utils.md
+local/
+AGENT.md
