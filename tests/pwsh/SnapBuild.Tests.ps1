@@ -152,6 +152,36 @@ Describe 'Snap Package Structure' -Skip:(-not $IsLinux) {
         It 'calls Open-Markdown.ps1' {
             $launcherContent | Should -Match 'Open-Markdown\.ps1'
         }
+
+        It 'prints friendly usage when no markdown file is supplied' {
+            $result = & bash $launcherPath 2>&1
+            $LASTEXITCODE | Should -Be 2
+
+            $output = $result -join "`n"
+            $output | Should -Match 'MarkView\s+\d+\.\d+\.\d+'
+            $output | Should -Match 'View Markdown files rendered in your browser\.'
+            $output | Should -Match 'Usage:'
+            $output | Should -Match 'markview <markdown-file>'
+        }
+
+        It 'prints snap command usage in snap layout' {
+            $env:SNAP = '/snap/markdownviewer/current'
+            $env:SNAP_NAME = 'markdownviewer'
+            $env:SNAP_VERSION = '1.3.0'
+            try {
+                $result = & bash $launcherPath --help 2>&1
+                $LASTEXITCODE | Should -Be 0
+            }
+            finally {
+                Remove-Item Env:\SNAP -ErrorAction SilentlyContinue
+                Remove-Item Env:\SNAP_NAME -ErrorAction SilentlyContinue
+                Remove-Item Env:\SNAP_VERSION -ErrorAction SilentlyContinue
+            }
+
+            $output = $result -join "`n"
+            $output | Should -Match 'MarkView 1\.3\.0'
+            $output | Should -Match 'markdownviewer <markdown-file>'
+        }
     }
 
     Describe 'App icon' {

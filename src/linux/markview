@@ -6,6 +6,53 @@ set -e
 
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 
+get_markview_version() {
+    if [ -n "${SNAP_VERSION:-}" ]; then
+        echo "$SNAP_VERSION"
+        return
+    fi
+
+    local csproj="$SCRIPT_DIR/../../src/host/MarkdownViewerHost/MarkdownViewerHost.csproj"
+    if [ -f "$csproj" ]; then
+        sed -n 's/.*<Version>\([^<]*\)<\/Version>.*/\1/p' "$csproj" | head -n 1
+        return
+    fi
+
+    echo "development"
+}
+
+COMMAND_NAME="$(basename "$0")"
+if [ -n "${SNAP:-}" ]; then
+    COMMAND_NAME="${SNAP_NAME:-markdownviewer}"
+fi
+
+print_usage() {
+    local version
+    version="$(get_markview_version)"
+
+    cat <<EOF
+MarkView $version
+View Markdown files rendered in your browser.
+
+Usage:
+  $COMMAND_NAME <markdown-file>
+
+Example:
+  $COMMAND_NAME README.md
+EOF
+}
+
+case "${1:-}" in
+    -h|--help)
+        print_usage
+        exit 0
+        ;;
+    "")
+        print_usage
+        exit 2
+        ;;
+esac
+
 # In snap, pwsh is at $SNAP/pwsh/pwsh
 # In dev/installed layout, pwsh is either bundled or system-installed
 if [ -n "$SNAP" ] && [ -x "$SNAP/pwsh/pwsh" ]; then
