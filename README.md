@@ -56,7 +56,7 @@ For manual installation without the Store:
 PowerShell 7 is bundled in the snap—no separate installation required.
 
 ```bash
-sudo snap install markview
+sudo snap install markdownviewer
 ```
 
 The snap registers file associations for `.md` and `.markdown` files and the `mdview:` URI scheme for linked-file navigation.
@@ -86,7 +86,7 @@ For testing or development without building a snap:
    ```
 3. Optionally register for desktop integration:
    ```bash
-   sudo cp src/linux/markview /usr/local/bin/markview
+   sudo cp src/linux/markview /usr/local/bin/markdownviewer
    cp src/linux/markview.desktop ~/.local/share/applications/
    update-desktop-database ~/.local/share/applications/
    xdg-mime default markview.desktop text/markdown text/x-markdown x-scheme-handler/mdview
@@ -124,7 +124,7 @@ For testing or development without building the app bundle:
 ## Usage
 
 - **Windows:** After installation, double-click any `.md` or `.markdown` file to view it rendered in your default web browser. If the context menu was enabled during installation, right-click on a Markdown file and select "View Markdown".
-- **Linux:** Run `markview file.md` from the terminal, or right-click a `.md` file in your file manager and open with MarkView.
+- **Linux:** Run `markdownviewer file.md` from the terminal after snap installation, or right-click a `.md` file in your file manager and open with MarkView.
 - **macOS:** Open a Markdown file with `MarkView.app` from Finder, or run `src/mac/markview file.md` from a source checkout.
 - The rendered HTML includes basic styling for readability.
 - **Dark mode support:** Use the "Theme" toggle button in the top-right corner of the page to switch between system theme (follows OS preference) and inverted theme (opposite of system preference).
@@ -152,7 +152,7 @@ For testing or development without building the app bundle:
 
 ### Snap (Linux)
 ```bash
-sudo snap remove markview
+sudo snap remove markdownviewer
 ```
 
 ### macOS

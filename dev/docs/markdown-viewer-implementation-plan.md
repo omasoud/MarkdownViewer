@@ -1026,7 +1026,7 @@ These rules are the single source of truth for fragment handling. All phases imp
 ## E.6 Snap Rebuild & Manual Verification (Linux)
 
 - [x] E.6.1 Rebuild snap: `cd installers/linux-snap && ./build.sh arm64`
-- [x] E.6.2 Install: `sudo snap install output/markview_1.0.0_arm64.snap --dangerous`
+- [x] E.6.2 Install: `sudo snap install output/markdownviewer_1.2.0_arm64.snap --dangerous`
 - [ ] E.6.3 Manual test: open markdown with TOC links → verify scroll (requires desktop environment)
 
 ---

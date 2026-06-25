@@ -1,4 +1,4 @@
-name: markview
+name: markdownviewer
 version: '1.2.0'
 summary: View Markdown files rendered in your browser
 description: |
@@ -7,8 +7,10 @@ description: |
   theme variations, and support for linked markdown files.
 title: MarkView
 license: MIT
-contact: https://github.com/nicholasgasior/MarkdownViewer/issues
-source-code: https://github.com/nicholasgasior/MarkdownViewer
+website: https://github.com/omasoud/MarkdownViewer
+issues: https://github.com/omasoud/MarkdownViewer/issues
+contact: https://github.com/omasoud/MarkdownViewer/issues
+source-code: https://github.com/omasoud/MarkdownViewer
 icon: staged/meta/gui/markview.png
 
 base: core24
@@ -19,7 +21,7 @@ platforms:
   arm64:
 
 apps:
-  markview:
+  markdownviewer:
     command: bin/markview
     desktop: meta/gui/markview.desktop
     plugs:
@@ -31,7 +33,7 @@ apps:
       - browser-support
 
 parts:
-  markview:
+  markdownviewer:
     plugin: dump
     source: staged/
     stage-packages:

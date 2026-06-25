@@ -260,7 +260,7 @@ cd installers/linux-snap
 4. Trims the PowerShell bundle to reduce snap size
 5. Runs snapcraft to produce the `.snap` file
 
-**Output:** `installers/linux-snap/output/markview_<version>_<arch>.snap`
+**Output:** `installers/linux-snap/output/markdownviewer_<version>_<arch>.snap`
 
 **Prerequisites:**
 - `pwsh` 7+ (for JSON parsing and trimming scripts)
@@ -668,19 +668,19 @@ After building and installing the snap:
 
 ```bash
 # Install the locally-built snap
-sudo snap install installers/linux-snap/output/markview_1.0.1_arm64.snap --dangerous
+sudo snap install installers/linux-snap/output/markdownviewer_1.2.0_arm64.snap --dangerous
 
 # Open a markdown file
-markview tests/highlight-test.md
+markdownviewer tests/highlight-test.md
 
 # Test the protocol handler (via xdg-open)
 xdg-open "mdview:file:///home/$USER/path/to/doc.md"
 
 # Verify linked-file navigation works (opens a .md with links to other .md files)
-markview tests/test-toc-links.md
+markdownviewer tests/test-toc-links.md
 
 # Uninstall when done
-sudo snap remove markview
+sudo snap remove markdownviewer
 ```
 
 **Snap confinement notes:**
@@ -887,7 +887,7 @@ staged/
 
 **Install locally-built snap:**
 ```bash
-sudo snap install output/markview_1.0.1_arm64.snap --dangerous
+sudo snap install output/markdownviewer_1.2.0_arm64.snap --dangerous
 ```
 
 **Updating the pinned PowerShell version:**

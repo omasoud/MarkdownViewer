@@ -485,8 +485,8 @@ Both modes handle `mdview:` URIs identically at the engine level - the only diff
 
 ### Activation Flow (Snap)
 
-1. User double-clicks `.md` file, runs `markview file.md`, or clicks `mdview:` link
-2. Desktop environment invokes `markview` launcher via desktop entry
+1. User double-clicks `.md` file, runs `markdownviewer file.md`, or clicks `mdview:` link
+2. Desktop environment invokes `markdownviewer` launcher via desktop entry
 3. Launcher resolves bundled `pwsh` at `$SNAP/pwsh/pwsh`
 4. Launches: `pwsh -NoProfile -File $SNAP/app/Open-Markdown.ps1 -Path <input>`
 5. Engine renders HTML to `~/MarkView/` (within `$SNAP_USER_DATA`)

@@ -38,7 +38,7 @@ Describe 'Snap Package Structure' -Skip:(-not $IsLinux) {
         }
 
         It 'has correct snap name' {
-            $yamlContent | Should -Match 'name:\s+markview'
+            $yamlContent | Should -Match 'name:\s+markdownviewer'
         }
 
         It 'uses core24 base' {
@@ -49,8 +49,8 @@ Describe 'Snap Package Structure' -Skip:(-not $IsLinux) {
             $yamlContent | Should -Match 'confinement:\s+strict'
         }
 
-        It 'defines markview app' {
-            $yamlContent | Should -Match 'apps:\s*\n\s+markview:'
+        It 'defines markdownviewer app' {
+            $yamlContent | Should -Match 'apps:\s*\n\s+markdownviewer:'
         }
 
         It 'has home plug for file access' {
@@ -118,6 +118,10 @@ Describe 'Snap Package Structure' -Skip:(-not $IsLinux) {
 
         It 'has Terminal=false' {
             $desktopContent | Should -Match 'Terminal=false'
+        }
+
+        It 'uses the snap command name' {
+            $desktopContent | Should -Match 'Exec=markdownviewer %u'
         }
     }
 

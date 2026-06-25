@@ -2,11 +2,11 @@
 
 ## Overview
 
-Port MarkView to Ubuntu Linux by creating a Linux platform module (`src/linux/`), making the core engine (`Open-Markdown.ps1`) platform-aware, and packaging as a strict Snap with bundled+trimmed pwsh. The existing Windows code stays untouched. Target: installable via `snap install markview`.
+Port MarkView to Ubuntu Linux by creating a Linux platform module (`src/linux/`), making the core engine (`Open-Markdown.ps1`) platform-aware, and packaging as a strict Snap with bundled+trimmed pwsh. The existing Windows code stays untouched. Target: installable via `snap install markdownviewer`.
 
 **Target platforms:** Ubuntu 24.04+ (arm64, amd64)  
 **Distribution:** Snap Store (strict confinement)  
-**Command:** `markview file.md`  
+**Command:** `markdownviewer file.md`
 **Desktop integration:** Double-click `.md` files in file managers (Nautilus, Thunar, etc.)
 
 ---
@@ -390,7 +390,7 @@ The Linux module must export the same function list as the Windows module.
   Name=MarkView
   GenericName=Markdown Viewer
   Comment=View Markdown files rendered in your browser
-  Exec=markview %f
+  Exec=markdownviewer %f
   Icon=markview
   Terminal=false
   Categories=Utility;TextEditor;Viewer;
@@ -431,7 +431,7 @@ The Linux module must export the same function list as the Windows module.
 
 - [x] 5.2.1 Create `installers/linux-snap/snap/snapcraft.yaml`:
   ```yaml
-  name: markview
+  name: markdownviewer
   version: '1.0.0'
   summary: View Markdown files rendered in your browser
   description: |
@@ -449,7 +449,7 @@ The Linux module must export the same function list as the Windows module.
       build-for: [arm64]
 
   apps:
-    markview:
+    markdownviewer:
       command: bin/markview
       desktop: meta/gui/markview.desktop
       plugs:
@@ -471,7 +471,7 @@ The Linux module must export the same function list as the Windows module.
         craftctl default
         # Trimming will be done by build script before snapcraft runs
 
-    markview:
+    markdownviewer:
       plugin: dump
       source: staged/
       organize:
@@ -609,8 +609,8 @@ The Linux module must export the same function list as the Windows module.
 ### 5.6 Verification
 
 - [x] 5.6.1 Build snap: `cd installers/linux-snap && ./build.sh` (stage-only tested; snapcraft not installed)
-- [ ] 5.6.2 Install locally: `sudo snap install markview_*.snap --dangerous` (deferred — requires snapcraft)
-- [ ] 5.6.3 Test command: `markview README.md` (deferred — requires snap install)
+- [ ] 5.6.2 Install locally: `sudo snap install markdownviewer_*.snap --dangerous` (deferred — requires snapcraft)
+- [ ] 5.6.3 Test command: `markdownviewer README.md` (deferred — requires snap install)
 - [ ] 5.6.4 Test desktop integration: Right-click `.md` file → Open With → MarkView (deferred — requires desktop)
 
 ---
@@ -696,7 +696,7 @@ The Linux module must export the same function list as the Windows module.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| App name | `markview` | Matches Windows Store name |
+| Snap name | `markdownviewer` | Store package name; app title remains MarkView |
 | Distribution | Strict Snap | Modern Store-style install, automatic updates, MIME registration |
 | pwsh | Bundled + trimmed | Snaps are self-contained by design |
 | Dialogs | zenity (with stderr fallback) | Works across GTK desktops, included via stage-packages |
