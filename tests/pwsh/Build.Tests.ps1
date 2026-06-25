@@ -145,7 +145,9 @@ Describe 'SHA256 Hash Verification Logic' {
     }
 }
 
-Describe 'Build Cache Directory' {
+Describe 'Build Cache Directory' -Skip:(-not $IsWindows) {
+    # Windows-only: Tests $env:TEMP which is Windows-specific
+    # Linux uses $env:TMPDIR or /tmp; the MSIX build cache is Windows-only anyway
     
     It 'Cache path pattern should use TEMP environment variable' {
         $cacheDir = Join-Path $env:TEMP 'MarkdownViewer-BuildCache'

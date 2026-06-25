@@ -12,7 +12,7 @@ param(
     [ValidateSet('x64', 'arm64')]
     [string]$Architecture = 'x64',
     
-    [string]$Version = '1.0.1.0',
+    [string]$Version = '1.2.0.0',
     
     [string]$PwshZipPath = '',  # Optional: path to PowerShell zip for bundling
     
@@ -217,6 +217,7 @@ function Build-SingleArchMsix {
     Copy-Item (Join-Path $CoreDir 'highlight-theme.css') $appDir
     Copy-Item (Join-Path $CoreDir 'icons\markdown.ico') $appDir
     Copy-Item (Join-Path $WinDir 'MarkdownViewer.psm1') $appDir
+    Copy-Item (Join-Path $CoreDir 'MarkdownViewer.Shared.psm1') $appDir
     Write-Host "Engine files staged" -ForegroundColor Green
     
     # Bundle PowerShell
@@ -489,6 +490,7 @@ else {
     Copy-Item (Join-Path $CoreDir 'highlight-theme.css') $AppDir
     Copy-Item (Join-Path $CoreDir 'icons\markdown.ico') $AppDir
     Copy-Item (Join-Path $WinDir 'MarkdownViewer.psm1') $AppDir
+    Copy-Item (Join-Path $CoreDir 'MarkdownViewer.Shared.psm1') $AppDir
     Write-Host "Engine files staged" -ForegroundColor Green
     
     # Bundle PowerShell (if not skipped)

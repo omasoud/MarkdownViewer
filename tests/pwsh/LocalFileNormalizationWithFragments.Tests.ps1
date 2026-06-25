@@ -1,5 +1,6 @@
 # LocalFileNormalizationWithFragments.Tests.ps1 - Pester tests for local file path normalization WITH fragments
 # Tests the fragment handling documented in dev\docs\local-file-normalization.md
+# Windows-only: Tests Get-FileBaseHref from Windows module with Windows paths
 #
 # For each path type, we test:
 # 1. A fragment without special characters: #Intro
@@ -15,6 +16,12 @@
 # - Fragment extraction logic pattern from Open-Markdown.ps1
 
 #Requires -Version 7.0
+
+# Skip entire file on non-Windows platforms
+if (-not $IsWindows) {
+    Write-Host "Skipping $(Split-Path -Leaf $PSCommandPath): Windows-only tests (Get-FileBaseHref, Windows paths)" -ForegroundColor Yellow
+    return
+}
 
 BeforeAll {
     $ErrorActionPreference = 'Stop'

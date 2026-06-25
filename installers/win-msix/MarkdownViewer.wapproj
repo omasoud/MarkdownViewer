@@ -77,7 +77,7 @@
     
     <!-- Package identity -->
     <PackageName>MarkdownViewer</PackageName>
-    <PackageVersion>1.0.1.0</PackageVersion>
+    <PackageVersion>1.2.0.0</PackageVersion>
     
     <!-- Define the entry point project - required by WAP SDK for manifest generation -->
     <EntryPointProjectUniqueName>..\..\src\host\MarkdownViewerHost\MarkdownViewerHost.csproj</EntryPointProjectUniqueName>

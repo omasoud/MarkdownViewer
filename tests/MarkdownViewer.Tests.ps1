@@ -492,7 +492,8 @@ Describe 'Test-RemoteImages' {
     }
 }
 
-Describe 'Get-FileBaseHref' {
+Describe 'Get-FileBaseHref' -Skip:(-not $IsWindows) {
+    # Windows-only: Tests Windows path formats (C:\, UNC paths)
     
     Context 'Standard Windows paths' {
         It 'converts C:\path\file.md correctly' {
@@ -537,7 +538,8 @@ Describe 'Get-FileBaseHref' {
     }
 }
 
-Describe 'Test-Motw' {
+Describe 'Test-Motw' -Skip:(-not $IsWindows) {
+    # Windows-only: MOTW (Zone.Identifier) is an NTFS alternate data stream feature
     
     BeforeAll {
         $testDir = Join-Path ([IO.Path]::GetTempPath()) 'MarkdownViewer_Tests'
@@ -1085,6 +1087,17 @@ Describe 'Syntax Highlighting Feature - HTML Template' {
         It 'checks if highlight assets exist' {
             $scriptContent | Should -Match 'Test-Path.*HighlightJsPath'
         }
+
+        It 'uses content-hashed output asset names for POSIX copied assets' {
+            $scriptContent | Should -Match 'function Copy-OutputAsset'
+            $scriptContent | Should -Match 'SHA256'
+            $scriptContent | Should -Match 'Move-Item.*Destination \$destinationPath'
+        }
+
+        It 'does not overwrite POSIX highlight assets on every render' {
+            $scriptContent | Should -Not -Match 'Copy-Item\s+-LiteralPath\s+\$HighlightJsPath\s+-Destination\s+\$outDir\s+-Force'
+            $scriptContent | Should -Not -Match 'Copy-Item\s+-LiteralPath\s+\$HighlightThemePath\s+-Destination\s+\$outDir\s+-Force'
+        }
     }
 
     Context 'HTML includes highlight assets' {
@@ -1176,7 +1189,43 @@ Describe 'ConvertFrom-Markdown Anchor ID Mismatch' {
     }
 }
 
-Describe 'MSIX Staged Payload Structure' -Tag 'Integration' {
+Describe '_fragment App Contract - JavaScript (script.js smoke tests)' {
+    BeforeAll {
+        $jsPath = Join-Path $PSScriptRoot '..\src\core\script.js'
+        $jsContent = Get-Content -Raw -LiteralPath $jsPath
+    }
+
+    Context '_fragment encoding in mdview: links' {
+        It 'contains _fragment string' {
+            $jsContent | Should -Match '_fragment'
+        }
+
+        It 'uses encodeURIComponent for fragment encoding' {
+            $jsContent | Should -Match 'encodeURIComponent'
+        }
+
+        It 'does not use localStorage for mdview_scroll' {
+            $jsContent | Should -Not -Match 'localStorage\.setItem\(\s*"mdview_scroll"'
+        }
+    }
+
+    Context '_fragment scroll on page load' {
+        It 'reads scrollTarget from embedded mdviewer_config (primary)' {
+            $jsContent | Should -Match 'mdviewer_config.*scrollTarget'
+        }
+
+        It 'falls back to URLSearchParams for _fragment (Windows)' {
+            $jsContent | Should -Match 'URLSearchParams'
+        }
+
+        It 'uses history.replaceState to clean address bar after scroll' {
+            $jsContent | Should -Match 'history\.replaceState'
+        }
+    }
+}
+
+Describe 'MSIX Staged Payload Structure' -Tag 'Integration' -Skip:(-not $IsWindows) {
+    # Windows-only: MSIX is a Windows packaging format
     # These tests validate the MSIX staging structure without requiring a full build
     # Run after staging with: Invoke-Pester -Path .\tests\MarkdownViewer.Tests.ps1 -Tag Integration
     
@@ -1310,7 +1359,8 @@ Describe 'MSIX Staged Payload Structure' -Tag 'Integration' {
     }
 }
 
-Describe 'MSIX Package Contents' -Tag 'Integration', 'MsixValidation' {
+Describe 'MSIX Package Contents' -Tag 'Integration', 'MsixValidation' -Skip:(-not $IsWindows) {
+    # Windows-only: MSIX is a Windows packaging format
     # These tests validate the ACTUAL MSIX package contents by extracting and inspecting
     # This catches issues where staging is correct but MSBuild fails to include content
     # 
@@ -1331,8 +1381,8 @@ Describe 'MSIX Package Contents' -Tag 'Integration', 'MsixValidation' {
         
         # Find MSIX package from a recent build
         $msixPaths = @(
-            (Join-Path $repoRoot 'installers\win-msix\output\MarkdownViewer_1.0.0.0_x64.msix'),
-            (Join-Path $repoRoot 'installers\win-msix\output\MarkdownViewer_1.0.0.0_ARM64.msix')
+            (Join-Path $repoRoot 'installers\win-msix\output\MarkdownViewer_1.2.0.0_x64.msix'),
+            (Join-Path $repoRoot 'installers\win-msix\output\MarkdownViewer_1.2.0.0_ARM64.msix')
         )
         $script:msixPath = $msixPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
         $script:hasMsix = $null -ne $script:msixPath
@@ -1368,7 +1418,7 @@ Describe 'MSIX Package Contents' -Tag 'Integration', 'MsixValidation' {
                     $script:hasMsix | Should -BeTrue -Because "MSIX should have been built by Invoke-AllTests.ps1"
                 } else {
                     # Run standalone - skip gracefully
-                    Set-ItResult -Skipped -Because "No MSIX found at installers\win-msix\output\MarkdownViewer_1.0.0.0_*.msix - build MSIX first"
+                    Set-ItResult -Skipped -Because "No MSIX found at installers\win-msix\output\MarkdownViewer_1.0.1.0_*.msix - build MSIX first"
                 }
                 return
             }
@@ -1494,6 +1544,111 @@ Describe 'MSIX Package Contents' -Tag 'Integration', 'MsixValidation' {
         
         It 'contains pwsh\pwsh.exe' -Skip:(-not $script:hasBundledPwsh) {
             Join-Path $script:extractDir 'pwsh\pwsh.exe' | Should -Exist
+        }
+    }
+}
+
+Describe 'Repair-HtmlLinks - Dimension unit conversion' {
+
+    Context 'Converts Pandoc inch-based dimensions to pixel integers' {
+        It 'converts width in inches' {
+            $html = '<img src="img.png" width="4.666666666666667in" alt="" />'
+            $result = Repair-HtmlLinks -Html $html
+            $result | Should -Match 'width="448"'
+        }
+
+        It 'converts height in inches' {
+            $html = '<img src="img.png" height="3.1770833333333335in" alt="" />'
+            $result = Repair-HtmlLinks -Html $html
+            $result | Should -Match 'height="305"'
+        }
+
+        It 'converts small inch values (would have been invisible)' {
+            $html = '<img src="img.png" width="0.3541666666666667in" height="0.2916666666666667in" alt="" />'
+            $result = Repair-HtmlLinks -Html $html
+            $result | Should -Match 'width="34"'
+            $result | Should -Match 'height="28"'
+        }
+
+        It 'converts scientific notation (e.g. 2.08e-2in)' {
+            $html = '<img src="img.png" height="2.0833333333333332e-2in" alt="" />'
+            $result = Repair-HtmlLinks -Html $html
+            $result | Should -Match 'height="2"'
+        }
+
+        It 'converts width="6.5in" to 624px' {
+            $html = '<img src="img.png" width="6.5in" alt="" />'
+            $result = Repair-HtmlLinks -Html $html
+            $result | Should -Match 'width="624"'
+        }
+    }
+
+    Context 'Converts other Pandoc dimension units' {
+        It 'converts cm to pixels (1cm ≈ 37.8px)' {
+            $html = '<img src="img.png" width="2.54cm" alt="" />'
+            $result = Repair-HtmlLinks -Html $html
+            $result | Should -Match 'width="96"'
+        }
+
+        It 'converts mm to pixels (1mm ≈ 3.78px)' {
+            $html = '<img src="img.png" width="25.4mm" alt="" />'
+            $result = Repair-HtmlLinks -Html $html
+            $result | Should -Match 'width="96"'
+        }
+
+        It 'converts pt to pixels (1pt = 1.333px)' {
+            $html = '<img src="img.png" width="72pt" alt="" />'
+            $result = Repair-HtmlLinks -Html $html
+            $result | Should -Match 'width="96"'
+        }
+
+        It 'strips px suffix (already pixels)' {
+            $html = '<img src="img.png" width="200px" alt="" />'
+            $result = Repair-HtmlLinks -Html $html
+            $result | Should -Match 'width="200"'
+        }
+    }
+
+    Context 'Does not affect non-dimension values' {
+        It 'leaves plain integer width unchanged' {
+            $html = '<img src="img.png" width="400" alt="" />'
+            $result = Repair-HtmlLinks -Html $html
+            $result | Should -Match 'width="400"'
+        }
+
+        It 'leaves percentage width unchanged' {
+            $html = '<img src="img.png" width="100%" alt="" />'
+            $result = Repair-HtmlLinks -Html $html
+            $result | Should -Match 'width="100%"'
+        }
+
+        It 'preserves src and other attributes' {
+            $html = '<img src="ERG_260121/media/image22.png" width="0.35in" height="0.29in" alt="" />'
+            $result = Repair-HtmlLinks -Html $html
+            $result | Should -Match 'src="ERG_260121/media/image22.png"'
+            $result | Should -Match 'alt=""'
+            $result | Should -Match 'width="34"'
+            $result | Should -Match 'height="28"'
+        }
+    }
+
+    Context 'Handles edge cases' {
+        It 'handles empty string' {
+            $result = Repair-HtmlLinks -Html ''
+            $result | Should -Be ''
+        }
+
+        It 'handles HTML with no dimensions' {
+            $html = '<p>Hello <img src="test.png" alt="" /> world</p>'
+            $result = Repair-HtmlLinks -Html $html
+            $result | Should -Be $html
+        }
+
+        It 'handles multiple images with dimensions' {
+            $html = '<img src="a.png" width="1in" /><img src="b.png" width="2in" />'
+            $result = Repair-HtmlLinks -Html $html
+            $result | Should -Match 'src="a.png" width="96"'
+            $result | Should -Match 'src="b.png" width="192"'
         }
     }
 }

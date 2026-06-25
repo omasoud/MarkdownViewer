@@ -213,6 +213,16 @@ if (Test-Path $iconsDir) {
     Write-Host "  Copied: icons/" -ForegroundColor Gray
 }
 
+# Copy shared module (cross-platform functions) from CoreDir
+$sharedModule = Join-Path $CoreDir 'MarkdownViewer.Shared.psm1'
+if (Test-Path $sharedModule) {
+    Copy-Item $sharedModule $appDir
+    Write-Host "  Copied: MarkdownViewer.Shared.psm1" -ForegroundColor Gray
+}
+else {
+    Write-Warning "  Shared module not found: $sharedModule"
+}
+
 # Copy MarkdownViewer.psm1 from WinDir if provided
 if ($WinDir -and (Test-Path (Join-Path $WinDir 'MarkdownViewer.psm1'))) {
     Copy-Item (Join-Path $WinDir 'MarkdownViewer.psm1') $appDir

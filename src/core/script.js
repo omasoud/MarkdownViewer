@@ -363,9 +363,57 @@
 
             // Only rewrite local markdown targets
             if (abs.toLowerCase().startsWith("file:") && isMarkdownHref(abs)) {
-                a.setAttribute("href", "mdview:" + abs);
+                var url = new URL(abs);
+                var fragId = "";
+                if (url.hash) {
+                    // url.hash preserves percent-encoding (e.g. "#Section%20%231"),
+                    // so decode first to get the real ID ("Section #1"), then
+                    // re-encode for _fragment transport. Without this, values
+                    // get double-encoded and getElementById fails.
+                    try { fragId = decodeURIComponent(url.hash.substring(1)); }
+                    catch (e) { fragId = url.hash.substring(1); }
+                    url.hash = "";
+                }
+                var final = url.href;
+                if (fragId) {
+                    var encoded = encodeURIComponent(fragId);
+                    // Handle existing query strings
+                    final += (final.indexOf("?") === -1 ? "?" : "&") + "_fragment=" + encoded;
+                }
+                a.setAttribute("href", "mdview:" + final);
             }
         });
+    }
+
+    // Scroll to _fragment target on page load.
+    // Primary: read from embedded config (works on all platforms, survives
+    //          launch services that strip URL query params).
+    // Fallback: read from URL query param when the browser preserves it.
+    var scrollTarget = (window.mdviewer_config || {}).scrollTarget ||
+        new URLSearchParams(window.location.search).get("_fragment") ||
+        null;
+
+    function doFragmentScroll(attemptsLeft) {
+        if (!scrollTarget) return;
+        var el = document.getElementById(scrollTarget);
+        if (el) {
+            el.scrollIntoView();
+            // Clean the address bar — transient HTML, not bookmarkable
+            try { history.replaceState(null, "", window.location.pathname); } catch (e) { }
+        } else if (attemptsLeft > 0) {
+            // Retry for late DOM injection (e.g. highlight.js)
+            setTimeout(function () { doFragmentScroll(attemptsLeft - 1); }, 200);
+        }
+    }
+
+    if (scrollTarget) {
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", function () {
+                doFragmentScroll(3);
+            });
+        } else {
+            doFragmentScroll(3);
+        }
     }
 })();
 

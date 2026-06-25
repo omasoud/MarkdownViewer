@@ -1,5 +1,6 @@
 # LocalFileNormalizationWithFragments.ActualBehavior.Tests.ps1
 # Tests for the ACTUAL behavior of the full pipeline with fragments.
+# Windows-only: Uses Get-FileBaseHref and tests Windows paths (C:\, UNC)
 #
 # Pipeline: Repair-MarkdownLinks → ConvertFrom-Markdown → Repair-HtmlLinks → URL resolution
 # Tests assert IDEAL behavior - all tests should pass when fix is implemented.
@@ -11,6 +12,12 @@
 # 4. Backslash paths are normalized by Repair-MarkdownLinks
 
 #Requires -Version 7.0
+
+# Skip entire file on non-Windows platforms
+if (-not $IsWindows) {
+    Write-Host "Skipping $(Split-Path -Leaf $PSCommandPath): Windows-only tests (Windows paths/module)" -ForegroundColor Yellow
+    return
+}
 
 BeforeAll {
     $ErrorActionPreference = 'Stop'

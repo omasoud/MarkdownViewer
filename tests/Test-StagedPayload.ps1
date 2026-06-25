@@ -65,7 +65,8 @@ $requiredEngineFiles = @(
     'style.css',
     'highlight.min.js',
     'highlight-theme.css',
-    'MarkdownViewer.psm1'
+    'MarkdownViewer.psm1',
+    'MarkdownViewer.Shared.psm1'
 )
 foreach ($file in $requiredEngineFiles) {
     $filePath = Join-Path $appDir $file

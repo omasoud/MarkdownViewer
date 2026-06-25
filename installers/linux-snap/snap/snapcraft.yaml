@@ -1,0 +1,44 @@
+name: markdownviewer
+version: '1.2.0'
+summary: View Markdown files rendered in your browser
+description: |
+  MarkView renders Markdown files as styled HTML and opens them in your
+  default web browser. Features include syntax highlighting, dark mode,
+  theme variations, and support for linked markdown files.
+title: MarkView
+license: MIT
+website: https://github.com/omasoud/MarkdownViewer
+issues: https://github.com/omasoud/MarkdownViewer/issues
+contact: https://github.com/omasoud/MarkdownViewer/issues
+source-code: https://github.com/omasoud/MarkdownViewer
+icon: staged/meta/gui/markview.png
+
+base: core24
+confinement: strict
+grade: stable
+platforms:
+  amd64:
+  arm64:
+
+apps:
+  markdownviewer:
+    command: bin/markview
+    desktop: meta/gui/markview.desktop
+    plugs:
+      - home
+      - desktop
+      - desktop-legacy
+      - x11
+      - wayland
+      - browser-support
+
+parts:
+  markdownviewer:
+    plugin: dump
+    source: staged/
+    stage-packages:
+      - zenity
+
+layout:
+  /usr/share/zenity:
+    bind: $SNAP/usr/share/zenity

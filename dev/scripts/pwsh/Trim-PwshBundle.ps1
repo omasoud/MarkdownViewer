@@ -92,7 +92,6 @@ Remove-Glob -root $pwshRootFull -pattern '*.xml' -excludeNames @()
 # --- 5) Remove Roslyn (checks were negative) ---
 Remove-FileIfExists (Join-Path $pwshRootFull 'Microsoft.CodeAnalysis.dll')
 Remove-FileIfExists (Join-Path $pwshRootFull 'Microsoft.CodeAnalysis.CSharp.dll')
-Remove-FileIfExists (Join-Path $pwshRootFull 'System.Collections.Immutable.dll')
 Remove-FileIfExists (Join-Path $pwshRootFull 'System.Reflection.Metadata.dll')
 Remove-FileIfExists (Join-Path $pwshRootFull 'Microsoft.CSharp.dll')
 Remove-FileIfExists (Join-Path $pwshRootFull 'System.CodeDom.dll')

@@ -1,4 +1,5 @@
 payload/scrap/*
+.DS_Store
 PSScriptAnalyzerSettings.psd1
 .vscode/settings.json
 all.txt
@@ -16,7 +17,16 @@ dev/docs/installation-folder-content.txt
 dev/docs/stability-issues.md
 dot-net-10-reference.txt
 dev/docs/solution3.txt
-tests/local-file-normalization/
 dev/docs/fragment-utils.md
+installers/linux-snap/.cache
+installers/linux-snap/.craft
+installers/linux-snap/staged
+installers/linux-snap/parts
+installers/linux-snap/prime
+installers/linux-snap/stage
+installers/macos-dmg/.cache
+installers/macos-dmg/dmg/root
+installers/macos-dmg/staged
+dev/docs/app-contract-and-scrolling-recommendation.md
 local/
 AGENT.md
