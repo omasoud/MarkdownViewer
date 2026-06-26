@@ -2,9 +2,22 @@ name: markdownviewer
 version: '1.3.0'
 summary: View Markdown files rendered in your browser
 description: |
-  MarkView renders Markdown files as styled HTML and opens them in your
-  default web browser. Features include syntax highlighting, dark mode,
-  theme variations, and support for linked markdown files.
+  MarkView renders Markdown files in your browser with a clean reading
+  experience.
+
+  Open .md or .markdown files and instantly see them rendered with proper
+  formatting, syntax-highlighted code blocks, and your choice of light or dark
+  themes. It is built for reading README files, documentation, notes, and
+  technical specs without opening a full editor.
+
+  Highlights:
+  - Renders Markdown to HTML using PowerShell's built-in converter
+  - Opens in your default browser with no separate app window to manage
+  - Highlights code blocks with bundled highlight.js support for 190+ languages
+  - Includes 10 theme variations across light and dark modes
+  - Opens links to other local Markdown files in the viewer
+  - Works offline with no data collection
+  - Blocks remote images by default until you opt in per document
 title: MarkView
 license: MIT
 website: https://github.com/omasoud/MarkdownViewer
