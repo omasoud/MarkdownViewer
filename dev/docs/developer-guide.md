@@ -925,12 +925,23 @@ staged/MarkView.app/
 **Developer ID signing and notarization:**
 
 ```bash
-# Build with Developer ID signing
-MARKVIEW_CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./build.sh
+# Confirm the Developer ID Application identity is installed in your keychain
+security find-identity -v -p codesigning
 
-# Submit the DMG to Apple notarization
-xcrun notarytool submit output/MarkView_1.2.0_arm64.dmg --keychain-profile markview-notary --wait
-xcrun stapler staple output/MarkView_1.2.0_arm64.dmg
+# Store Apple notarization credentials once
+xcrun notarytool store-credentials markview-notary
+
+# Build, notarize, staple, and validate the release DMG
+MARKVIEW_CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+    ./scripts/Release-MarkViewDmg.sh --keychain-profile markview-notary
+```
+
+`Release-MarkViewDmg.sh` creates the versioned arm64 DMG, signs the app and DMG with the Developer ID identity, submits the DMG to Apple notarization with `notarytool`, staples the notarization ticket, and runs a Gatekeeper assessment. The final DMG is written to `installers/macos-dmg/output/` and is the file to upload to GitHub Releases.
+
+For existing signed DMGs, skip the rebuild:
+
+```bash
+./scripts/Release-MarkViewDmg.sh --skip-build --dmg output/MarkView_1.3.0_arm64.dmg
 ```
 
 **Updating the pinned PowerShell version:**

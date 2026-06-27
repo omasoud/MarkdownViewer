@@ -3,6 +3,7 @@ import Foundation
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var handledActivation = false
+    private let projectPageURL = URL(string: "https://github.com/omasoud/MarkdownViewer")!
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSAppleEventManager.shared().setEventHandler(
@@ -88,10 +89,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showHelpAndExit() {
         let alert = NSAlert()
         alert.alertStyle = .informational
-        alert.messageText = "MarkView"
+        alert.messageText = appTitle
         alert.informativeText = "Open a Markdown file with MarkView from Finder, or use a mdview: link from a rendered document."
         alert.addButton(withTitle: "OK")
-        alert.runModal()
+        alert.addButton(withTitle: "Project Page")
+
+        if alert.runModal() == .alertSecondButtonReturn {
+            NSWorkspace.shared.open(projectPageURL)
+        }
+
         finishSoon()
     }
 
@@ -108,6 +114,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             NSApplication.shared.terminate(nil)
         }
+    }
+
+    private var appTitle: String {
+        let displayName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
+        let name = displayName?.isEmpty == false ? displayName! : "MarkView"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+
+        if let version, !version.isEmpty {
+            return "\(name) \(version)"
+        }
+
+        return name
     }
 }
 

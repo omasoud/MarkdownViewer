@@ -492,18 +492,19 @@ Do not add these blindly. Sign, launch, run end-to-end, then add only what the h
   xcrun notarytool store-credentials markview-notary
   ```
 
-- [ ] 6.4.2 Create the DMG.
-- [ ] 6.4.3 Sign the DMG if needed.
-- [ ] 6.4.4 Submit and wait:
+- [x] 6.4.2 Create the DMG.
+- [x] 6.4.3 Sign the DMG with a timestamp when a Developer ID identity is provided.
+- [x] 6.4.4 Submit and wait via `installers/macos-dmg/scripts/Release-MarkViewDmg.sh`:
 
   ```bash
-  xcrun notarytool submit MarkView.dmg --keychain-profile markview-notary --wait
+  MARKVIEW_CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+      ./scripts/Release-MarkViewDmg.sh --keychain-profile markview-notary
   ```
 
-- [ ] 6.4.5 Staple the ticket:
+- [x] 6.4.5 Staple the ticket:
 
   ```bash
-  xcrun stapler staple MarkView.dmg
+  xcrun stapler staple output/MarkView_1.3.0_arm64.dmg
   ```
 
 - [ ] 6.4.6 Validate on a clean Mac user account, then on another Mac if available:

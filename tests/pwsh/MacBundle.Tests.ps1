@@ -8,6 +8,7 @@ BeforeAll {
     $appPath = Join-Path $macDir 'staged/MarkView.app'
     $resourcesPath = Join-Path $appPath 'Contents/Resources'
     $hostSourcePath = Join-Path $repoRoot 'src/host/MarkdownViewerMacHost/MarkViewHost.swift'
+    $hostProjectPath = Join-Path $repoRoot 'src/host/MarkdownViewerHost/MarkdownViewerHost.csproj'
 }
 
 Describe 'macOS App Bundle Structure' -Skip:(-not $IsMacOS) {
@@ -36,6 +37,43 @@ Describe 'macOS App Bundle Structure' -Skip:(-not $IsMacOS) {
             $signScript | Should -Exist
             (Get-Item $signScript).UnixMode | Should -Match 'x'
         }
+
+        It 'Release-MarkViewDmg.sh exists and is executable' {
+            $releaseScript = Join-Path $macDir 'scripts/Release-MarkViewDmg.sh'
+            $releaseScript | Should -Exist
+            (Get-Item $releaseScript).UnixMode | Should -Match 'x'
+        }
+    }
+
+    Describe 'Release signing and notarization scripts' {
+        BeforeAll {
+            $buildScript = Join-Path $macDir 'build.sh'
+            $buildSource = Get-Content -LiteralPath $buildScript -Raw
+            $releaseScript = Join-Path $macDir 'scripts/Release-MarkViewDmg.sh'
+            $releaseSource = Get-Content -LiteralPath $releaseScript -Raw
+        }
+
+        It 'release script has valid bash syntax' {
+            & bash -n $releaseScript
+            $LASTEXITCODE | Should -Be 0
+        }
+
+        It 'release script requires a Developer ID identity for builds' {
+            $releaseSource | Should -Match 'Developer ID signing identity is required'
+            $releaseSource | Should -Match 'MARKVIEW_CODESIGN_IDENTITY'
+        }
+
+        It 'release script submits, staples, and validates notarized DMGs' {
+            $releaseSource | Should -Match 'xcrun notarytool submit'
+            $releaseSource | Should -Match '--keychain-profile'
+            $releaseSource | Should -Match 'xcrun stapler staple'
+            $releaseSource | Should -Match 'xcrun stapler validate'
+            $releaseSource | Should -Match 'spctl --assess --type open'
+        }
+
+        It 'build script timestamps Developer ID DMG signatures' {
+            $buildSource | Should -Match 'codesign --force --timestamp --sign "\$MARKVIEW_CODESIGN_IDENTITY" "\$DMG_PATH"'
+        }
     }
 
     Describe 'Swift host protocol activation lifecycle' {
@@ -58,6 +96,19 @@ Describe 'macOS App Bundle Structure' -Skip:(-not $IsMacOS) {
             $hostSource | Should -Match 'kInternetEventClass'
             $hostSource | Should -Match 'kAEGetURL'
             $hostSource | Should -Match 'handleGetURLEvent'
+        }
+
+        It 'shows the bundle version when launched without a file' {
+            $hostSource | Should -Match 'CFBundleDisplayName'
+            $hostSource | Should -Match 'CFBundleShortVersionString'
+            $hostSource | Should -Match 'appTitle'
+        }
+
+        It 'offers a Project Page button that opens the GitHub project' {
+            $hostSource | Should -Match 'Project Page'
+            $hostSource | Should -Match 'https://github\.com/omasoud/MarkdownViewer'
+            $hostSource | Should -Match 'alertSecondButtonReturn'
+            $hostSource | Should -Match 'NSWorkspace\.shared\.open'
         }
     }
 
@@ -109,6 +160,14 @@ Describe 'macOS App Bundle Structure' -Skip:(-not $IsMacOS) {
             $plistContent = Get-Content (Join-Path $appPath 'Contents/Info.plist') -Raw
             $plistContent | Should -Match '<string>com\.omasoud\.MarkView</string>'
             $plistContent | Should -Match '<string>MarkView</string>'
+        }
+
+        It 'sets the bundle version from the canonical app version' {
+            $plistContent = Get-Content (Join-Path $appPath 'Contents/Info.plist') -Raw
+            $canonicalVersion = ([xml](Get-Content -Raw -LiteralPath $hostProjectPath)).Project.PropertyGroup.Version
+
+            $plistContent | Should -Match '<key>CFBundleShortVersionString</key>'
+            $plistContent | Should -Match "<string>$([regex]::Escape($canonicalVersion))</string>"
         }
 
         It 'declares Markdown document extensions' {

@@ -195,7 +195,7 @@ hdiutil create \
     "$DMG_PATH"
 
 if [[ "${MARKVIEW_CODESIGN_IDENTITY:-}" != "" ]]; then
-    codesign --force --sign "$MARKVIEW_CODESIGN_IDENTITY" "$DMG_PATH"
+    codesign --force --timestamp --sign "$MARKVIEW_CODESIGN_IDENTITY" "$DMG_PATH"
 fi
 
 echo ""
