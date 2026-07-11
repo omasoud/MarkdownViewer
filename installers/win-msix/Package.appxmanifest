@@ -45,7 +45,7 @@
       <Extensions>
         <!-- File type association for .md -->
         <uap:Extension Category="windows.fileTypeAssociation">
-          <uap:FileTypeAssociation Name="markdown">
+          <uap3:FileTypeAssociation Name="markdown" MultiSelectModel="Player">
             <uap:SupportedFileTypes>
               <uap:FileType>.md</uap:FileType>
               <uap:FileType>.markdown</uap:FileType>
@@ -53,7 +53,7 @@
             <uap:DisplayName>Markdown File</uap:DisplayName>
             <uap:Logo>Assets\Square44x44Logo.png</uap:Logo>
             <uap:InfoTip>Markdown document</uap:InfoTip>
-          </uap:FileTypeAssociation>
+          </uap3:FileTypeAssociation>
         </uap:Extension>
 
         <!-- Protocol handler for mdview: -->

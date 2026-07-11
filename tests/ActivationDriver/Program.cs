@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -14,6 +15,7 @@ namespace ActivationDriver;
 ///   ActivationDriver.exe --aumid "PackageFamilyName!App" --launch
 ///   ActivationDriver.exe --aumid "PackageFamilyName!App" --protocol "mdview:file:///C:/test.md#section"
 ///   ActivationDriver.exe --aumid "PackageFamilyName!App" --file "C:\test.md"
+///   ActivationDriver.exe --aumid "PackageFamilyName!App" --file "C:\one.md" --file "C:\two.md"
 /// </summary>
 internal class Program
 {
@@ -44,7 +46,7 @@ internal class Program
 
         string? aumid = null;
         string? protocolUri = null;
-        string? filePath = null;
+        var filePaths = new List<string>();
         bool launch = false;
         bool waitForExit = false;
         int waitTimeoutMs = 5000;
@@ -60,7 +62,7 @@ internal class Program
                     if (i + 1 < args.Length) protocolUri = args[++i];
                     break;
                 case "--file":
-                    if (i + 1 < args.Length) filePath = args[++i];
+                    if (i + 1 < args.Length) filePaths.Add(args[++i]);
                     break;
                 case "--launch":
                     launch = true;
@@ -81,7 +83,7 @@ internal class Program
             return 1;
         }
 
-        int activationCount = (launch ? 1 : 0) + (!string.IsNullOrEmpty(protocolUri) ? 1 : 0) + (!string.IsNullOrEmpty(filePath) ? 1 : 0);
+        int activationCount = (launch ? 1 : 0) + (!string.IsNullOrEmpty(protocolUri) ? 1 : 0) + (filePaths.Count > 0 ? 1 : 0);
         if (activationCount == 0)
         {
             Console.Error.WriteLine("Error: Specify --launch, --protocol, or --file");
@@ -117,21 +119,23 @@ internal class Program
             // Use ActivateForProtocol to trigger true protocol activation.
             // This causes Windows to deliver ProtocolActivatedEventArgs via AppInstance,
             // which validates that the MSIX protocol extension is correctly registered.
-            var itemArray = ShellHelpers.CreateShellItemArrayFromUri(protocolUri);
+            var itemArray = ShellHelpers.CreateShellItemArrayFromUri(protocolUri!);
             hr = aam.ActivateForProtocol(appId, itemArray, out processId);
             CheckHResult(hr, "ActivateForProtocol");
         }
-        else if (!string.IsNullOrEmpty(filePath))
+        else if (filePaths.Count > 0)
         {
             Console.WriteLine($"Activating app (file): {appId}");
-            Console.WriteLine($"  File: {filePath}");
-
-            if (!File.Exists(filePath))
+            foreach (var filePath in filePaths)
             {
-                Console.Error.WriteLine($"Warning: File does not exist: {filePath}");
+                Console.WriteLine($"  File: {filePath}");
+                if (!File.Exists(filePath))
+                {
+                    Console.Error.WriteLine($"Warning: File does not exist: {filePath}");
+                }
             }
 
-            var itemArray = ShellHelpers.CreateShellItemArrayFromPath(filePath!);
+            var itemArray = ShellHelpers.CreateShellItemArrayFromPaths(filePaths);
             hr = aam.ActivateForFile(appId, itemArray, "open", out processId);
             CheckHResult(hr, "ActivateForFile");
         }
@@ -179,13 +183,13 @@ ActivationDriver - Trigger packaged app activations for E2E testing
 Usage:
   ActivationDriver.exe --aumid <AUMID> --launch
   ActivationDriver.exe --aumid <AUMID> --protocol <URI>
-  ActivationDriver.exe --aumid <AUMID> --file <PATH>
+  ActivationDriver.exe --aumid <AUMID> --file <PATH> [--file <PATH> ...]
 
 Options:
   --aumid <AUMID>       Application User Model ID (PackageFamilyName!ApplicationId)
   --launch              Basic launch activation (no arguments)
   --protocol <URI>      Protocol activation with the specified URI
-  --file <PATH>         File activation with the specified file path
+  --file <PATH>         File activation path; repeat for a multi-file payload
   --wait                Wait for the activated process to exit
   --timeout <MS>        Timeout for --wait in milliseconds (default: 5000)
 

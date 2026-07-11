@@ -626,7 +626,61 @@ This proves that clicking rewritten links triggers ActivationKind.Protocol.
             Write-TestResult -Name "File activation (ActivationKind.File)" -Passed $false -Message $_.Exception.Message
         }
         
-        # Test 4: Launch activation (no arguments)
+        # Test 4: Multi-file activation via IApplicationActivationManager
+        Write-Host "  Testing multi-file activation (single payload)..." -ForegroundColor Gray
+
+        $multiFileDir = Join-Path $env:TEMP "mdv-e2e-multifile-$([Guid]::NewGuid().ToString('N').Substring(0,8))"
+        try {
+            New-Item -ItemType Directory -Path $multiFileDir -Force | Out-Null
+            $multiFilePaths = 1..3 | ForEach-Object {
+                $path = Join-Path $multiFileDir "file-$_.md"
+                "# Multi-file Activation Test $_" | Set-Content -Path $path -Encoding UTF8
+                $path
+            }
+
+            $hostLogPath = Join-Path $env:TEMP 'MarkdownViewerHost.log'
+            if (Test-Path $hostLogPath) { Clear-Content $hostLogPath -Force }
+
+            $activationArgs = @('--aumid', $aumid)
+            foreach ($multiFilePath in $multiFilePaths) {
+                $activationArgs += @('--file', $multiFilePath)
+            }
+
+            $activationOutput = & $activationDriverExe @activationArgs 2>&1
+            $activationExitCode = $LASTEXITCODE
+            Start-Sleep -Milliseconds 2000
+
+            $hostLog = if (Test-Path $hostLogPath) { Get-Content $hostLogPath -Raw -ErrorAction SilentlyContinue } else { '' }
+            $hostStartCount = ([regex]::Matches($hostLog, '=== MarkdownViewerHost started \(PID=\d+\) ===')).Count
+            $hasThreeDistinctFiles = $hostLog -match 'FileActivation:\s*3\s*file\(s\),\s*3\s*distinct'
+            $eachPathLaunchedOnce = $true
+            foreach ($multiFilePath in $multiFilePaths) {
+                $launchPattern = 'LaunchEngine:\s*' + [regex]::Escape($multiFilePath)
+                if (([regex]::Matches($hostLog, $launchPattern)).Count -ne 1) {
+                    $eachPathLaunchedOnce = $false
+                }
+            }
+
+            if ($activationExitCode -eq 0 -and $hostStartCount -eq 1 -and $hasThreeDistinctFiles -and $eachPathLaunchedOnce) {
+                Write-TestResult -Name "Multi-file activation (one renderer per file)" -Passed $true
+            } else {
+                $failReason = @()
+                if ($activationExitCode -ne 0) { $failReason += "ActivationDriver exit code $activationExitCode" }
+                if ($hostStartCount -ne 1) { $failReason += "Expected 1 host start, found $hostStartCount" }
+                if (-not $hasThreeDistinctFiles) { $failReason += 'Host did not receive 3 distinct files' }
+                if (-not $eachPathLaunchedOnce) { $failReason += 'A selected path was not launched exactly once' }
+                Write-TestResult -Name "Multi-file activation (one renderer per file)" -Passed $false -Message ($failReason -join '; ')
+                $activationOutput | ForEach-Object { Write-Host "      $_" -ForegroundColor Gray }
+            }
+        } catch {
+            Write-TestResult -Name "Multi-file activation (one renderer per file)" -Passed $false -Message $_.Exception.Message
+        } finally {
+            if (Test-Path $multiFileDir) {
+                Remove-Item $multiFileDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        # Test 5: Launch activation (no arguments)
         Write-Host "  Testing launch activation..." -ForegroundColor Gray
         
         try {

@@ -27,6 +27,7 @@ Describe 'Module Exports (macOS)' {
         $exported = (Get-Module MarkdownViewer).ExportedFunctions.Keys
         $exported | Should -Contain 'Invoke-HtmlSanitization'
         $exported | Should -Contain 'Test-RemoteImages'
+        $exported | Should -Contain 'Write-MarkViewTextFile'
         $exported | Should -Contain 'Repair-MarkdownLinks'
         $exported | Should -Contain 'Repair-HtmlLinks'
     }

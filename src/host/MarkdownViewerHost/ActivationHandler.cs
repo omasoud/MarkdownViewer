@@ -140,14 +140,33 @@ namespace MarkdownViewerHost
                 return false;
             }
 
-            if (_log != null) _log(string.Format("  FileActivation: {0} file(s)", filePaths.Count));
+            // AppInstance file payloads can contain the same Windows path more than once.
+            // Launch each distinct source exactly once while preserving selection order.
+            var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var distinctPaths = new List<string>();
             foreach (var path in filePaths)
             {
-                if (_log != null) _log(string.Format("    File: {0}", path));
-                if (!string.IsNullOrWhiteSpace(path))
+                if (!string.IsNullOrWhiteSpace(path) && seenPaths.Add(path))
                 {
-                    LaunchEngine(path, "file");
+                    distinctPaths.Add(path);
                 }
+            }
+
+            if (distinctPaths.Count == 0)
+            {
+                if (_log != null) _log("  FileActivation: No valid files");
+                return false;
+            }
+
+            if (_log != null)
+            {
+                _log(string.Format("  FileActivation: {0} file(s), {1} distinct", filePaths.Count, distinctPaths.Count));
+            }
+
+            foreach (var path in distinctPaths)
+            {
+                if (_log != null) _log(string.Format("    File: {0}", path));
+                LaunchEngine(path, "file");
             }
 
             return true;

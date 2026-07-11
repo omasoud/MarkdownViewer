@@ -112,6 +112,57 @@ function Test-RemoteImages {
 
 <#
 .SYNOPSIS
+    Writes a UTF-8 text file with bounded retries for transient sharing violations.
+.DESCRIPTION
+    Preserves the stable output path while tolerating another MarkView renderer that
+    is briefly writing the same document. Only IO exceptions are retried; permission
+    and other non-transient failures are surfaced immediately.
+.PARAMETER Path
+    The destination file path.
+.PARAMETER Content
+    The complete text content to write.
+.PARAMETER MaxAttempts
+    Maximum number of write attempts, including the initial attempt.
+.PARAMETER RetryDelayMilliseconds
+    Base delay used for linear retry backoff.
+#>
+function Write-MarkViewTextFile {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Path,
+
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [string] $Content,
+
+        [ValidateRange(1, 100)]
+        [int] $MaxAttempts = 6,
+
+        [ValidateRange(1, 5000)]
+        [int] $RetryDelayMilliseconds = 50
+    )
+
+    $encoding = [Text.UTF8Encoding]::new($false)
+
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            [IO.File]::WriteAllText($Path, $Content, $encoding)
+            return
+        }
+        catch [IO.IOException] {
+            if ($attempt -eq $MaxAttempts) {
+                throw
+            }
+
+            Start-Sleep -Milliseconds ($RetryDelayMilliseconds * $attempt)
+        }
+    }
+}
+
+
+<#
+.SYNOPSIS
     Pre-processes markdown to fix local file link targets before ConvertFrom-Markdown.
 .DESCRIPTION
     Fixes common issues with local file paths in markdown links that would otherwise
@@ -467,6 +518,7 @@ function Repair-HtmlLinks {
 Export-ModuleMember -Function @(
     'Invoke-HtmlSanitization'
     'Test-RemoteImages'
+    'Write-MarkViewTextFile'
     'Repair-MarkdownLinks'
     'Repair-HtmlLinks'
 )

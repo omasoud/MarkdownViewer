@@ -291,7 +291,7 @@ $html
 </html>
 "@
 
-        [IO.File]::WriteAllText($outPath, $doc, [Text.UTF8Encoding]::new($false))
+        Write-MarkViewTextFile -Path $outPath -Content $doc
     }
 
     Write-Doc -outPath $outLocal -allowRemoteImages:$false -hasRemoteImages:$hasRemoteImages

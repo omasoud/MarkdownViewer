@@ -179,6 +179,29 @@ namespace MarkdownViewerHost.Tests
     }
 
     [Fact]
+    public void HandleFileActivation_Deduplicates_Paths_CaseInsensitively()
+    {
+        // Arrange - Windows paths that differ only by case identify the same file.
+        var filePaths = new List<string>
+        {
+            @"C:\docs\file1.md",
+            @"C:\DOCS\FILE1.md",
+            @"C:\docs\file2.md",
+            @"C:\docs\file2.md"
+        };
+        _fileSystem.FileExists(Arg.Any<string>()).Returns(true);
+        _processLauncher.LaunchProcess(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<bool>(), Arg.Any<bool>())
+            .Returns(12345);
+
+        // Act
+        var result = _handler.HandleFileActivation(filePaths);
+
+        // Assert
+        Assert.True(result);
+        _processLauncher.Received(2).LaunchProcess(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), false, true);
+    }
+
+    [Fact]
     public void HandleFileActivation_Skips_WhitespaceOnly_Paths()
     {
         // Arrange

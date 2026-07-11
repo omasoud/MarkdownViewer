@@ -58,7 +58,7 @@ namespace MarkdownViewerHost
         [STAThread]
         static void Main(string[] args)
         {
-            Logger.Log("=== MarkdownViewerHost started ===");
+            Logger.Log(string.Format("=== MarkdownViewerHost started (PID={0}) ===", System.Diagnostics.Process.GetCurrentProcess().Id));
             Logger.Log(string.Format("  Args: [{0}]", string.Join(", ", args.Select(a => string.Format("\"{0}\"", a)))));
             Logger.Log(string.Format("  BaseDirectory: {0}", AppContext.BaseDirectory));
 
