@@ -79,7 +79,7 @@ if (-not $NoBuild) {
                     $results += [PSCustomObject]@{ Suite = 'Build'; Passed = 0; Failed = 1; Skipped = 0; Status = 'FAILED' }
                 } else {
                     # Verify MSIX was created
-                    $msixPath = Join-Path $RepoRoot 'installers\win-msix\output\MarkdownViewer_1.3.0.0_x64.msix'
+                    $msixPath = Join-Path $RepoRoot 'installers\win-msix\output\MarkdownViewer_1.3.1.0_x64.msix'
                     if (Test-Path $msixPath) {
                         Write-Host "[Build] MSIX OK: $msixPath" -ForegroundColor Green
                         $results += [PSCustomObject]@{ Suite = 'Build'; Passed = 1; Failed = 0; Skipped = 0; Status = 'PASSED' }

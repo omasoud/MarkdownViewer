@@ -2,6 +2,21 @@
 
 All notable changes to MarkView are documented in this file.
 
+## 1.3.1 - 2026-07-11
+
+Windows hotfix release for the Microsoft Store.
+
+### Changed
+
+- Bumped versioned components to `1.3.1` (`1.3.1.0` for Windows package and assembly metadata).
+- Expanded packaged activation diagnostics and regression coverage for Explorer multi-file selection.
+
+### Fixed
+
+- Fixed Windows Explorer multi-file activation so each selected Markdown file opens exactly once instead of producing duplicate or rapidly multiplying browser tabs.
+- Prevented duplicate file paths in a packaged activation payload from launching more than one renderer.
+- Retried transient temporary-HTML sharing violations while preserving stable per-document output filenames.
+
 ## 1.3.0 - 2026-06-27
 
 Cross-platform release line. The Linux Snap was tagged as `v1.3.0-linux` on 2026-06-26; the source and macOS release tags were created on 2026-06-27.

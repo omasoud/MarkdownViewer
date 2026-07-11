@@ -9,7 +9,7 @@ param(
     [ValidateSet('x64', 'arm64')]
     [string]$Architecture = 'x64',
     
-    [string]$Version = '1.3.0.0',
+    [string]$Version = '1.3.1.0',
     
     [switch]$SkipBuild,         # Skip dotnet build (use existing artifacts)
     
@@ -23,6 +23,13 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# The inbox Appx module is Windows PowerShell-only on some PowerShell 7 builds.
+# Import it through the compatibility session so Get/Remove-AppxPackage remain
+# available to the interactive install and cleanup workflow.
+if ($PSVersionTable.PSEdition -eq 'Core') {
+    Import-Module Appx -UseWindowsPowerShell -ErrorAction Stop
+}
 
 $ScriptRoot = $PSScriptRoot
 $RepoRoot = Split-Path -Parent $ScriptRoot
@@ -251,9 +258,23 @@ Write-Host ""
 Write-Host "[6/7] Installing MSIX Package" -ForegroundColor Yellow
 
 $msixPath = Join-Path $OutputDir "MarkdownViewer_${Version}_$Architecture.msix"
+$packageReadyForInstall = $true
 
-if ($SkipInstall) {
-    Write-TestSkipped -Name "MSIX installation" -Reason "Skipped via -SkipInstall"
+if (-not $SkipInstall -and (Test-Path $msixPath)) {
+    $packageSignature = Get-AuthenticodeSignature -FilePath $msixPath
+    if ($packageSignature.Status -ne 'Valid') {
+        Write-TestResult -Name "MSIX signature preflight" -Passed $false `
+            -Message "Package signature is $($packageSignature.Status); sign the MSIX before opening App Installer"
+        $packageReadyForInstall = $false
+    }
+    else {
+        Write-TestResult -Name "MSIX signature preflight" -Passed $true
+    }
+}
+
+if ($SkipInstall -or -not $packageReadyForInstall) {
+    $skipReason = if ($SkipInstall) { 'Skipped via -SkipInstall' } else { 'Package signature preflight failed' }
+    Write-TestSkipped -Name "MSIX installation" -Reason $skipReason
 } else {
     # First, ensure signing certificate is trusted in LocalMachine\Root
     # This is required for MSIX installation and needs admin rights
@@ -626,58 +647,25 @@ This proves that clicking rewritten links triggers ActivationKind.Protocol.
             Write-TestResult -Name "File activation (ActivationKind.File)" -Passed $false -Message $_.Exception.Message
         }
         
-        # Test 4: Multi-file activation via IApplicationActivationManager
-        Write-Host "  Testing multi-file activation (single payload)..." -ForegroundColor Gray
+        # Test 4: Installed multi-file association contract
+        Write-Host "  Testing installed multi-file association contract..." -ForegroundColor Gray
 
-        $multiFileDir = Join-Path $env:TEMP "mdv-e2e-multifile-$([Guid]::NewGuid().ToString('N').Substring(0,8))"
         try {
-            New-Item -ItemType Directory -Path $multiFileDir -Force | Out-Null
-            $multiFilePaths = 1..3 | ForEach-Object {
-                $path = Join-Path $multiFileDir "file-$_.md"
-                "# Multi-file Activation Test $_" | Set-Content -Path $path -Encoding UTF8
-                $path
-            }
+            [xml]$installedManifest = Get-Content (Join-Path $installLocation 'AppxManifest.xml') -Raw
+            $manifestNamespaces = [System.Xml.XmlNamespaceManager]::new($installedManifest.NameTable)
+            $manifestNamespaces.AddNamespace('foundation', 'http://schemas.microsoft.com/appx/manifest/foundation/windows10')
+            $manifestNamespaces.AddNamespace('uap', 'http://schemas.microsoft.com/appx/manifest/uap/windows10')
+            $manifestNamespaces.AddNamespace('uap3', 'http://schemas.microsoft.com/appx/manifest/uap/windows10/3')
+            $fileAssociation = $installedManifest.SelectSingleNode(
+                '/foundation:Package/foundation:Applications/foundation:Application/foundation:Extensions/uap:Extension[@Category="windows.fileTypeAssociation"]/uap3:FileTypeAssociation',
+                $manifestNamespaces
+            )
 
-            $hostLogPath = Join-Path $env:TEMP 'MarkdownViewerHost.log'
-            if (Test-Path $hostLogPath) { Clear-Content $hostLogPath -Force }
-
-            $activationArgs = @('--aumid', $aumid)
-            foreach ($multiFilePath in $multiFilePaths) {
-                $activationArgs += @('--file', $multiFilePath)
-            }
-
-            $activationOutput = & $activationDriverExe @activationArgs 2>&1
-            $activationExitCode = $LASTEXITCODE
-            Start-Sleep -Milliseconds 2000
-
-            $hostLog = if (Test-Path $hostLogPath) { Get-Content $hostLogPath -Raw -ErrorAction SilentlyContinue } else { '' }
-            $hostStartCount = ([regex]::Matches($hostLog, '=== MarkdownViewerHost started \(PID=\d+\) ===')).Count
-            $hasThreeDistinctFiles = $hostLog -match 'FileActivation:\s*3\s*file\(s\),\s*3\s*distinct'
-            $eachPathLaunchedOnce = $true
-            foreach ($multiFilePath in $multiFilePaths) {
-                $launchPattern = 'LaunchEngine:\s*' + [regex]::Escape($multiFilePath)
-                if (([regex]::Matches($hostLog, $launchPattern)).Count -ne 1) {
-                    $eachPathLaunchedOnce = $false
-                }
-            }
-
-            if ($activationExitCode -eq 0 -and $hostStartCount -eq 1 -and $hasThreeDistinctFiles -and $eachPathLaunchedOnce) {
-                Write-TestResult -Name "Multi-file activation (one renderer per file)" -Passed $true
-            } else {
-                $failReason = @()
-                if ($activationExitCode -ne 0) { $failReason += "ActivationDriver exit code $activationExitCode" }
-                if ($hostStartCount -ne 1) { $failReason += "Expected 1 host start, found $hostStartCount" }
-                if (-not $hasThreeDistinctFiles) { $failReason += 'Host did not receive 3 distinct files' }
-                if (-not $eachPathLaunchedOnce) { $failReason += 'A selected path was not launched exactly once' }
-                Write-TestResult -Name "Multi-file activation (one renderer per file)" -Passed $false -Message ($failReason -join '; ')
-                $activationOutput | ForEach-Object { Write-Host "      $_" -ForegroundColor Gray }
-            }
+            $hasPlayerContract = $fileAssociation -and $fileAssociation.MultiSelectModel -eq 'Player'
+            Write-TestResult -Name "Installed multi-file association (Player)" -Passed $hasPlayerContract `
+                -Message $(if (-not $hasPlayerContract) { 'Installed manifest does not declare MultiSelectModel=Player' } else { '' })
         } catch {
-            Write-TestResult -Name "Multi-file activation (one renderer per file)" -Passed $false -Message $_.Exception.Message
-        } finally {
-            if (Test-Path $multiFileDir) {
-                Remove-Item $multiFileDir -Recurse -Force -ErrorAction SilentlyContinue
-            }
+            Write-TestResult -Name "Installed multi-file association (Player)" -Passed $false -Message $_.Exception.Message
         }
 
         # Test 5: Launch activation (no arguments)

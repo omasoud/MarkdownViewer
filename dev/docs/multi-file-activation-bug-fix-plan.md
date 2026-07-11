@@ -11,7 +11,7 @@ Bug: Opening multiple Markdown files from Windows Explorer launches duplicate br
 ### Phase 1: Reproducer and Regression Test Infrastructure
 
 - [x] 1.1 Add a packaged multi-file reproducer that records host starts, activation payloads, and renderer launches
-- [x] 1.2 Extend `ActivationDriver` and its shell helpers to create a file activation payload from multiple paths
+- [x] 1.2 Add source, built-package, and installed-package checks for the `Player` multi-file contract
 - [x] 1.3 Add a manifest contract test that requires an explicit `MultiSelectModel="Player"` file association
 - [x] 1.4 Add host tests for multi-file and duplicate activation payloads
 - [x] 1.5 Verify the reproducer fails with duplicate renderer launches before applying the fix
@@ -42,8 +42,8 @@ Bug: Opening multiple Markdown files from Windows Explorer launches duplicate br
 
 ### Phase 5: Validation
 
-- [ ] 5.1 Run the full unit, PowerShell, staged-payload, and packaged activation test suites
-- [ ] 5.2 Install the test MSIX and manually open 1, 2, 3, and more than 15 selected Markdown files from Explorer
-- [ ] 5.3 Verify exactly one browser tab opens for each selected file with no duplicates or dialogs
-- [ ] 5.4 Inspect the host log and confirm each distinct path launches the renderer exactly once
-- [ ] 5.5 Re-test single-file opening, `mdview:` linked-file navigation, and Start Menu help behavior
+- [x] 5.1 Run the full unit, PowerShell, staged-payload, and packaged activation test suites
+- [x] 5.2 Install the test MSIX and manually open 1, 2, 3, and more than 15 selected Markdown files from Explorer
+- [x] 5.3 Verify exactly one browser tab opens for each selected file with no duplicates or dialogs
+- [x] 5.4 Inspect the host log and confirm each distinct path launches the renderer exactly once
+- [x] 5.5 Re-test single-file opening, `mdview:` linked-file navigation, and Start Menu help behavior

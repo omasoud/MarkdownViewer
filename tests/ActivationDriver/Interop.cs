@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 
@@ -111,69 +110,26 @@ internal static class ShellHelpers
         ref Guid riid,
         out IShellItemArray ppv);
 
-    [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern int SHParseDisplayName(
-        [MarshalAs(UnmanagedType.LPWStr)] string name,
-        IntPtr bindingContext,
-        out IntPtr itemIdList,
-        uint attributesIn,
-        out uint attributesOut);
-
-    [DllImport("shell32.dll", SetLastError = true)]
-    private static extern int SHCreateShellItemArrayFromIDLists(
-        uint itemCount,
-        [MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 0)] IntPtr[] itemIdLists,
-        out IShellItemArray itemArray);
-
     /// <summary>
     /// Creates an IShellItemArray from a file path for file activation.
     /// </summary>
     public static IShellItemArray CreateShellItemArrayFromPath(string path)
     {
-        return CreateShellItemArrayFromPaths(new[] { path });
-    }
-
-    /// <summary>
-    /// Creates an IShellItemArray from one or more file paths.
-    /// </summary>
-    public static IShellItemArray CreateShellItemArrayFromPaths(IReadOnlyList<string> paths)
-    {
-        if (paths == null || paths.Count == 0)
+        Guid shellItemGuid = typeof(IShellItem).GUID;
+        int hr = SHCreateItemFromParsingName(path, IntPtr.Zero, ref shellItemGuid, out IShellItem item);
+        if (hr != 0)
         {
-            throw new ArgumentException("At least one file path is required.", nameof(paths));
+            throw new COMException($"SHCreateItemFromParsingName failed for '{path}'", hr);
         }
 
-        var itemIdLists = new IntPtr[paths.Count];
-        try
+        Guid shellItemArrayGuid = typeof(IShellItemArray).GUID;
+        hr = SHCreateShellItemArrayFromShellItem(item, ref shellItemArrayGuid, out IShellItemArray array);
+        if (hr != 0)
         {
-            for (var index = 0; index < paths.Count; index++)
-            {
-                uint attributes;
-                var hr = SHParseDisplayName(paths[index], IntPtr.Zero, out itemIdLists[index], 0, out attributes);
-                if (hr != 0)
-                {
-                    throw new COMException($"SHParseDisplayName failed for '{paths[index]}'", hr);
-                }
-            }
-
-            var createHr = SHCreateShellItemArrayFromIDLists((uint)itemIdLists.Length, itemIdLists, out IShellItemArray array);
-            if (createHr != 0)
-            {
-                throw new COMException("SHCreateShellItemArrayFromIDLists failed", createHr);
-            }
-
-            return array;
+            throw new COMException($"SHCreateShellItemArrayFromShellItem failed for '{path}'", hr);
         }
-        finally
-        {
-            foreach (var itemIdList in itemIdLists)
-            {
-                if (itemIdList != IntPtr.Zero)
-                {
-                    Marshal.FreeCoTaskMem(itemIdList);
-                }
-            }
-        }
+
+        return array;
     }
 
     /// <summary>

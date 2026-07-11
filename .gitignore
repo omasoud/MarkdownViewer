@@ -8,6 +8,7 @@ all.txt
 **/obj/**
 **/bin/**
 **/output/**
+installers/win-msix/store-output/
 src/core/icons/markdown - Copy*.ico
 **/AppPackages/**
 **/BundleArtifacts/**
