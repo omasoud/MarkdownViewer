@@ -30,7 +30,7 @@ Markdown Viewer is a cross-platform application (Windows, Linux, and macOS) that
 │  - Platform trust-marker check + user prompts                               │
 │  - Converts Markdown → HTML via ConvertFrom-Markdown                        │
 │  - Sanitizes HTML (removes dangerous elements/attributes)                   │
-│  - Injects CSS, JS, CSP, highlight.js, favicon into HTML document           │
+│  - Injects CSS, JS, CSP, highlight.js, optional KaTeX, and favicon           │
 │  - Writes generated HTML to the platform output directory                   │
 │  - Launches default browser                                                 │
 └──────────────────────────────────┬──────────────────────────────────────────┘
@@ -44,15 +44,16 @@ Markdown Viewer is a cross-platform application (Windows, Linux, and macOS) that
 │  - Get-FileBaseHref           │  │  │   - CSP meta tag (nonce-based)      │   │
 │  - Test-Motw                  │  │  │   - Inline CSS (style.css)          │   │
 └───────────────────────────────┘  │  │   - highlight-theme.css (file:)     │   │
-                                   │  │   - Base href for relative links    │   │
-                                   │  │   - Favicon (base64-encoded)        │   │
+                                   │  │   - KaTeX CSS when math is present  │   │
+                                   │  │   - Base href and favicon           │   │
                                    │  └─────────────────────────────────────┘   │
                                    │  ┌─────────────────────────────────────┐   │
                                    │  │ <body>                              │   │
                                    │  │   - Theme toggle button             │   │
                                    │  │   - Images toggle button (if needed)│   │
-                                   │  │   - Inline JS (script.js)           │   │
                                    │  │   - highlight.min.js (file: defer)  │   │
+                                   │  │   - katex.min.js (conditional)      │   │
+                                   │  │   - Inline JS (script.js)           │   │
                                    │  │   - Sanitized HTML content          │   │
                                    │  └─────────────────────────────────────┘   │
                                    └───────────────────────────────────────────┘
@@ -263,6 +264,7 @@ The module system uses a three-layer architecture:
 | Markdown Links | Rewrites local `.md` links to `mdview:` protocol with `_fragment` query param |
 | Fragment Scroll | Reads `?_fragment=` from HTML URL on load, scrolls to target element |
 | Syntax Highlighting | Applies highlight.js to fenced code blocks with language tags |
+| Math Typesetting | Applies KaTeX only to converter-emitted `span.math` and `div.math` nodes |
 
 **localStorage Keys:**
 - `mdviewer_theme_mode` - "system" or "invert"
@@ -305,7 +307,23 @@ const LANG_MAP = {
 4. Call `hljs.highlightElement()` for each valid block
 5. Set `highlighted` flag to prevent re-execution on theme toggle
 
-### 7. Ad-hoc Mode Installation: install.ps1 (Windows)
+### 7. Math Typesetting: vendored KaTeX
+
+**Purpose:** Renders converter-recognized inline and display TeX without network access.
+
+**Location:** `src/core/vendor/katex/`, with integration in `Open-Markdown.ps1`,
+`MarkdownViewer.Shared.psm1`, `script.js`, and `style.css`.
+
+**Architecture:**
+- KaTeX 0.18.3 is vendored with its browser runtime, stylesheet, and every font referenced by that stylesheet.
+- The PowerShell engine checks sanitized converter output for `span.math` or `div.math`. Documents without those nodes do not receive KaTeX links or copy the bundle.
+- A deterministic content hash identifies an immutable `katex.<hash>` directory beside generated HTML. Publishing uses a temporary directory and atomic rename, so concurrent renders reuse one complete bundle.
+- The stylesheet loads in `<head>`. The deferred KaTeX script loads after highlight.js and before the nonce-protected viewer script.
+- The browser integration reads only `textContent` from converter-created nodes, accepts the converter's `\(...\)` and `\[...\]` wrappers, and does not use KaTeX auto-render.
+- KaTeX runs with `trust: false`, `strict: 'warn'`, bounded expansion/size settings, and accessible HTML plus MathML output.
+- Missing assets, malformed expressions, and resource-limit skips preserve readable source and do not stop other viewer features.
+
+### 8. Ad-hoc Mode Installation: install.ps1 (Windows)
 
 **Purpose:** Per-user installation without admin privileges.
 
@@ -337,6 +355,8 @@ const LANG_MAP = {
 │   ├── style.css
 │   ├── highlight.min.js
 │   ├── highlight-theme.css
+│   ├── vendor/katex/             # KaTeX JS, CSS, fonts, and license
+│   ├── THIRD-PARTY-LICENSES.md
 │   └── markdown.ico
 ├── pwsh/                      # Bundled PowerShell 7
 │   ├── pwsh.exe
@@ -555,10 +575,11 @@ form-action 'none';
 base-uri file:;
 img-src file: data: [https: if remote enabled];
 style-src 'nonce-<random>' file:;
-script-src 'nonce-<random>' file:
+script-src 'nonce-<random>' file:;
+font-src file:
 ```
 
-**Note:** The `file:` directive is required for loading external highlight.js assets (`highlight.min.js` and `highlight-theme.css`) from the installation directory. Inline scripts and styles still require the cryptographic nonce.
+**Note:** The `file:` directives load bundled highlight.js and KaTeX assets. `font-src file:` is limited to local KaTeX fonts. Inline scripts and styles still require the cryptographic nonce, and KaTeX is configured with `trust: false`.
 
 ### HTML Sanitization (Defense-in-Depth)
 
@@ -636,7 +657,7 @@ Input: C:\docs\README.md  (or /home/user/docs/README.md, /Users/user/docs/README
 MarkdownViewer/
 ├── README.md                # User documentation
 ├── LICENSE                  # MIT License
-├── THIRD-PARTY-LICENSES.md  # Third-party license attributions (highlight.js)
+├── THIRD-PARTY-LICENSES.md  # Third-party license attributions
 ├── PSScriptAnalyzerSettings.psd1  # Linter config
 │
 ├── src/
@@ -647,6 +668,7 @@ MarkdownViewer/
 │   │   ├── style.css                # Client-side CSS
 │   │   ├── highlight.min.js         # highlight.js bundle
 │   │   ├── highlight-theme.css      # highlight.js theme
+│   │   ├── vendor/katex/            # Offline KaTeX runtime and fonts
 │   │   └── icons/
 │   │       ├── markdown.ico
 │   │       └── markdown-light.ico
@@ -715,6 +737,7 @@ MarkdownViewer/
 │   │   ├── LocalFileNormalization.Tests.ps1
 │   │   └── ...
 │   ├── highlight-test.md
+│   ├── math-test.md
 │   └── theme-variation-test.md
 │
 └── dev/
@@ -738,6 +761,7 @@ Located in `tests/MarkdownViewer.Tests.ps1` and `tests/pwsh/*.Tests.ps1`.
 - File path to URL conversion
 - Platform trust-marker detection (Windows MOTW, macOS quarantine)
 - Syntax highlighting (asset files, LANG_MAP, CSP, HTML template, installer)
+- Math typesetting (converter contract, immutable bundle publication, CSP, browser guardrails, packaging)
 - Theme variations
 - `_fragment` contract (parsing, encoding, browser launch)
 - Local-file link normalization

@@ -112,6 +112,215 @@ function Test-RemoteImages {
 
 <#
 .SYNOPSIS
+    Detects converter-emitted inline or display math elements.
+.DESCRIPTION
+    Looks only for a `math` class token on span or div elements. It does not
+    inspect raw Markdown or scan arbitrary text for math delimiters.
+.PARAMETER Html
+    Sanitized HTML produced by ConvertFrom-Markdown.
+#>
+function Test-MarkViewMathHtml {
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param(
+        [Parameter(Mandatory, ValueFromPipeline)]
+        [AllowEmptyString()]
+        [string] $Html
+    )
+
+    process {
+        if ([string]::IsNullOrEmpty($Html)) {
+            return $false
+        }
+
+        $elements = [regex]::Matches($Html, '(?is)<(?:span|div)\b[^>]*>')
+        foreach ($element in $elements) {
+            $classAttribute = [regex]::Match(
+                $element.Value,
+                '(?is)\bclass\s*=\s*(?:"([^"]*)"|''([^'']*)''|([^\s>]+))'
+            )
+            if (-not $classAttribute.Success) {
+                continue
+            }
+
+            $classValue = $classAttribute.Groups[1].Value
+            if (-not $classValue) { $classValue = $classAttribute.Groups[2].Value }
+            if (-not $classValue) { $classValue = $classAttribute.Groups[3].Value }
+
+            if (($classValue -split '\s+') -contains 'math') {
+                return $true
+            }
+        }
+
+        return $false
+    }
+}
+
+
+<#
+.SYNOPSIS
+    Copies an immutable, content-addressed asset directory beside rendered HTML.
+.DESCRIPTION
+    Hashes sorted relative paths and file bytes, then copies the complete source
+    tree through a temporary sibling directory. Concurrent renderers may race to
+    publish the same bundle; the completed destination is validated and reused.
+.PARAMETER SourcePath
+    Source asset directory.
+.PARAMETER OutputDirectory
+    Existing directory that receives the content-addressed bundle.
+.PARAMETER BundleName
+    Safe filename prefix used for the destination directory.
+.PARAMETER RequiredFiles
+    Relative files that must exist in both the source and published bundle.
+.OUTPUTS
+    The absolute path of the immutable published bundle.
+#>
+function Copy-MarkViewOutputAssetBundle {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)]
+        [string] $SourcePath,
+
+        [Parameter(Mandatory)]
+        [string] $OutputDirectory,
+
+        [Parameter(Mandatory)]
+        [ValidatePattern('^[A-Za-z0-9._-]+$')]
+        [string] $BundleName,
+
+        [string[]] $RequiredFiles = @()
+    )
+
+    if (-not (Test-Path -LiteralPath $SourcePath -PathType Container)) {
+        throw "Asset bundle source directory not found: $SourcePath"
+    }
+    if (-not (Test-Path -LiteralPath $OutputDirectory -PathType Container)) {
+        throw "Asset bundle output directory not found: $OutputDirectory"
+    }
+
+    $sourceRoot = [IO.Path]::GetFullPath((Resolve-Path -LiteralPath $SourcePath).Path)
+    $outputRoot = [IO.Path]::GetFullPath((Resolve-Path -LiteralPath $OutputDirectory).Path)
+    $sourcePrefix = $sourceRoot.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+    $pathComparison = if ($IsWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
+
+    foreach ($requiredFile in $RequiredFiles) {
+        $requiredPath = [IO.Path]::GetFullPath((Join-Path $sourceRoot $requiredFile))
+        if (-not $requiredPath.StartsWith($sourcePrefix, $pathComparison)) {
+            throw "Required file resolves outside the asset bundle: $requiredFile"
+        }
+        if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
+            throw "Asset bundle required file not found: $requiredFile"
+        }
+    }
+
+    function Get-AssetBundleIdentity([string] $RootPath) {
+        $rootFullPath = [IO.Path]::GetFullPath($RootPath)
+        $items = @(Get-ChildItem -LiteralPath $rootFullPath -Recurse -Force)
+        foreach ($item in $items) {
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "Asset bundle cannot contain symbolic links or reparse points: $($item.FullName)"
+            }
+        }
+
+        $files = @($items | Where-Object { -not $_.PSIsContainer })
+        if ($files.Count -eq 0) {
+            throw "Asset bundle contains no files: $rootFullPath"
+        }
+
+        [string[]] $paths = @(
+            $files | ForEach-Object {
+                [IO.Path]::GetRelativePath($rootFullPath, $_.FullName).Replace('\', '/')
+            }
+        )
+        [Array]::Sort($paths, [StringComparer]::Ordinal)
+
+        $bundleHasher = [Security.Cryptography.IncrementalHash]::CreateHash([Security.Cryptography.HashAlgorithmName]::SHA256)
+        try {
+            foreach ($path in $paths) {
+                $pathBytes = [Text.Encoding]::UTF8.GetBytes($path)
+                $filePath = [IO.Path]::GetFullPath((Join-Path $rootFullPath $path))
+                $fileBytes = [IO.File]::ReadAllBytes($filePath)
+                $bundleHasher.AppendData([BitConverter]::GetBytes([long]$pathBytes.Length))
+                $bundleHasher.AppendData($pathBytes)
+                $bundleHasher.AppendData([BitConverter]::GetBytes([long]$fileBytes.Length))
+                $bundleHasher.AppendData($fileBytes)
+            }
+
+            return [pscustomobject]@{
+                Hash = [BitConverter]::ToString($bundleHasher.GetHashAndReset()).Replace('-', '').ToLowerInvariant()
+                RelativePaths = $paths
+            }
+        }
+        finally {
+            $bundleHasher.Dispose()
+        }
+    }
+
+    $sourceIdentity = Get-AssetBundleIdentity -RootPath $sourceRoot
+    $hash = $sourceIdentity.Hash
+    [string[]] $relativePaths = $sourceIdentity.RelativePaths
+
+    $destinationPath = Join-Path $outputRoot ("$BundleName.$($hash.Substring(0, 12))")
+
+    function Assert-RequiredBundleFiles([string] $BundlePath) {
+        foreach ($requiredFile in $RequiredFiles) {
+            $publishedPath = [IO.Path]::GetFullPath((Join-Path $BundlePath $requiredFile))
+            $bundlePrefix = [IO.Path]::GetFullPath($BundlePath).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+            if (-not $publishedPath.StartsWith($bundlePrefix, $pathComparison) -or -not (Test-Path -LiteralPath $publishedPath -PathType Leaf)) {
+                throw "Published asset bundle required file not found: $requiredFile"
+            }
+        }
+
+        $publishedIdentity = Get-AssetBundleIdentity -RootPath $BundlePath
+        if ($publishedIdentity.Hash -ne $hash) {
+            throw "Published asset bundle failed its content-integrity check: $BundlePath"
+        }
+    }
+
+    if (Test-Path -LiteralPath $destinationPath -PathType Container) {
+        Assert-RequiredBundleFiles -BundlePath $destinationPath
+        return [IO.Path]::GetFullPath($destinationPath)
+    }
+
+    $temporaryPath = Join-Path $outputRoot (".$BundleName.$($hash.Substring(0, 12)).$([Guid]::NewGuid().ToString('N')).tmp")
+    [IO.Directory]::CreateDirectory($temporaryPath) | Out-Null
+    try {
+        foreach ($relativePath in $relativePaths) {
+            $sourceFilePath = [IO.Path]::GetFullPath((Join-Path $sourceRoot $relativePath))
+            $temporaryFilePath = [IO.Path]::GetFullPath((Join-Path $temporaryPath $relativePath))
+            $temporaryParent = [IO.Path]::GetDirectoryName($temporaryFilePath)
+            [IO.Directory]::CreateDirectory($temporaryParent) | Out-Null
+            [IO.File]::Copy($sourceFilePath, $temporaryFilePath, $false)
+        }
+
+        Assert-RequiredBundleFiles -BundlePath $temporaryPath
+        try {
+            [IO.Directory]::Move($temporaryPath, $destinationPath)
+        }
+        catch [IO.IOException] {
+            if (-not (Test-Path -LiteralPath $destinationPath -PathType Container)) {
+                throw
+            }
+        }
+
+        Assert-RequiredBundleFiles -BundlePath $destinationPath
+        return [IO.Path]::GetFullPath($destinationPath)
+    }
+    finally {
+        if (Test-Path -LiteralPath $temporaryPath -PathType Container) {
+            $resolvedTemporaryPath = [IO.Path]::GetFullPath((Resolve-Path -LiteralPath $temporaryPath).Path)
+            $outputPrefix = $outputRoot.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+            if ($resolvedTemporaryPath.StartsWith($outputPrefix, $pathComparison)) {
+                Remove-Item -LiteralPath $resolvedTemporaryPath -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+}
+
+
+<#
+.SYNOPSIS
     Writes a UTF-8 text file with bounded retries for transient sharing violations.
 .DESCRIPTION
     Preserves the stable output path while tolerating another MarkView renderer that
@@ -518,6 +727,8 @@ function Repair-HtmlLinks {
 Export-ModuleMember -Function @(
     'Invoke-HtmlSanitization'
     'Test-RemoteImages'
+    'Test-MarkViewMathHtml'
+    'Copy-MarkViewOutputAssetBundle'
     'Write-MarkViewTextFile'
     'Repair-MarkdownLinks'
     'Repair-HtmlLinks'

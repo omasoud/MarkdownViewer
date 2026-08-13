@@ -88,6 +88,9 @@ cp "$REPO_ROOT/src/core/script.js"              "$STAGE_DIR/app/"
 cp "$REPO_ROOT/src/core/style.css"              "$STAGE_DIR/app/"
 cp "$REPO_ROOT/src/core/highlight.min.js"       "$STAGE_DIR/app/"
 cp "$REPO_ROOT/src/core/highlight-theme.css"    "$STAGE_DIR/app/"
+mkdir -p "$STAGE_DIR/app/vendor"
+cp -R "$REPO_ROOT/src/core/vendor/katex"        "$STAGE_DIR/app/vendor/"
+cp "$REPO_ROOT/THIRD-PARTY-LICENSES.md"         "$STAGE_DIR/app/"
 cp "$REPO_ROOT/src/core/icons/markdown.ico"     "$STAGE_DIR/app/"
 
 # Platform modules

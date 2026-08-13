@@ -66,7 +66,13 @@ $requiredEngineFiles = @(
     'highlight.min.js',
     'highlight-theme.css',
     'MarkdownViewer.psm1',
-    'MarkdownViewer.Shared.psm1'
+    'MarkdownViewer.Shared.psm1',
+    'vendor/katex/katex.min.js',
+    'vendor/katex/katex.min.css',
+    'vendor/katex/fonts/KaTeX_Main-Regular.woff2',
+    'vendor/katex/README.md',
+    'vendor/katex/LICENSE',
+    'THIRD-PARTY-LICENSES.md'
 )
 foreach ($file in $requiredEngineFiles) {
     $filePath = Join-Path $appDir $file

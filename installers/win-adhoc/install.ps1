@@ -73,6 +73,11 @@ function Copy-Payload {
   Copy-Item -Force (Join-Path $CoreDir "style.css") $InstallDir
   Copy-Item -Force (Join-Path $CoreDir "highlight.min.js") $InstallDir
   Copy-Item -Force (Join-Path $CoreDir "highlight-theme.css") $InstallDir
+  $vendorSource = Join-Path $CoreDir "vendor"
+  $vendorDestination = Join-Path $InstallDir "vendor"
+  New-Item -ItemType Directory -Path $vendorDestination -Force | Out-Null
+  Copy-Item -Force -Recurse (Join-Path $vendorSource '*') $vendorDestination
+  Copy-Item -Force (Join-Path $RepoRoot "THIRD-PARTY-LICENSES.md") $InstallDir
   Copy-Item -Force $SourceIconPath $InstalledIconPath
   
   # Windows-specific files (from src/win)
@@ -86,12 +91,15 @@ function Copy-Payload {
 
 function Set-ReadOnlyAcl {
     $InstalledIconFileName = [IO.Path]::GetFileName($InstalledIconPath)
-    $files = @("Open-Markdown.ps1", "MarkdownViewer.psm1", "viewmd.vbs", "script.js", "style.css", "highlight.min.js", "highlight-theme.css", $InstalledIconFileName, "uninstall.ps1", "uninstall.vbs")
+    $files = @("Open-Markdown.ps1", "MarkdownViewer.psm1", "viewmd.vbs", "script.js", "style.css", "highlight.min.js", "highlight-theme.css", "THIRD-PARTY-LICENSES.md", $InstalledIconFileName, "uninstall.ps1", "uninstall.vbs")
     foreach ($f in $files) {
         $path = Join-Path $InstallDir $f
         if (Test-Path $path) {
             Set-ItemProperty $path -Name IsReadOnly -Value $true
         }
+    }
+    Get-ChildItem -LiteralPath (Join-Path $InstallDir 'vendor') -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+        Set-ItemProperty $_.FullName -Name IsReadOnly -Value $true
     }
 }
 

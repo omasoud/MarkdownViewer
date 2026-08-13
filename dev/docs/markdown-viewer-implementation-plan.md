@@ -8,6 +8,7 @@ This document outlines the implementation plan for Markdown Viewer features:
 - **Phase C (Current):** Enhancement of MSIX Packaging and Host Launcher
 - **Phase D (In Progress):** MSBuild-Driven WAP Packaging Pipeline
 - **Phase E (Complete):** Fragment Navigation (`_fragment` App Contract & Scrolling)
+- **Phase F (Planned):** Offline KaTeX math typesetting
 
 **Key Documents:**
 - [markdown-viewer-architecture.md](markdown-viewer-architecture.md) - Architecture overview
@@ -1090,3 +1091,480 @@ Browser loads HTML, script.js runs:
 5. Snap + Firefox on Linux scrolls to correct section
 6. Windows ad-hoc install scrolls to correct section
 7. Architecture doc reflects the `_fragment` contract
+
+---
+
+# Phase F: Offline KaTeX Math Typesetting (Implemented; Manual Browser Matrix Pending)
+
+## Overview
+
+Add client-side math typesetting with a locally bundled, pinned KaTeX distribution. `ConvertFrom-Markdown` already recognizes Markdig mathematics and emits these intermediate forms:
+
+| Markdown | Converter output | Viewer behavior |
+|---|---|---|
+| `$E = mc^2$` | `<span class="math">\(E = mc^2\)</span>` | Render as inline math |
+| `$$E = mc^2$$` | `<div class="math">\[E = mc^2\]</div>` | Render as display math |
+
+This phase starts after Markdown parsing and HTML sanitization. It typesets only converter-emitted `.math` elements; it does not scan the whole document for dollar-sign delimiters and does not change PowerShell or Markdig parsing behavior.
+
+**Implementation status (2026-08-09):** The runtime, conditional asset flow,
+browser module, package definitions, automated tests, fixture, and documentation
+are implemented. Pester discovered 619 tests (503 passed, 116 platform/package
+skips), the 44 native-host tests passed, and a fresh Windows staged-payload
+integration run passed with all 60 KaTeX font files. The remaining unchecked
+items require real supported-browser or non-Windows package testing. The
+available in-app browser blocks local `file:` navigation by policy, so those
+manual results are intentionally not inferred from source-level checks.
+
+**Goals:**
+
+1. Render inline and display math in the default browser on Windows, Linux, and macOS.
+2. Remain fully offline: no CDN, remote font, telemetry, or runtime package-manager access.
+3. Preserve the existing sanitizer and strict Content Security Policy (CSP).
+4. Load and copy KaTeX assets only when the sanitized converter output contains math nodes.
+5. Degrade to readable TeX without breaking the rest of the document when KaTeX is missing or an expression fails.
+6. Keep the implementation build-tool-free: ship the official browser distribution without adding Node.js/npm as a runtime or repository build prerequisite.
+
+**Non-goals:**
+
+- Changing the Markdown dialect, math delimiter rules, or `ConvertFrom-Markdown` pipeline.
+- Fixing currency dollar signs that PowerShell currently misinterprets as math; track that separately in [PowerShell/PowerShell#27792](https://github.com/PowerShell/PowerShell/issues/27792).
+- Adding KaTeX auto-render, MathJax, equation numbering policy, custom macros, or a math enable/disable setting in the first version.
+- Supporting TeX commands that require trusted HTML, external resources, or network access.
+
+**Upstream references:**
+
+- [KaTeX browser integration](https://katex.org/docs/browser.html)
+- [KaTeX rendering options](https://katex.org/docs/options)
+- [KaTeX security guidance](https://katex.org/docs/security)
+- [KaTeX font layout](https://katex.org/docs/font)
+
+**Key files:**
+
+| File | Role |
+|---|---|
+| `src/core/vendor/katex/` | Pinned KaTeX browser distribution, fonts, provenance, and license |
+| `src/core/Open-Markdown.ps1` | Detect math output, prepare asset URLs, extend CSP, and assemble HTML |
+| `src/core/MarkdownViewer.Shared.psm1` | Testable cross-platform math detection and immutable bundle-copy helpers |
+| `src/core/script.js` | Typeset converter-emitted `.math` elements after DOM load |
+| `src/core/style.css` | Overflow, spacing, print, and fallback presentation |
+| `tests/pwsh/MathSupport.Tests.ps1` | Core, security, asset, and HTML integration tests |
+| `tests/math-test.md` | Manual cross-platform rendering fixture |
+| `THIRD-PARTY-LICENSES.md` | KaTeX version, provenance, and MIT license notice |
+
+---
+
+## F.1 Dependency, Syntax Contract, and Reproducer Tests
+
+### F.1.1 Pin and vendor KaTeX
+
+- [x] MATH-01 Pin KaTeX `v0.18.3` and record the upstream release URL and asset hashes in `src/core/vendor/katex/README.md`
+- [x] MATH-02 Vendor the official `katex.min.js`, `katex.min.css`, and every font referenced by that stylesheet while preserving the sibling `fonts/` layout
+- [x] MATH-03 Exclude auto-render, source maps, demos, contrib extensions, package-manager metadata, and unreferenced font formats from the runtime payload
+- [x] MATH-04 Verify the vendored JavaScript exposes the browser-global `katex` API and contains no CDN or other runtime network dependency
+- [x] MATH-05 Add KaTeX's version, source, purpose, and MIT license text to `THIRD-PARTY-LICENSES.md`; include the notice in every packaged distribution
+
+### F.1.2 Lock down the converter contract before implementation
+
+- [x] MATH-06 Add Pester reproducer tests for PowerShell's inline output: `$x^2$` becomes a `span.math` containing `\(...\)`
+- [x] MATH-07 Add Pester reproducer tests for PowerShell's display output: `$$x^2$$` becomes a `div.math` containing `\[...\]`
+- [x] MATH-08 Verify sanitization preserves the converter's `span.math` and `div.math` elements and their encoded TeX text
+- [x] MATH-09 Verify code blocks and ordinary elements are not selected by the viewer's math stage; KaTeX must never reparse `document.body`
+
+---
+
+## F.2 Cross-Platform Asset Delivery and CSP
+
+### F.2.1 Add a content-addressed directory-copy helper
+
+KaTeX CSS resolves fonts relative to `katex.min.css`, so the stylesheet and its `fonts/` sibling must move as one unit. Copy the complete runtime bundle beside generated HTML on every platform. This avoids `file:` cross-directory differences between browsers while retaining the existing POSIX strategy of immutable, content-hashed output assets.
+
+- [x] MATH-10 Add `Copy-MarkViewOutputAssetBundle` to `MarkdownViewer.Shared.psm1`
+- [x] MATH-11 Compute a deterministic SHA-256 bundle identity from sorted relative paths plus file bytes; name the output directory `katex.<12-hex>/`
+- [x] MATH-12 Copy through a unique sibling temporary directory and atomically rename it; if a concurrent renderer wins the race, validate and reuse the completed destination
+- [x] MATH-13 Preserve relative paths, reject files that resolve outside the source bundle, and validate `katex.min.js`, `katex.min.css`, and referenced fonts before returning URLs
+- [x] MATH-14 Skip copying when the matching immutable bundle already exists; never overwrite a bundle a browser may have open
+
+### F.2.2 Detect math and conditionally assemble assets
+
+- [x] MATH-15 Add a testable helper that detects a `math` class token on sanitized `span` or `div` output; do not infer syntax from raw Markdown
+- [x] MATH-16 Add a `KaTeXRootPath` parameter to `Open-Markdown.ps1`, defaulting to `src/core/vendor/katex/`
+- [x] MATH-17 Only when math is present and the bundle is complete, copy/resolve the bundle and add the KaTeX stylesheet and deferred script to both local-image and remote-image HTML variants
+- [x] MATH-18 Place `katex.min.css` in `<head>` and the deferred `katex.min.js` before the nonce-protected viewer script, matching the existing highlight.js load pattern
+- [x] MATH-19 Omit all KaTeX markup and output-bundle work for documents without math
+- [x] MATH-20 If the installed bundle is missing or incomplete, leave the original TeX visible, log a diagnostic, and continue rendering the page
+
+### F.2.3 Extend CSP narrowly
+
+- [x] MATH-21 Add `font-src file:` to `New-Csp`; keep `default-src 'none'`, `connect-src 'none'`, nonce requirements, and all existing sanitizer rules unchanged
+- [ ] MATH-22 Verify KaTeX loads with the CSP on `file:` pages without adding `unsafe-inline`, `unsafe-eval`, `https:`, `data:` scripts, or network connections
+- [x] MATH-23 Add regression tests proving Markdown-authored `<script>`, `<link>`, and `<style>` elements are still stripped before application-owned KaTeX tags are assembled
+
+---
+
+## F.3 Browser Typesetting and Presentation
+
+### F.3.1 Render only converter-emitted math nodes
+
+- [x] MATH-24 Add an isolated math module to `script.js` that runs once after DOM readiness and selects only `span.math` and `div.math`
+- [x] MATH-25 Read source with `textContent`, accept only the converter wrappers `\(...\)` and `\[...\]`, remove exactly one outer wrapper pair, and derive `displayMode` from that pair
+- [x] MATH-26 Call `katex.render(source, element, options)` directly; do not include or call KaTeX auto-render
+- [x] MATH-27 Render with explicit safe options: `output: "htmlAndMathml"`, `throwOnError: false`, `strict: "warn"`, `trust: false`, `maxSize: 10`, `maxExpand: 1000`, and `globalGroup: false`
+- [x] MATH-28 Add document limits consistent with syntax highlighting: process at most 1,000 math nodes and skip any expression over 100 KB, leaving skipped source readable
+- [x] MATH-29 Make processing idempotent and mark successfully processed nodes so duplicate DOM initialization cannot render them twice
+
+### F.3.2 Failure behavior and styling
+
+- [x] MATH-30 If `window.katex` is unavailable, leave all source nodes untouched and emit one console warning
+- [x] MATH-31 Preserve the original text before each render; on an unexpected exception restore it with `textContent`, never with `innerHTML`
+- [x] MATH-32 Add viewer CSS for horizontally scrollable long display equations, inline alignment, readable unrendered fallback text, and print output
+- [ ] MATH-33 Verify KaTeX inherits foreground color and remains legible across every light/dark theme variation without modifying the upstream KaTeX stylesheet
+- [ ] MATH-34 Verify generated MathML remains in the accessibility tree and does not interfere with copy/paste, fragment scrolling, or syntax highlighting
+
+---
+
+## F.4 Installer and Package Integration
+
+### F.4.1 Windows ad-hoc and MSIX
+
+- [x] MATH-35 Update `installers/win-adhoc/install.ps1` to copy `vendor/katex/` recursively and apply the existing read-only policy to its files
+- [x] MATH-36 Update `installers/win-msix/build/stage.ps1` to stage and validate the complete KaTeX directory
+- [x] MATH-37 Update both legacy staging paths in `installers/win-msix/build.ps1`; preserve the directory hierarchy in the MSIX
+- [x] MATH-38 Extend staged-payload and MSIX-content tests to verify JavaScript, CSS, fonts, provenance, and license files
+
+### F.4.2 Linux Snap
+
+- [x] MATH-39 Update `installers/linux-snap/build.sh` to copy the KaTeX directory recursively into `staged/app/vendor/katex/`
+- [x] MATH-40 Extend `SnapBuild.Tests.ps1` and the bundled-PowerShell verification flow to assert that KaTeX assets survive staging and strict confinement
+
+### F.4.3 macOS DMG
+
+- [x] MATH-41 Update `installers/macos-dmg/build.sh` to copy the KaTeX directory recursively into the app resources
+- [x] MATH-42 Extend `MacBundle.Tests.ps1` and DMG verification to assert that KaTeX assets are present before signing and notarization
+
+---
+
+## F.5 Automated and Manual Verification
+
+### F.5.1 Unit and integration tests
+
+- [x] MATH-43 Add `tests/pwsh/MathSupport.Tests.ps1` with unit tests for math-node detection, stable bundle hashing, nested-font copying, cache reuse, incomplete bundles, and concurrent-copy behavior
+- [x] MATH-44 Add HTML-assembly tests proving math documents contain local KaTeX tags in the correct order and non-math documents contain none
+- [x] MATH-45 Add CSP tests for `font-src file:` and for the continued absence of network, unsafe-inline, and unsafe-eval permissions
+- [x] MATH-46 Add `script.js` contract tests for selector scope, delimiter validation, safe options, resource limits, idempotence, and missing-library fallback
+- [x] MATH-47 Add packaging tests for the Windows ad-hoc payload, MSIX staging, Snap staging, and macOS app resources
+- [x] MATH-48 Run the complete Pester 5.7.1 suite and the existing host tests; fix all regressions
+
+### F.5.2 Browser fixture and platform matrix
+
+- [x] MATH-49 Add `tests/math-test.md` covering inline/display expressions, fractions, roots, sums, matrices, Unicode, invalid TeX, long equations, math beside links, and TeX-looking text inside code fences
+- [ ] MATH-50 Verify packaged Windows output in Edge, Chrome, and Firefox, including a path containing spaces and non-ASCII characters
+- [ ] MATH-51 Verify the Snap with Firefox under strict confinement and confirm fonts load from the content-addressed output directory
+- [ ] MATH-52 Verify the signed macOS app with Safari and Chrome and confirm no quarantine/signing regression from the added resources
+- [ ] MATH-53 With browser developer tools, verify a math document makes no network requests and a non-math document does not request or copy KaTeX assets
+- [ ] MATH-54 Temporarily remove/corrupt a KaTeX asset in a development copy and verify the page remains usable with readable TeX fallback
+
+---
+
+## F.6 Documentation
+
+- [x] MATH-55 Update `README.md` with supported inline (`$...$`) and display (`$$...$$`) syntax, examples, offline behavior, and fallback behavior
+- [x] MATH-56 Document the current PowerShell dollar-sign parsing limitation and link to PowerShell/PowerShell#27792 without making math support depend on that fix
+- [x] MATH-57 Update `markdown-viewer-architecture.md` with the post-sanitization KaTeX stage, asset-bundle flow, CSP font rule, and trust boundary
+- [x] MATH-58 Update `developer-guide.md` with the pinned-version update procedure, required files, hash/provenance checks, packaging checks, and manual browser fixture
+- [x] MATH-59 Document that KaTeX auto-render is intentionally excluded because Markdown parsing remains the responsibility of `ConvertFrom-Markdown`
+
+---
+
+## Data Flow (Phase F)
+
+```
+Markdown source
+    |
+    v
+Repair-MarkdownLinks -> ConvertFrom-Markdown
+    |                    emits span.math / div.math with \(...\) / \[...\]
+    v
+Invoke-HtmlSanitization -> Repair-HtmlLinks
+    |
+    +-- no math nodes ------------------------------+
+    |                                               |
+    +-- math nodes                                  |
+          |                                         |
+          v                                         |
+    Copy/reuse katex.<content-hash>/ beside HTML    |
+          |                                         |
+          v                                         v
+    Assemble local CSS + deferred JS             Assemble page
+          |                                         |
+          +----------------------+------------------+
+                                 v
+                         Browser loads local page
+                                 |
+                         DOMContentLoaded
+                                 |
+                  script.js selects only .math nodes
+                                 |
+                  katex.render(..., trust: false)
+                                 |
+                      HTML + accessible MathML
+```
+
+---
+
+## Risk Mitigation (Phase F)
+
+| Risk | Mitigation |
+|---|---|
+| KaTeX reparses currency or code as math | Never use auto-render or scan body text; process only converter-emitted `.math` nodes |
+| CSS loads but fonts do not | Keep the stock CSS and referenced `fonts/` tree together in one content-addressed directory beside the generated HTML |
+| Untrusted TeX creates links, images, attributes, or excessive layout | Use `trust: false`, finite `maxSize`/`maxExpand`, node/source caps, and the existing no-network CSP |
+| Client-generated KaTeX DOM is not passed through the Markdown sanitizer | Use KaTeX's DOM API with safe options; never inject error/source strings with `innerHTML`; retain CSP defense-in-depth |
+| Missing or invalid assets break the page | Validate the bundle before emitting tags and keep converter output visible as fallback |
+| Concurrent viewers partially copy a multi-file bundle | Copy to a unique temporary directory, atomically rename, and validate an existing winning destination |
+| Dependency update silently changes files or license | Pin the version, record source and hashes, keep the MIT notice, and test the required asset inventory |
+| Package size grows unexpectedly | Ship only the minified runtime, stylesheet, referenced fonts, provenance, and license; exclude auto-render and development files |
+| Math-free documents pay a startup cost | Detect sanitized math nodes before copying or linking any KaTeX asset |
+| PowerShell changes its math wrapper contract | Converter-contract tests fail before browser behavior silently regresses |
+
+---
+
+## Implementation Order (Phase F)
+
+1. **MATH-06 through MATH-09:** Lock down converter and sanitizer behavior with reproducer tests.
+2. **MATH-01 through MATH-05:** Vendor the pinned, licensed, minimal KaTeX distribution.
+3. **MATH-10 through MATH-23:** Implement and test bundle delivery, conditional HTML assembly, and CSP.
+4. **MATH-24 through MATH-34:** Implement browser typesetting, limits, fallback behavior, and styling.
+5. **MATH-35 through MATH-42:** Integrate and validate all installers/packages.
+6. **MATH-43 through MATH-54:** Complete automated tests and the cross-platform browser matrix.
+7. **MATH-55 through MATH-59:** Update user, architecture, dependency, and maintenance documentation.
+
+---
+
+## Success Criteria (Phase F)
+
+1. Inline `$...$` and display `$$...$$` expressions render with locally bundled KaTeX on supported Windows, Linux, and macOS browsers.
+2. The viewer processes only `.math` elements produced before page assembly; it never auto-detects delimiters in ordinary DOM text.
+3. Rendered equations include visual HTML and accessible MathML.
+4. Math documents make no network requests, and the CSP remains strict with only `font-src file:` added.
+5. Non-math documents neither copy nor load KaTeX assets.
+6. Invalid expressions, missing assets, and configured resource-limit violations leave readable source without breaking themes, links, images, code highlighting, or fragment navigation.
+7. KaTeX JavaScript, CSS, fonts, provenance, and licensing are present and usable in Windows ad-hoc/MSIX, Linux Snap, and macOS DMG payloads.
+8. All automated tests pass, and the platform/browser manual matrix is complete.
+
+---
+
+# Phase G: MarkView 1.4.0 Math Release (Planned)
+
+## Release Recommendation
+
+Use **1.4.0** for the first public release containing offline KaTeX math
+typesetting. Math support is an additive, user-visible capability across all
+supported platforms, so a minor version communicates the scope more accurately
+than a 1.3.x patch. It does not introduce a compatibility break that would
+justify 2.0.0.
+
+Planning snapshot as of 2026-08-13:
+
+| Surface | Current public version | 1.4.0 target |
+|---|---:|---:|
+| Windows Microsoft Store | 1.3.1 | 1.4.0.0, x64, unsigned Store submission |
+| macOS GitHub DMG | 1.3.0 | 1.4.0, Apple Silicon, signed/notarized/stapled |
+| Snap Store | 1.3.0 revision 2 | 1.4.0, amd64 and arm64 |
+| GitHub release routing page | v1.3.1 | v1.4.0 with the macOS DMG and platform links |
+
+The release should be cut from one reviewed release-candidate commit. Generated
+packages, local signing certificates, Store credentials, Snap credentials, and
+notarization material must remain outside version control.
+
+## Release Invariants
+
+- The canonical source version is `1.4.0`; the Windows package version is
+  `1.4.0.0`.
+- The locally signed Windows MSIX is a QA artifact only. The Microsoft Store
+  submission must be rebuilt unsigned and must not contain `AppxSignature.p7x`.
+- Windows Store remains x64, macOS remains arm64, and Snap ships both amd64 and
+  arm64.
+- KaTeX JavaScript, CSS, fonts, provenance, and license files must be present in
+  every packaged payload and must work offline.
+- Existing public tags are immutable. Create `v1.4.0-windows`,
+  `v1.4.0-macos`, and `v1.4.0-linux` only after each channel is public, then
+  create canonical `v1.4.0` after all channels are verified.
+- Manual platform/browser tasks are closed only with recorded results from the
+  packaged app, not from source-tree inspection alone.
+
+---
+
+## G.1 Release-Candidate Readiness
+
+- [x] **REL140-01** — Review the complete math-support diff and confirm that it
+  contains only intended source, tests, documentation, and vendored KaTeX
+  assets.
+- [x] **REL140-02** — Confirm generated MSIX, DMG, Snap, staging, signing, and
+  test-output files are ignored and absent from the candidate commit.
+- [x] **REL140-03** — Run the full PowerShell/Pester and .NET host test suites
+  from a clean checkout and record the totals.
+- [ ] **REL140-04** — Commit the math feature as a standalone reviewed change
+  before making release-only version and metadata changes.
+- [ ] **REL140-05** — Select and record one clean release-candidate commit SHA
+  used by all platform builds.
+- [ ] **REL140-06** — Complete `MATH-22` browser validation for conditional
+  asset loading and zero-network behavior.
+- [ ] **REL140-07** — Complete `MATH-33` and `MATH-34` packaged-app validation
+  for fallback behavior, overflow, and theme styling.
+- [ ] **REL140-08** — Complete `MATH-50` through `MATH-54` on the supported
+  Windows, Linux, and macOS browser matrix, including accessibility and
+  regression checks.
+
+## G.2 Version, Metadata, and Release Notes
+
+- [ ] **REL140-09** — Change the canonical project version from 1.3.1 to 1.4.0.
+- [ ] **REL140-10** — Run `dev/scripts/Test-VersionConsistency.ps1 -Fix` and
+  review every propagated version change.
+- [ ] **REL140-11** — Run version consistency validation without `-Fix` and
+  require all references to report 1.4.0 or 1.4.0.0 as appropriate.
+- [ ] **REL140-12** — Verify the Windows identity and manifest version resolve
+  to 1.4.0.0 and all release artifact names resolve to 1.4.0.
+- [ ] **REL140-13** — Add a dated 1.4.0 changelog section covering offline math
+  typesetting, safe fallback behavior, accessibility output, and packaged
+  KaTeX assets.
+- [ ] **REL140-14** — Prepare common release notes plus channel-specific Store
+  descriptions; keep claims limited to completed and verified behavior.
+- [ ] **REL140-15** — Update Snap and Microsoft Store metadata/screenshots only
+  where the new math capability materially changes the listing.
+- [ ] **REL140-16** — Prepare the draft GitHub 1.4.0 routing release, including
+  Store/Snap links and a checksum only for the GitHub-hosted macOS DMG.
+
+## G.3 Cross-Platform Quality Gates
+
+- [ ] **REL140-17** — Run the complete Windows test matrix, including all
+  Pester tests and the native-host xUnit suite.
+- [ ] **REL140-18** — Run the Linux tests on Ubuntu 24.04 for amd64.
+- [ ] **REL140-19** — Run the Linux tests on Ubuntu 24.04 for arm64.
+- [ ] **REL140-20** — Run the macOS tests on an Apple Silicon host.
+- [ ] **REL140-21** — Inspect each package for the pinned KaTeX JavaScript,
+  stylesheet, referenced font set, provenance record, and MIT license.
+- [ ] **REL140-22** — Open the math fixture from each installed package and
+  verify inline math, display math, Unicode, matrices, malformed input,
+  currency exclusions, inline/fenced code exclusions, and long-expression
+  overflow.
+- [ ] **REL140-23** — Verify math and non-math documents in light and dark
+  themes with no network access.
+- [ ] **REL140-24** — Verify accessible MathML is exposed and ordinary text
+  selection, copying, links, fragments, and syntax highlighting still work.
+
+## G.4 Windows Store Release
+
+- [ ] **REL140-25** — Build a locally signed x64 1.4.0.0 MSIX from the exact
+  release-candidate commit for installation testing.
+- [ ] **REL140-26** — Validate the signed QA package signature, version,
+  identity, architecture, runtime contents, KaTeX contents, and staged tests.
+- [ ] **REL140-27** — Install the QA MSIX and test file activation, command-line
+  activation, theme switching, math rendering, offline behavior, and
+  uninstall/reinstall.
+- [ ] **REL140-28** — Run the applicable Windows App Certification Kit checks
+  and record any advisory-only exceptions.
+- [ ] **REL140-29** — Delete or isolate the signed QA output, then make a fresh
+  unsigned x64 Store build from the same release-candidate commit.
+- [ ] **REL140-30** — Prove the Store artifact is unsigned, is 1.4.0.0, has the
+  expected identity, and contains no `AppxSignature.p7x`.
+- [ ] **REL140-31** — Submit the minimal artifact set for product
+  `9MSWK3Q0JZ5N`, monitor certification, and use manual publication unless an
+  intentional coordinated time is chosen.
+- [ ] **REL140-32** — After public availability, install from the Store, repeat
+  the math smoke test, record the public version, and create
+  `v1.4.0-windows`.
+
+## G.5 macOS DMG Release
+
+- [ ] **REL140-33** — Build the arm64 app and DMG from the exact
+  release-candidate commit on the designated Apple Silicon release host.
+- [ ] **REL140-34** — Run the packaged-app tests and the supported browser
+  matrix before signing.
+- [ ] **REL140-35** — Apply Developer ID signing, notarize the DMG, staple the
+  ticket, and pass Gatekeeper verification.
+- [ ] **REL140-36** — Compute the final DMG SHA-256 after stapling and record it
+  in the release notes.
+- [ ] **REL140-37** — Upload the final DMG to the draft GitHub release,
+  download it again, verify its checksum and launch behavior, then create
+  `v1.4.0-macos`.
+
+## G.6 Snap Store Release
+
+- [ ] **REL140-38** — Build the core24 amd64 Snap from the exact
+  release-candidate commit on Ubuntu 24.04.
+- [ ] **REL140-39** — Build the core24 arm64 Snap from the same commit on an
+  arm64 Ubuntu 24.04 host.
+- [ ] **REL140-40** — Inspect both Snaps for version, confinement, architecture,
+  launchers, runtime, KaTeX contents, and absence of build-only material.
+- [ ] **REL140-41** — Upload both architectures to `latest/edge` with temporary
+  release credentials.
+- [ ] **REL140-42** — Install from edge on matching hardware and verify desktop
+  integration, launch paths, offline math, themes, fallback, accessibility,
+  and non-math regressions.
+- [ ] **REL140-43** — Promote the verified revisions to `latest/stable` and
+  confirm both architectures, public metadata, and install behavior.
+- [ ] **REL140-44** — Revoke/delete temporary credentials and create
+  `v1.4.0-linux` only after stable is verified.
+
+## G.7 Coordinated Publication and Closeout
+
+Recommended sequencing:
+
+1. Submit Windows first because Store certification has the longest external
+   lead time.
+2. While Windows is in certification, build and verify the final macOS DMG and
+   Snap edge candidates from the same release-candidate commit.
+3. Promote Snap and publish the DMG only after their packaged-app smoke tests
+   pass.
+4. Verify the Windows Store listing and installed package when certification
+   and publication complete.
+5. Publish the canonical GitHub routing release and tag only after every public
+   channel is verified.
+
+- [ ] **REL140-45** — Verify the public Windows Store package, macOS DMG, and
+  amd64/arm64 Snap all report the intended 1.4.0 release and render the math
+  fixture correctly.
+- [ ] **REL140-46** — Update the changelog and release records with actual
+  publication dates, Snap revisions, artifact checksum, and any approved
+  deviations.
+- [ ] **REL140-47** — Commit and push final release documentation from a clean
+  worktree.
+- [ ] **REL140-48** — Create canonical `v1.4.0` at the verified release commit;
+  never retarget an existing tag.
+- [ ] **REL140-49** — Publish the GitHub 1.4.0 routing release and recheck every
+  Store, Snap, DMG, checksum, and documentation link.
+- [ ] **REL140-50** — Record final validation evidence, remove local secrets
+  and temporary release outputs, and leave the repository clean.
+
+---
+
+## Rollback and Hold Points (Phase G)
+
+| Channel | Hold or rollback action |
+|---|---|
+| Windows Store | Stop submission before publication or submit a corrected superseding package; never use the locally signed QA artifact for Store submission |
+| macOS GitHub DMG | Keep the draft unpublished until notarization and download verification pass; replace only unpublished draft assets |
+| Snap Store | Keep candidates in edge until both architectures pass; do not promote a failing revision to stable |
+| GitHub release/tags | Keep the release as a draft and do not create platform/canonical tags until the corresponding public channel is verified |
+
+Any source change after the release-candidate SHA is selected invalidates prior
+package evidence. Rebuild and rerun the affected platform gates from the new
+candidate commit.
+
+---
+
+## Success Criteria (Phase G)
+
+1. All release references are consistent at 1.4.0/1.4.0.0 and the repository is
+   clean at the selected release commit.
+2. The full automated suite and the remaining Phase F manual browser matrix pass
+   on the intended packaged applications.
+3. Windows Store x64, macOS arm64 DMG, and Snap amd64/arm64 packages all include
+   and render the pinned offline KaTeX bundle.
+4. The Windows Store artifact is unsigned; the macOS DMG is signed, notarized,
+   stapled, and checksum-verified; both Snap architectures are verified in edge
+   before stable promotion.
+5. Public Store, Snap, DMG, release-note, checksum, and documentation links are
+   verified before canonical `v1.4.0` is created and the GitHub release is
+   published.

@@ -8,7 +8,8 @@ param(
     [string] $IconPath = (Join-Path $PSScriptRoot 'markdown.ico'),
     [string] $HighlightJsPath = (Join-Path $PSScriptRoot 'highlight.min.js'),
     [string] $HighlightThemePath = (Join-Path $PSScriptRoot 'highlight-theme.css'),
-    [string] $ModulePath = ''
+    [string] $ModulePath = '',
+    [string] $KaTeXRootPath = (Join-Path $PSScriptRoot 'vendor/katex')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -129,6 +130,7 @@ try {
 
     # Detect remote images in the rendered HTML
     $hasRemoteImages = Test-RemoteImages -Html $html
+    $hasMath = Test-MarkViewMathHtml -Html $html
 
     
     $favicon = ""
@@ -180,6 +182,7 @@ try {
             "form-action 'none'",
             "base-uri file:",
             $img,
+            "font-src file:",
             "style-src 'nonce-$nonce' file:",
             "script-src 'nonce-$nonce' file:"
         ) -join '; '
@@ -246,6 +249,51 @@ try {
         $highlightScript = "<script src=`"$highlightJsUri`" defer></script>"
     }
 
+    # Generate KaTeX asset URLs only for documents containing converter-emitted
+    # math nodes. Keep CSS and its relative fonts/ directory together by copying
+    # the complete immutable bundle beside the generated HTML on every platform.
+    $katexStyleLink = ''
+    $katexScript = ''
+    if ($hasMath) {
+        try {
+            $katexJsPath = Join-Path $KaTeXRootPath 'katex.min.js'
+            $katexCssPath = Join-Path $KaTeXRootPath 'katex.min.css'
+            if (-not (Test-Path -LiteralPath $katexJsPath -PathType Leaf)) {
+                throw "KaTeX JavaScript asset not found: $katexJsPath"
+            }
+            if (-not (Test-Path -LiteralPath $katexCssPath -PathType Leaf)) {
+                throw "KaTeX stylesheet asset not found: $katexCssPath"
+            }
+
+            $katexCss = Get-Content -Raw -LiteralPath $katexCssPath
+            $fontReferences = @(
+                [regex]::Matches($katexCss, 'url\(([^)]+)\)') | ForEach-Object {
+                    $_.Groups[1].Value.Trim('"', '''')
+                } | Sort-Object -Unique
+            )
+            foreach ($fontReference in $fontReferences) {
+                if ($fontReference -notmatch '^fonts/[A-Za-z0-9._-]+$') {
+                    throw "KaTeX stylesheet contains an unsupported font reference: $fontReference"
+                }
+            }
+
+            $requiredKaTeXFiles = @('katex.min.js', 'katex.min.css') + $fontReferences
+            $katexBundlePath = Copy-MarkViewOutputAssetBundle `
+                -SourcePath $KaTeXRootPath `
+                -OutputDirectory $outDir `
+                -BundleName 'katex' `
+                -RequiredFiles $requiredKaTeXFiles
+
+            $katexJsUri = ([Uri]::new((Join-Path $katexBundlePath 'katex.min.js'))).AbsoluteUri
+            $katexCssUri = ([Uri]::new((Join-Path $katexBundlePath 'katex.min.css'))).AbsoluteUri
+            $katexStyleLink = "<link rel=`"stylesheet`" href=`"$katexCssUri`">"
+            $katexScript = "<script src=`"$katexJsUri`" defer></script>"
+        }
+        catch {
+            Write-Warning "Math typesetting is unavailable; leaving TeX source visible. $($_.Exception.Message)"
+        }
+    }
+
     
     function Write-Doc([string]$outPath, [bool]$allowRemoteImages, [bool]$hasRemoteImages) {
         $csp = New-Csp -allowRemoteImages:$allowRemoteImages -nonce $nonce
@@ -278,11 +326,13 @@ $favicon
 $css
 </style>
 $highlightThemeLink
+$katexStyleLink
 </head>
 <body>
 <button id="mvTheme" type="button">Theme</button>
 $imgButton
 $highlightScript
+$katexScript
 <script nonce="$nonce">
 $js2
 </script>

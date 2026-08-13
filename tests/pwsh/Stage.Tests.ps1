@@ -121,6 +121,17 @@ Describe 'stage.ps1 Staging Logic' {
     It 'Should copy highlight-theme.css' {
         $content | Should -Match 'highlight-theme\.css'
     }
+
+    It 'Should copy the vendored KaTeX tree recursively' {
+        $content | Should -Match '(?s)Copy-Item.*vendor.*-Recurse'
+        $content | Should -Match 'vendor/katex/katex\.min\.js'
+        $content | Should -Match 'vendor/katex/fonts/KaTeX_Main-Regular\.woff2'
+        $content | Should -Match 'vendor/katex/README\.md'
+    }
+
+    It 'Should copy the third-party license notice' {
+        $content | Should -Match 'THIRD-PARTY-LICENSES\.md'
+    }
 }
 
 Describe 'stage.ps1 Asset Generation' {
@@ -220,6 +231,14 @@ Describe 'Source Files Exist' {
     
     It 'src/core/highlight-theme.css should exist' {
         Test-Path (Join-Path $CoreDir 'highlight-theme.css') | Should -BeTrue
+    }
+
+    It 'src/core vendored KaTeX runtime should exist' {
+        Test-Path (Join-Path $CoreDir 'vendor/katex/katex.min.js') | Should -BeTrue
+        Test-Path (Join-Path $CoreDir 'vendor/katex/katex.min.css') | Should -BeTrue
+        Test-Path (Join-Path $CoreDir 'vendor/katex/fonts/KaTeX_Main-Regular.woff2') | Should -BeTrue
+        Test-Path (Join-Path $CoreDir 'vendor/katex/README.md') | Should -BeTrue
+        Test-Path (Join-Path $CoreDir 'vendor/katex/LICENSE') | Should -BeTrue
     }
     
     It 'src/core/icons/markdown.ico should exist' {

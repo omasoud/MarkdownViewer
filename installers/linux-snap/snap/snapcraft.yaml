@@ -14,6 +14,7 @@ description: |
   - Renders Markdown to HTML using PowerShell's built-in converter
   - Opens in your default browser with no separate app window to manage
   - Highlights code blocks with bundled highlight.js support for 190+ languages
+  - Typesets inline and display math offline with bundled KaTeX
   - Includes 10 theme variations across light and dark modes
   - Opens links to other local Markdown files in the viewer
   - Works offline with no data collection

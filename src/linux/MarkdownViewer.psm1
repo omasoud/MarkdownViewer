@@ -224,6 +224,8 @@ Export-ModuleMember -Function @(
     # Shared cross-platform functions (re-exported from MarkdownViewer.Shared.psm1)
     'Invoke-HtmlSanitization'
     'Test-RemoteImages'
+    'Test-MarkViewMathHtml'
+    'Copy-MarkViewOutputAssetBundle'
     'Write-MarkViewTextFile'
     'Repair-MarkdownLinks'
     'Repair-HtmlLinks'

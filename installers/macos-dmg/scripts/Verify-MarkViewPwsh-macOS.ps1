@@ -36,6 +36,23 @@ if (-not (Test-Path $ScriptPath)) { Write-Error "Open-Markdown.ps1 not found: $S
 if (-not (Test-Path $ModulePath)) { Write-Error "MarkdownViewer.psm1 not found: $ModulePath"; $errors++ }
 if (-not (Test-Path $SharedModulePath)) { Write-Error "MarkdownViewer.Shared.psm1 not found: $SharedModulePath"; $errors++ }
 
+$appDir = Split-Path -Parent $ScriptPath
+$requiredMathAssets = @(
+    'vendor/katex/katex.min.js',
+    'vendor/katex/katex.min.css',
+    'vendor/katex/fonts/KaTeX_Main-Regular.woff2',
+    'vendor/katex/README.md',
+    'vendor/katex/LICENSE',
+    'THIRD-PARTY-LICENSES.md'
+)
+foreach ($requiredMathAsset in $requiredMathAssets) {
+    $assetPath = Join-Path $appDir $requiredMathAsset
+    if (-not (Test-Path -LiteralPath $assetPath -PathType Leaf)) {
+        Write-Error "Math runtime asset not found: $assetPath"
+        $errors++
+    }
+}
+
 $pwshBin = Join-Path $PwshDir 'pwsh'
 if (-not (Test-Path $pwshBin)) {
     Write-Error "Bundled pwsh not found: $pwshBin"
@@ -68,6 +85,7 @@ Import-Module $moduleLiteral -Force
 
 `$requiredExports = @(
     'Invoke-HtmlSanitization', 'Test-RemoteImages', 'Repair-MarkdownLinks',
+    'Test-MarkViewMathHtml', 'Copy-MarkViewOutputAssetBundle',
     'Repair-HtmlLinks', 'Get-FileBaseHref', 'Test-Motw', 'Clear-FileTrustMarker',
     'Get-MarkViewOutputDirectory', 'Start-DefaultBrowser', 'Initialize-PlatformUI',
     'Show-MotwWarning', 'Show-FileNotFound', 'Show-ErrorDialog'

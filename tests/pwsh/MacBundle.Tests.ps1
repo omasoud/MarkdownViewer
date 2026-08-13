@@ -196,6 +196,12 @@ Describe 'macOS App Bundle Structure' -Skip:(-not $IsMacOS) {
             Join-Path $resourcesPath 'app/highlight.min.js' | Should -Exist
             Join-Path $resourcesPath 'app/highlight-theme.css' | Should -Exist
             Join-Path $resourcesPath 'app/markdown.ico' | Should -Exist
+            Join-Path $resourcesPath 'app/vendor/katex/katex.min.js' | Should -Exist
+            Join-Path $resourcesPath 'app/vendor/katex/katex.min.css' | Should -Exist
+            Join-Path $resourcesPath 'app/vendor/katex/fonts/KaTeX_Main-Regular.woff2' | Should -Exist
+            Join-Path $resourcesPath 'app/vendor/katex/README.md' | Should -Exist
+            Join-Path $resourcesPath 'app/vendor/katex/LICENSE' | Should -Exist
+            Join-Path $resourcesPath 'app/THIRD-PARTY-LICENSES.md' | Should -Exist
         }
 
         It 'creates app icon' {

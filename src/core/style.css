@@ -265,3 +265,43 @@ a:hover {
 .mv-var-item.active::before {
     content: "✓ ";
 }
+
+/* Math typesetting and readable fallback source */
+.math,
+.katex {
+    color: inherit;
+}
+
+.katex-display {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.25em 0;
+}
+
+.math-unrendered {
+    background: var(--codebg);
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Consolas, Liberation Mono, monospace;
+    overflow-wrap: anywhere;
+}
+
+span.math-unrendered {
+    padding: 0.1em 0.3em;
+}
+
+div.math-unrendered {
+    overflow-x: auto;
+    padding: 0.6em 0.8em;
+    white-space: pre-wrap;
+}
+
+@media print {
+    .katex-display {
+        overflow: visible;
+    }
+
+    .math-unrendered {
+        background: transparent;
+    }
+}

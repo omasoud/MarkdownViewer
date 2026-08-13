@@ -218,6 +218,11 @@ function Build-SingleArchMsix {
     Copy-Item (Join-Path $CoreDir 'icons\markdown.ico') $appDir
     Copy-Item (Join-Path $WinDir 'MarkdownViewer.psm1') $appDir
     Copy-Item (Join-Path $CoreDir 'MarkdownViewer.Shared.psm1') $appDir
+    $vendorSource = Join-Path $CoreDir 'vendor'
+    $vendorDestination = Join-Path $appDir 'vendor'
+    New-Item -ItemType Directory -Path $vendorDestination -Force | Out-Null
+    Copy-Item (Join-Path $vendorSource '*') $vendorDestination -Recurse -Force
+    Copy-Item (Join-Path $RepoRoot 'THIRD-PARTY-LICENSES.md') $appDir
     Write-Host "Engine files staged" -ForegroundColor Green
     
     # Bundle PowerShell
@@ -491,6 +496,11 @@ else {
     Copy-Item (Join-Path $CoreDir 'icons\markdown.ico') $AppDir
     Copy-Item (Join-Path $WinDir 'MarkdownViewer.psm1') $AppDir
     Copy-Item (Join-Path $CoreDir 'MarkdownViewer.Shared.psm1') $AppDir
+    $vendorSource = Join-Path $CoreDir 'vendor'
+    $vendorDestination = Join-Path $AppDir 'vendor'
+    New-Item -ItemType Directory -Path $vendorDestination -Force | Out-Null
+    Copy-Item (Join-Path $vendorSource '*') $vendorDestination -Recurse -Force
+    Copy-Item (Join-Path $RepoRoot 'THIRD-PARTY-LICENSES.md') $AppDir
     Write-Host "Engine files staged" -ForegroundColor Green
     
     # Bundle PowerShell (if not skipped)

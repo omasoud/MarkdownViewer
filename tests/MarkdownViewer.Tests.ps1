@@ -1298,6 +1298,15 @@ Describe 'MSIX Staged Payload Structure' -Tag 'Integration' -Skip:(-not $IsWindo
         It 'contains highlight-theme.css' {
             Join-Path $script:appDir 'highlight-theme.css' | Should -Exist
         }
+
+        It 'contains the complete KaTeX runtime and third-party notice' {
+            Join-Path $script:appDir 'vendor\katex\katex.min.js' | Should -Exist
+            Join-Path $script:appDir 'vendor\katex\katex.min.css' | Should -Exist
+            Join-Path $script:appDir 'vendor\katex\fonts\KaTeX_Main-Regular.woff2' | Should -Exist
+            Join-Path $script:appDir 'vendor\katex\README.md' | Should -Exist
+            Join-Path $script:appDir 'vendor\katex\LICENSE' | Should -Exist
+            Join-Path $script:appDir 'THIRD-PARTY-LICENSES.md' | Should -Exist
+        }
         
         It 'contains icons directory' {
             Join-Path $script:appDir 'icons' | Should -Exist
@@ -1485,6 +1494,16 @@ Describe 'MSIX Package Contents' -Tag 'Integration', 'MsixValidation' -Skip:(-no
         It 'contains app\highlight-theme.css' {
             if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
             Join-Path $script:extractDir 'app\highlight-theme.css' | Should -Exist
+        }
+
+        It 'contains the complete app\vendor\katex runtime and third-party notice' {
+            if (-not $script:extractedOk) { Set-ItResult -Skipped -Because "MSIX extraction failed"; return }
+            Join-Path $script:extractDir 'app\vendor\katex\katex.min.js' | Should -Exist
+            Join-Path $script:extractDir 'app\vendor\katex\katex.min.css' | Should -Exist
+            Join-Path $script:extractDir 'app\vendor\katex\fonts\KaTeX_Main-Regular.woff2' | Should -Exist
+            Join-Path $script:extractDir 'app\vendor\katex\README.md' | Should -Exist
+            Join-Path $script:extractDir 'app\vendor\katex\LICENSE' | Should -Exist
+            Join-Path $script:extractDir 'app\THIRD-PARTY-LICENSES.md' | Should -Exist
         }
     }
     

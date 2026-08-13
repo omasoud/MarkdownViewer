@@ -418,6 +418,102 @@
 })();
 
 /**
+ * Markdown Viewer - Math Typesetting Module
+ *
+ * ConvertFrom-Markdown/Markdig is the only math parser. This module does not
+ * scan document text for delimiters; it typesets only the span.math and
+ * div.math wrappers emitted by that converter.
+ */
+(function () {
+    'use strict';
+
+    const MAX_MATH_NODES = 1000;
+    const MAX_MATH_SOURCE_LENGTH = 102400; // 100 KB per expression
+    let initialized = false;
+
+    function getMathSource(element) {
+        const wrapped = element.textContent.trim();
+        if (wrapped.startsWith('\\(') && wrapped.endsWith('\\)')) {
+            return {
+                source: wrapped.slice(2, -2).trim(),
+                displayMode: false
+            };
+        }
+        if (wrapped.startsWith('\\[') && wrapped.endsWith('\\]')) {
+            return {
+                source: wrapped.slice(2, -2).trim(),
+                displayMode: true
+            };
+        }
+        return null;
+    }
+
+    function leaveUnrendered(element) {
+        element.classList.add('math-unrendered');
+    }
+
+    function runMathTypesetting() {
+        if (initialized) return;
+        initialized = true;
+
+        const nodes = document.querySelectorAll('span.math, div.math');
+        if (nodes.length === 0) return;
+
+        if (typeof katex === 'undefined') {
+            console.warn('Markdown Viewer: KaTeX not loaded; leaving math source visible');
+            nodes.forEach(leaveUnrendered);
+            return;
+        }
+
+        const count = Math.min(nodes.length, MAX_MATH_NODES);
+        if (nodes.length > MAX_MATH_NODES) {
+            console.warn('Markdown Viewer: Limiting math rendering to', MAX_MATH_NODES, 'of', nodes.length, 'nodes');
+        }
+
+        for (let i = 0; i < nodes.length; i++) {
+            const element = nodes[i];
+            if (i >= count) {
+                leaveUnrendered(element);
+                continue;
+            }
+            if (element.dataset.mathRendered === 'true') continue;
+
+            const originalText = element.textContent;
+            const math = getMathSource(element);
+            if (!math || math.source.length > MAX_MATH_SOURCE_LENGTH) {
+                leaveUnrendered(element);
+                continue;
+            }
+
+            try {
+                katex.render(math.source, element, {
+                    displayMode: math.displayMode,
+                    output: 'htmlAndMathml',
+                    throwOnError: false,
+                    strict: 'warn',
+                    trust: false,
+                    maxSize: 10,
+                    maxExpand: 1000,
+                    globalGroup: false
+                });
+                element.dataset.mathRendered = 'true';
+                element.classList.remove('math-unrendered');
+            } catch (err) {
+                element.textContent = originalText;
+                leaveUnrendered(element);
+                console.warn('Markdown Viewer: Failed to render a math expression', err);
+            }
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', runMathTypesetting);
+    } else {
+        runMathTypesetting();
+    }
+})();
+
+/**
  * Markdown Viewer - Syntax Highlighting Module
  * 
  * Requirements:

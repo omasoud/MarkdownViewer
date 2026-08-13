@@ -138,6 +138,7 @@ MarkdownViewer/
 │   │   ├── style.css            # Client-side CSS
 │   │   ├── highlight.min.js     # Syntax highlighting
 │   │   ├── highlight-theme.css  # Highlight.js theme
+│   │   ├── vendor/katex/        # Offline KaTeX JS, CSS, fonts, and license
 │   │   └── icons/               # Application icons
 │   ├── win/                     # Windows platform module
 │   │   ├── MarkdownViewer.psm1  # Windows-specific functions
@@ -518,6 +519,11 @@ open -a "$PWD/installers/macos-dmg/staged/MarkView.app" "$PWD/tests/highlight-te
 
 This opens the rendered markdown in your default browser.
 
+For math-specific checks, substitute `tests/math-test.md`. Test while offline and
+confirm inline/display expressions render, escaped currency and code stay literal,
+the malformed expression stays readable, and the page still supports themes,
+highlighting, and fragment links.
+
 ### Testing CSS/JS Changes
 
 CSS and JS changes take effect immediately when you re-run the engine, since they're inlined into the generated HTML. Just run the engine again on any markdown file.
@@ -876,6 +882,8 @@ staged/
 │   ├── style.css
 │   ├── highlight.min.js
 │   ├── highlight-theme.css
+│   ├── vendor/katex/            # KaTeX runtime, stylesheet, fonts, license
+│   ├── THIRD-PARTY-LICENSES.md
 │   └── markdown.ico
 ├── pwsh/                    # Bundled & trimmed PowerShell 7
 │   ├── pwsh
@@ -1070,6 +1078,17 @@ Edit the shared module `src/core/MarkdownViewer.Shared.psm1`, function `Invoke-H
 2. Replace `src/core/highlight.min.js`
 3. Update `src/core/highlight-theme.css` if theme changed
 4. Run tests to verify
+
+### Updating KaTeX
+
+1. Follow the pinned-source and checksum procedure in
+   `src/core/vendor/katex/README.md`.
+2. Replace the browser runtime, stylesheet, and complete referenced `fonts/` set
+   together; do not add the auto-render extension or load a CDN resource.
+3. Update the KaTeX version and license attribution in
+   `THIRD-PARTY-LICENSES.md`.
+4. Run `tests/pwsh/MathSupport.Tests.ps1`, then the full Pester suite, and render
+   `tests/math-test.md` in the supported browsers while offline.
 
 ### Changing the App Name
 

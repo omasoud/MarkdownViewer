@@ -206,6 +206,21 @@ foreach ($file in $engineFiles) {
     }
 }
 
+# Copy the complete vendored runtime tree so KaTeX CSS retains its relative fonts/ paths.
+$vendorSource = Join-Path $CoreDir 'vendor'
+if (Test-Path -LiteralPath $vendorSource -PathType Container) {
+    $vendorDestination = Join-Path $appDir 'vendor'
+    New-Item -ItemType Directory -Path $vendorDestination -Force | Out-Null
+    Copy-Item -Path (Join-Path $vendorSource '*') -Destination $vendorDestination -Recurse -Force
+    Write-Host "  Copied: vendor/" -ForegroundColor Gray
+}
+
+$thirdPartyLicenses = Join-Path (Split-Path -Parent (Split-Path -Parent $CoreDir)) 'THIRD-PARTY-LICENSES.md'
+if (Test-Path -LiteralPath $thirdPartyLicenses -PathType Leaf) {
+    Copy-Item -LiteralPath $thirdPartyLicenses -Destination $appDir
+    Write-Host "  Copied: THIRD-PARTY-LICENSES.md" -ForegroundColor Gray
+}
+
 # Copy icons directory
 $iconsDir = Join-Path $CoreDir 'icons'
 if (Test-Path $iconsDir) {
@@ -352,6 +367,20 @@ if (-not (Test-Path (Join-Path $StagingDir 'MarkdownViewerHost.exe'))) {
 # Required files in app\
 if (-not (Test-Path (Join-Path $appDir 'Open-Markdown.ps1'))) {
     $validationErrors += "app\Open-Markdown.ps1 not found"
+}
+
+$requiredKaTeXFiles = @(
+    'vendor/katex/katex.min.js',
+    'vendor/katex/katex.min.css',
+    'vendor/katex/fonts/KaTeX_Main-Regular.woff2',
+    'vendor/katex/README.md',
+    'vendor/katex/LICENSE',
+    'THIRD-PARTY-LICENSES.md'
+)
+foreach ($requiredKaTeXFile in $requiredKaTeXFiles) {
+    if (-not (Test-Path (Join-Path $appDir $requiredKaTeXFile) -PathType Leaf)) {
+        $validationErrors += "app\$($requiredKaTeXFile.Replace('/', '\')) not found"
+    }
 }
 
 # Required pwsh\pwsh.exe (unless skipped)

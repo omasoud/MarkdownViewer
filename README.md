@@ -139,6 +139,8 @@ For testing or development without building the app bundle:
   - **Other:** `python`, `py`, `bash`, `sh`, `sql`, `csharp`, `cs`, `cpp`, `c`, `java`, `go`, `rust`, `ruby`, `rb`, `php`, `markdown`, `md`, `diff`, `dockerfile`
   - Supports all languages included in the bundled `highlight.min.js` (currently 192 languages)
   - Code blocks without a recognized language tag are displayed as plain preformatted text (no auto-detection).
+- **Math typesetting:** Inline `$...$` and display `$$...$$` expressions are rendered with the bundled KaTeX runtime. Math works fully offline, includes accessible MathML, and is only enabled when the Markdown converter identifies math nodes. Code and escaped currency are left unchanged. If KaTeX is unavailable or an expression cannot be rendered, its TeX source remains readable.
+  - The current PowerShell Markdown converter can misinterpret unescaped currency containing dollar signs. Escape literal currency as `\$12.50`. This upstream limitation is tracked in [PowerShell/PowerShell#27792](https://github.com/PowerShell/PowerShell/issues/27792); math support does not depend on that fix.
 - **Linked markdown files:** Clicking links to other local `.md` files within a document opens them in Markdown Viewer. First time you click a linked Markdown file, Chrome/Edge will ask to allow launching the Markdown Viewer. Check 'Always allow…' to avoid future prompts.
 
 ## Uninstallation
@@ -186,7 +188,7 @@ sudo snap remove markdownviewer
 
 This tool includes several security measures for viewing Markdown files safely:
 
-- **Content Security Policy (CSP):** The rendered HTML uses a strict CSP with a cryptographic nonce. Only the app's own scripts and styles execute; any scripts embedded in the Markdown (malicious or otherwise) are blocked by the browser. The CSP allows loading local files (`file:` scheme) for syntax highlighting assets, but HTML sanitization (below) ensures no unauthorized file references exist in the rendered output.
+- **Content Security Policy (CSP):** The rendered HTML uses a strict CSP with a cryptographic nonce. Only the app's own scripts and styles execute; any scripts embedded in the Markdown (malicious or otherwise) are blocked by the browser. The CSP allows loading local files (`file:` scheme) for bundled syntax-highlighting and math assets, but HTML sanitization (below) ensures no unauthorized file references exist in the rendered output.
 
 - **HTML Sanitization:** Before rendering, the app strips dangerous HTML elements and attributes from the Markdown output:
   - Removes `<script>`, `<iframe>`, `<object>`, `<embed>`, `<meta>`, `<base>`, `<link>`, `<style>` tags
@@ -234,6 +236,7 @@ MarkdownViewer/
 │   │   ├── style.css                # Client-side CSS
 │   │   ├── highlight.min.js         # Syntax highlighting (highlight.js)
 │   │   ├── highlight-theme.css      # Highlight.js theme
+│   │   ├── vendor/katex/            # Offline KaTeX runtime, CSS, and fonts
 │   │   └── icons/                   # Application icons
 │   ├── win/                         # Windows platform module
 │   │   ├── MarkdownViewer.psm1      # Windows-specific functions
@@ -286,4 +289,4 @@ MarkdownViewer/
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-This project includes third-party software (highlight.js) under separate licenses - see [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) for details.
+This project includes third-party software (highlight.js and KaTeX) under separate licenses - see [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) for details.

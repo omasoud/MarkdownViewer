@@ -17,7 +17,7 @@
     <DisplayName>MarkView</DisplayName>
     <PublisherDisplayName>omasoud</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
-    <Description>View Markdown files rendered in your browser with syntax highlighting and theme support.</Description>
+    <Description>View Markdown files rendered in your browser with syntax highlighting, offline math typesetting, and theme support.</Description>
   </Properties>
 
   <Dependencies>

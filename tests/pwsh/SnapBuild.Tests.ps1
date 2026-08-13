@@ -256,6 +256,12 @@ Describe 'Snap Package Structure' -Skip:(-not $IsLinux) {
             Join-Path $snapDir 'staged/app/highlight.min.js' | Should -Exist
             Join-Path $snapDir 'staged/app/highlight-theme.css' | Should -Exist
             Join-Path $snapDir 'staged/app/markdown.ico' | Should -Exist
+            Join-Path $snapDir 'staged/app/vendor/katex/katex.min.js' | Should -Exist
+            Join-Path $snapDir 'staged/app/vendor/katex/katex.min.css' | Should -Exist
+            Join-Path $snapDir 'staged/app/vendor/katex/fonts/KaTeX_Main-Regular.woff2' | Should -Exist
+            Join-Path $snapDir 'staged/app/vendor/katex/README.md' | Should -Exist
+            Join-Path $snapDir 'staged/app/vendor/katex/LICENSE' | Should -Exist
+            Join-Path $snapDir 'staged/app/THIRD-PARTY-LICENSES.md' | Should -Exist
         }
 
         It 'staged snap payload has packable permissions' {
