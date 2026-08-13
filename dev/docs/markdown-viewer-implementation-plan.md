@@ -1435,12 +1435,12 @@ notarization material must remain outside version control.
   where the new math capability materially changes the listing.
 - [ ] **REL140-16** — Prepare the draft GitHub 1.4.0 routing release, including
   Store/Snap links and a checksum only for the GitHub-hosted macOS DMG.
-- [ ] **REL140-51** — Commit the reviewed 1.4.0 version and release metadata,
+- [x] **REL140-51** — Commit the reviewed 1.4.0 version and release metadata,
   then record the clean release-candidate SHA used for every platform package.
 
 ## G.3 Cross-Platform Quality Gates
 
-- [ ] **REL140-17** — Run the complete Windows test matrix, including all
+- [x] **REL140-17** — Run the complete Windows test matrix, including all
   Pester tests and the native-host xUnit suite.
 - [ ] **REL140-18** — Run the Linux tests on Ubuntu 24.04 for amd64.
 - [ ] **REL140-19** — Run the Linux tests on Ubuntu 24.04 for arm64.
