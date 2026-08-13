@@ -1390,8 +1390,8 @@ Describe 'MSIX Package Contents' -Tag 'Integration', 'MsixValidation' -Skip:(-no
         
         # Find MSIX package from a recent build
         $msixPaths = @(
-            (Join-Path $repoRoot 'installers\win-msix\output\MarkdownViewer_1.3.1.0_x64.msix'),
-            (Join-Path $repoRoot 'installers\win-msix\output\MarkdownViewer_1.3.1.0_ARM64.msix')
+            (Join-Path $repoRoot 'installers\win-msix\output\MarkdownViewer_1.4.0.0_x64.msix'),
+            (Join-Path $repoRoot 'installers\win-msix\output\MarkdownViewer_1.4.0.0_ARM64.msix')
         )
         $script:msixPath = $msixPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
         $script:hasMsix = $null -ne $script:msixPath

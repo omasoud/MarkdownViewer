@@ -20,9 +20,9 @@
     <!-- Assembly info -->
     <AssemblyName>MarkdownViewerHost</AssemblyName>
     <RootNamespace>MarkdownViewerHost</RootNamespace>
-    <Version>1.3.1</Version>
-    <FileVersion>1.3.1.0</FileVersion>
-    <AssemblyVersion>1.3.1.0</AssemblyVersion>
+    <Version>1.4.0</Version>
+    <FileVersion>1.4.0.0</FileVersion>
+    <AssemblyVersion>1.4.0.0</AssemblyVersion>
     <Product>MarkView</Product>
     <Company></Company>
     <Copyright>MIT License</Copyright>

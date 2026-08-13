@@ -2,6 +2,38 @@
 
 All notable changes to MarkView are documented in this file.
 
+## 1.4.0 - Unreleased
+
+Cross-platform feature release adding offline math typesetting.
+
+### Added
+
+- Added inline (`$...$`) and display (`$$...$$`) math typesetting with the
+  bundled KaTeX 0.18.3 browser runtime.
+- Added accessible HTML and MathML equation output, bounded rendering limits,
+  horizontally scrollable display equations, and readable fallback source.
+- Added content-addressed local KaTeX asset delivery so JavaScript, CSS, and
+  fonts remain together and load without a network connection.
+- Added math-specific converter, sanitizer, browser-contract, concurrency,
+  fallback, and cross-platform packaging tests plus a manual rendering fixture.
+
+### Changed
+
+- Bumped versioned components to `1.4.0` (`1.4.0.0` for Windows package and
+  assembly metadata).
+- Expanded Windows MSIX, Linux Snap, macOS app-bundle, and ad-hoc Windows
+  staging to include the pinned KaTeX runtime, font files, provenance, and MIT
+  license notices.
+- Extended the strict Content Security Policy with local font loading while
+  retaining the existing no-network script and connection restrictions.
+
+### Known limitations
+
+- PowerShell's Markdown converter can interpret unescaped dollar-delimited
+  currency as math. Escape literal currency dollar signs, such as
+  `\$12.50`. This upstream behavior is tracked in
+  [PowerShell/PowerShell#27792](https://github.com/PowerShell/PowerShell/issues/27792).
+
 ## 1.3.1 - 2026-07-11
 
 Windows hotfix release for the Microsoft Store.

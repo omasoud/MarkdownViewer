@@ -9,7 +9,7 @@ param(
     [ValidateSet('x64', 'arm64')]
     [string]$Architecture = 'x64',
     
-    [string]$Version = '1.3.1.0',
+    [string]$Version = '1.4.0.0',
     
     [switch]$SkipBuild,         # Skip dotnet build (use existing artifacts)
     

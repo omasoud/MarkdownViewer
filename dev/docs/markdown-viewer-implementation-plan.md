@@ -1404,10 +1404,10 @@ notarization material must remain outside version control.
   test-output files are ignored and absent from the candidate commit.
 - [x] **REL140-03** — Run the full PowerShell/Pester and .NET host test suites
   from a clean checkout and record the totals.
-- [ ] **REL140-04** — Commit the math feature as a standalone reviewed change
-  before making release-only version and metadata changes.
-- [ ] **REL140-05** — Select and record one clean release-candidate commit SHA
-  used by all platform builds.
+- [x] **REL140-04** — Commit the math feature as a standalone reviewed change
+  before making release-only version and metadata changes (`2702452`).
+- [x] **REL140-05** — Record the clean math-feature baseline commit SHA
+  (`2702452`) on which the 1.4.0 release-only changes are based.
 - [ ] **REL140-06** — Complete `MATH-22` browser validation for conditional
   asset loading and zero-network behavior.
 - [ ] **REL140-07** — Complete `MATH-33` and `MATH-34` packaged-app validation
@@ -1418,22 +1418,25 @@ notarization material must remain outside version control.
 
 ## G.2 Version, Metadata, and Release Notes
 
-- [ ] **REL140-09** — Change the canonical project version from 1.3.1 to 1.4.0.
-- [ ] **REL140-10** — Run `dev/scripts/Test-VersionConsistency.ps1 -Fix` and
+- [x] **REL140-09** — Change the canonical project version from 1.3.1 to 1.4.0.
+- [x] **REL140-10** — Run `dev/scripts/Test-VersionConsistency.ps1 -Fix` and
   review every propagated version change.
-- [ ] **REL140-11** — Run version consistency validation without `-Fix` and
+- [x] **REL140-11** — Run version consistency validation without `-Fix` and
   require all references to report 1.4.0 or 1.4.0.0 as appropriate.
-- [ ] **REL140-12** — Verify the Windows identity and manifest version resolve
+- [x] **REL140-12** — Verify the Windows identity and manifest version resolve
   to 1.4.0.0 and all release artifact names resolve to 1.4.0.
-- [ ] **REL140-13** — Add a dated 1.4.0 changelog section covering offline math
-  typesetting, safe fallback behavior, accessibility output, and packaged
-  KaTeX assets.
-- [ ] **REL140-14** — Prepare common release notes plus channel-specific Store
+- [x] **REL140-13** — Add an Unreleased 1.4.0 changelog section covering
+  offline math typesetting, safe fallback behavior, accessibility output, and
+  packaged KaTeX assets; replace Unreleased with the actual publication date
+  during closeout.
+- [x] **REL140-14** — Prepare common release notes plus channel-specific Store
   descriptions; keep claims limited to completed and verified behavior.
 - [ ] **REL140-15** — Update Snap and Microsoft Store metadata/screenshots only
   where the new math capability materially changes the listing.
 - [ ] **REL140-16** — Prepare the draft GitHub 1.4.0 routing release, including
   Store/Snap links and a checksum only for the GitHub-hosted macOS DMG.
+- [ ] **REL140-51** — Commit the reviewed 1.4.0 version and release metadata,
+  then record the clean release-candidate SHA used for every platform package.
 
 ## G.3 Cross-Platform Quality Gates
 
