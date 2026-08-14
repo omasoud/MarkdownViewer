@@ -1570,7 +1570,7 @@ Recommended sequencing:
 5. Publish the canonical GitHub routing release and tag only after every public
    channel is verified.
 
-- [ ] **REL140-45** — Verify the public Windows Store package, macOS DMG, and
+- [x] **REL140-45** — Verify the public Windows Store package, macOS DMG, and
   amd64/arm64 Snap all report the intended 1.4.0 release and render the math
   fixture correctly.
 - [x] **REL140-46** — Update the changelog and release records with actual
@@ -1578,12 +1578,25 @@ Recommended sequencing:
   deviations.
 - [x] **REL140-47** — Commit and push final release documentation from a clean
   worktree.
-- [ ] **REL140-48** — Create canonical `v1.4.0` at the verified release commit;
+- [x] **REL140-48** — Create canonical `v1.4.0` at the verified release commit;
   never retarget an existing tag.
-- [ ] **REL140-49** — Publish the GitHub 1.4.0 routing release and recheck every
+- [x] **REL140-49** — Publish the GitHub 1.4.0 routing release and recheck every
   Store, Snap, DMG, checksum, and documentation link.
-- [ ] **REL140-50** — Record final validation evidence, remove local secrets
+- [x] **REL140-50** — Record final validation evidence, remove local secrets
   and temporary release outputs, and leave the repository clean.
+
+Final coordinated publication evidence (2026-08-14 UTC): annotated tag
+`v1.4.0` resolves to release-record commit `9786ee5` and the public GitHub
+release was published at 02:47 UTC. The public DMG download was 56,701,857
+bytes and independently reproduced SHA-256
+`a01922afa0fe5f1de4a6aed2f1dfca3da2556171bce8f98e5d3df9c449e2ef49`.
+The GitHub release, DMG, Microsoft Store, and Snap Store links all returned
+success. The installed public Windows package remained Store-signed x64
+1.4.0.0 with status OK. The Snap Store API reported stable and edge version
+1.4.0 for amd64 revision 4 and arm64 revision 3. Temporary Snap credentials,
+the public-download verification copy, mounted test image, and Safari
+WebDriver process were removed; retained files under `local/` are
+non-secret release evidence excluded from version control.
 
 ---
 
