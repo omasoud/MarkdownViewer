@@ -2,7 +2,7 @@
 
 All notable changes to MarkView are documented in this file.
 
-## 1.4.0 - Unreleased
+## 1.4.0 - 2026-08-14
 
 Cross-platform feature release adding offline math typesetting.
 
