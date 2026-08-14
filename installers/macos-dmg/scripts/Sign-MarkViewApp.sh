@@ -5,7 +5,7 @@ set -euo pipefail
 
 APP_PATH=""
 IDENTITY="${MARKVIEW_CODESIGN_IDENTITY:--}"
-ENTITLEMENTS=""
+PWSH_ENTITLEMENTS=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -17,8 +17,8 @@ while [[ $# -gt 0 ]]; do
             IDENTITY="$2"
             shift 2
             ;;
-        --entitlements)
-            ENTITLEMENTS="$2"
+        --pwsh-entitlements)
+            PWSH_ENTITLEMENTS="$2"
             shift 2
             ;;
         *)
@@ -29,7 +29,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$APP_PATH" ]]; then
-    echo "Usage: $0 --app /path/to/MarkView.app [--identity <codesign identity>] [--entitlements file]" >&2
+    echo "Usage: $0 --app /path/to/MarkView.app [--identity <codesign identity>] --pwsh-entitlements file" >&2
     exit 1
 fi
 
@@ -38,15 +38,16 @@ if [[ ! -d "$APP_PATH" ]]; then
     exit 1
 fi
 
-SIGN_ARGS=(--force --sign "$IDENTITY")
+SIGN_ARGS=(--force --sign "$IDENTITY" --options runtime)
 if [[ "$IDENTITY" != "-" ]]; then
-    SIGN_ARGS+=(--options runtime --timestamp)
+    SIGN_ARGS+=(--timestamp)
 else
     SIGN_ARGS+=(--timestamp=none)
 fi
 
-if [[ -n "$ENTITLEMENTS" ]]; then
-    SIGN_ARGS+=(--entitlements "$ENTITLEMENTS")
+if [[ -z "$PWSH_ENTITLEMENTS" || ! -f "$PWSH_ENTITLEMENTS" ]]; then
+    echo "PowerShell entitlements file not found: $PWSH_ENTITLEMENTS" >&2
+    exit 1
 fi
 
 echo "Signing app: $APP_PATH"
@@ -56,7 +57,11 @@ PWSH_DIR="$APP_PATH/Contents/Resources/pwsh"
 if [[ -d "$PWSH_DIR" ]]; then
     while IFS= read -r file_path; do
         if file "$file_path" | grep -q "Mach-O"; then
-            codesign "${SIGN_ARGS[@]}" "$file_path"
+            if [[ "$file_path" == "$PWSH_DIR/pwsh" ]]; then
+                codesign "${SIGN_ARGS[@]}" --entitlements "$PWSH_ENTITLEMENTS" "$file_path"
+            else
+                codesign "${SIGN_ARGS[@]}" "$file_path"
+            fi
         fi
     done < <(find "$PWSH_DIR" -type f \( -perm -111 -o -name "*.dylib" -o -name "*.so" -o -name "*.bundle" \))
 fi

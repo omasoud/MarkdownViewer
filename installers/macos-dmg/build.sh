@@ -56,6 +56,7 @@ MARKVIEW_VERSION="${MARKVIEW_VERSION:-$(pwsh -NoProfile -Command "([xml](Get-Con
 MIN_MACOS_VERSION="${MARKVIEW_MIN_MACOS_VERSION:-14.0}"
 
 PWSH_CONFIG="$SCRIPT_DIR/build/pwsh-versions.json"
+PWSH_ENTITLEMENTS="$SCRIPT_DIR/build/pwsh.entitlements.plist"
 PWSH_VERSION="$(pwsh -NoProfile -Command "(Get-Content '$PWSH_CONFIG' -Raw | ConvertFrom-Json).version")"
 PWSH_URL="$(pwsh -NoProfile -Command "(Get-Content '$PWSH_CONFIG' -Raw | ConvertFrom-Json).archives.arm64.url")"
 PWSH_SHA256="$(pwsh -NoProfile -Command "(Get-Content '$PWSH_CONFIG' -Raw | ConvertFrom-Json).archives.arm64.sha256")"
@@ -80,11 +81,11 @@ echo "PowerShell version: $PWSH_VERSION"
 echo "Repo root:          $REPO_ROOT"
 echo ""
 
-echo "[1/9] Preparing staging directory..."
+echo "[1/10] Preparing staging directory..."
 rm -rf "$STAGE_DIR"
 mkdir -p "$MACOS_DIR" "$APP_RESOURCES_DIR" "$PWSH_DIR" "$CLI_DIR"
 
-echo "[2/9] Staging engine payload..."
+echo "[2/10] Staging engine payload..."
 cp "$REPO_ROOT/src/core/Open-Markdown.ps1" "$APP_RESOURCES_DIR/"
 cp "$REPO_ROOT/src/core/script.js" "$APP_RESOURCES_DIR/"
 cp "$REPO_ROOT/src/core/style.css" "$APP_RESOURCES_DIR/"
@@ -99,26 +100,26 @@ cp "$REPO_ROOT/src/mac/MarkdownViewer.psm1" "$APP_RESOURCES_DIR/"
 cp "$REPO_ROOT/src/mac/markview" "$CLI_DIR/"
 chmod +x "$CLI_DIR/markview"
 
-echo "[3/9] Generating app icon..."
+echo "[3/10] Generating app icon..."
 pwsh -NoProfile -File "$SCRIPT_DIR/scripts/New-MarkViewIcns.ps1" \
     -SourcePng "$REPO_ROOT/src/linux/markview.png" \
     -OutputIcns "$RESOURCES_DIR/markview.icns"
 
-echo "[4/9] Generating Info.plist..."
+echo "[4/10] Generating Info.plist..."
 sed \
     -e "s/__VERSION__/$MARKVIEW_VERSION/g" \
     -e "s/__MIN_MACOS__/$MIN_MACOS_VERSION/g" \
     "$REPO_ROOT/src/host/MarkdownViewerMacHost/Info.plist.template" > "$CONTENTS_DIR/Info.plist"
 plutil -lint "$CONTENTS_DIR/Info.plist"
 
-echo "[5/9] Compiling Swift host..."
+echo "[5/10] Compiling Swift host..."
 swiftc "$REPO_ROOT/src/host/MarkdownViewerMacHost/MarkViewHost.swift" \
     -o "$MACOS_DIR/MarkViewHost" \
     -framework AppKit \
     -framework Foundation
 chmod +x "$MACOS_DIR/MarkViewHost"
 
-echo "[6/9] Preparing bundled PowerShell..."
+echo "[6/10] Preparing bundled PowerShell..."
 CACHE_DIR="$SCRIPT_DIR/.cache"
 mkdir -p "$CACHE_DIR"
 TARBALL_NAME="powershell-${PWSH_VERSION}-osx-arm64.tar.gz"
@@ -149,24 +150,33 @@ tar xzf "$CACHED_TARBALL" -C "$PWSH_DIR"
 chmod +x "$PWSH_DIR/pwsh"
 
 if [[ "$SKIP_PWSH_TRIM" == false ]]; then
-    echo "[7/9] Trimming bundled PowerShell..."
+    echo "[7/10] Trimming bundled PowerShell..."
     pwsh -NoProfile -File "$SCRIPT_DIR/scripts/Trim-PwshBundle-macOS.ps1" -PwshRoot "$PWSH_DIR"
 else
-    echo "[7/9] Skipping PowerShell trim."
+    echo "[7/10] Skipping PowerShell trim."
 fi
 
-echo "[8/9] Verifying staged runtime..."
+echo "[8/10] Verifying staged runtime..."
 pwsh -NoProfile -File "$SCRIPT_DIR/scripts/Verify-MarkViewPwsh-macOS.ps1" \
     -ScriptPath "$APP_RESOURCES_DIR/Open-Markdown.ps1" \
     -ModulePath "$APP_RESOURCES_DIR/MarkdownViewer.psm1" \
     -SharedModulePath "$APP_RESOURCES_DIR/MarkdownViewer.Shared.psm1" \
     -PwshDir "$PWSH_DIR"
 
-echo "[9/9] Signing app..."
+echo "[9/10] Signing app..."
 if [[ "$SKIP_SIGN" == true ]]; then
     echo "Skipping signing."
 else
-    "$SCRIPT_DIR/scripts/Sign-MarkViewApp.sh" --app "$APP_PATH"
+    "$SCRIPT_DIR/scripts/Sign-MarkViewApp.sh" \
+        --app "$APP_PATH" \
+        --pwsh-entitlements "$PWSH_ENTITLEMENTS"
+
+    echo "[10/10] Verifying signed runtime..."
+    pwsh -NoProfile -File "$SCRIPT_DIR/scripts/Verify-MarkViewPwsh-macOS.ps1" \
+        -ScriptPath "$APP_RESOURCES_DIR/Open-Markdown.ps1" \
+        -ModulePath "$APP_RESOURCES_DIR/MarkdownViewer.psm1" \
+        -SharedModulePath "$APP_RESOURCES_DIR/MarkdownViewer.Shared.psm1" \
+        -PwshDir "$PWSH_DIR"
 fi
 
 echo ""

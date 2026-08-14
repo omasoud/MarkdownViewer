@@ -113,6 +113,12 @@ The release helper builds the app bundle, signs the app and DMG, submits the DMG
 installers/macos-dmg/output/MarkView_<version>_arm64.dmg
 ```
 
+The bundled `pwsh` executable is signed with Hardened Runtime plus the standard
+.NET exceptions in `installers/macos-dmg/build/pwsh.entitlements.plist`. The
+build must pass its bundled-runtime verification both before and after signing;
+a valid code signature and successful notarization do not by themselves prove
+that CoreCLR can launch.
+
 Record the SHA-256 checksum:
 
 ```bash

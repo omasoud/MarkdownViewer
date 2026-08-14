@@ -294,8 +294,10 @@ cd installers/macos-dmg
 4. Downloads pinned PowerShell arm64 archive (cached in `.cache/`)
 5. Verifies SHA256 hash
 6. Trims and verifies the bundled PowerShell runtime
-7. Ad-hoc signs local builds, or Developer ID signs when `MARKVIEW_CODESIGN_IDENTITY` is set
-8. Creates `installers/macos-dmg/output/MarkView_<version>_arm64.dmg`
+7. Signs bundled PowerShell with Hardened Runtime and the standard .NET runtime
+   exceptions from `build/pwsh.entitlements.plist`
+8. Verifies the bundled runtime again after signing
+9. Creates `installers/macos-dmg/output/MarkView_<version>_arm64.dmg`
 
 For public distribution, sign with a Developer ID Application identity, then notarize and staple the DMG with `xcrun notarytool` and `xcrun stapler`.
 
@@ -944,7 +946,7 @@ MARKVIEW_CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
     ./scripts/Release-MarkViewDmg.sh --keychain-profile markview-notary
 ```
 
-`Release-MarkViewDmg.sh` creates the versioned arm64 DMG, signs the app and DMG with the Developer ID identity, submits the DMG to Apple notarization with `notarytool`, staples the notarization ticket, and runs a Gatekeeper assessment. The final DMG is written to `installers/macos-dmg/output/` and is the file to upload to GitHub Releases.
+`Release-MarkViewDmg.sh` creates the versioned arm64 DMG, signs the app and DMG with the Developer ID identity, submits the DMG to Apple notarization with `notarytool`, staples the notarization ticket, and runs a Gatekeeper assessment. The bundled `pwsh` executable is signed with the four standard .NET Hardened Runtime exceptions in `build/pwsh.entitlements.plist`; libraries do not receive executable entitlements. The build reruns bundled-runtime verification after signing so a trusted but non-launching runtime cannot reach notarization. The final DMG is written to `installers/macos-dmg/output/` and is the file to upload to GitHub Releases.
 
 For existing signed DMGs, skip the rebuild:
 

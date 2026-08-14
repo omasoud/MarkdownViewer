@@ -27,6 +27,12 @@ Cross-platform feature release adding offline math typesetting.
 - Extended the strict Content Security Policy with local font loading while
   retaining the existing no-network script and connection restrictions.
 
+### Fixed
+
+- Fixed macOS Developer ID packaging so the bundled PowerShell runtime retains
+  the standard .NET Hardened Runtime exceptions and remains launchable after
+  signing.
+
 ### Known limitations
 
 - PowerShell's Markdown converter can interpret unescaped dollar-delimited

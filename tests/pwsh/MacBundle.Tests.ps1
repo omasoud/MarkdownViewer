@@ -24,6 +24,10 @@ Describe 'macOS App Bundle Structure' -Skip:(-not $IsMacOS) {
             Join-Path $macDir 'build/pwsh-versions.json' | Should -Exist
         }
 
+        It 'PowerShell Hardened Runtime entitlements exist' {
+            Join-Path $macDir 'build/pwsh.entitlements.plist' | Should -Exist
+        }
+
         It 'Trim-PwshBundle-macOS.ps1 exists' {
             Join-Path $macDir 'scripts/Trim-PwshBundle-macOS.ps1' | Should -Exist
         }
@@ -49,8 +53,33 @@ Describe 'macOS App Bundle Structure' -Skip:(-not $IsMacOS) {
         BeforeAll {
             $buildScript = Join-Path $macDir 'build.sh'
             $buildSource = Get-Content -LiteralPath $buildScript -Raw
+            $signScript = Join-Path $macDir 'scripts/Sign-MarkViewApp.sh'
+            $signSource = Get-Content -LiteralPath $signScript -Raw
             $releaseScript = Join-Path $macDir 'scripts/Release-MarkViewDmg.sh'
             $releaseSource = Get-Content -LiteralPath $releaseScript -Raw
+        }
+
+        It 'signing script has valid bash syntax' {
+            & bash -n $signScript
+            $LASTEXITCODE | Should -Be 0
+        }
+
+        It 'signs PowerShell with Hardened Runtime and explicit entitlements' {
+            $signSource | Should -Match '--options runtime'
+            $signSource | Should -Match '--pwsh-entitlements'
+        }
+
+        It 'build passes the PowerShell entitlements and verifies the signed runtime' {
+            $buildSource | Should -Match 'pwsh\.entitlements\.plist'
+            $buildSource | Should -Match 'Verifying signed runtime'
+        }
+
+        It 'declares the standard .NET Hardened Runtime exceptions' {
+            $entitlements = Get-Content -LiteralPath (Join-Path $macDir 'build/pwsh.entitlements.plist') -Raw
+            $entitlements | Should -Match 'com\.apple\.security\.cs\.allow-jit'
+            $entitlements | Should -Match 'com\.apple\.security\.cs\.allow-unsigned-executable-memory'
+            $entitlements | Should -Match 'com\.apple\.security\.cs\.allow-dyld-environment-variables'
+            $entitlements | Should -Match 'com\.apple\.security\.cs\.disable-library-validation'
         }
 
         It 'release script has valid bash syntax' {
@@ -224,6 +253,31 @@ Describe 'macOS App Bundle Structure' -Skip:(-not $IsMacOS) {
                 Write-Host ($verifyResult -join "`n")
             }
             $LASTEXITCODE | Should -Be 0
+        }
+
+        It 'signs bundled PowerShell with the standard .NET runtime entitlements' {
+            $pwshPath = Join-Path $resourcesPath 'pwsh/pwsh'
+            $entitlements = (& codesign -d --entitlements :- $pwshPath 2>&1) -join "`n"
+
+            $entitlements | Should -Match 'com\.apple\.security\.cs\.allow-jit'
+            $entitlements | Should -Match 'com\.apple\.security\.cs\.allow-unsigned-executable-memory'
+            $entitlements | Should -Match 'com\.apple\.security\.cs\.allow-dyld-environment-variables'
+            $entitlements | Should -Match 'com\.apple\.security\.cs\.disable-library-validation'
+        }
+
+        It 'does not apply PowerShell executable entitlements to the Swift host or runtime libraries' {
+            $targets = @(
+                (Join-Path $appPath 'Contents/MacOS/MarkViewHost'),
+                (Join-Path $resourcesPath 'pwsh/libcoreclr.dylib')
+            )
+
+            foreach ($target in $targets) {
+                $entitlements = (& codesign -d --entitlements :- $target 2>&1) -join "`n"
+                $entitlements | Should -Not -Match 'com\.apple\.security\.cs\.allow-jit'
+                $entitlements | Should -Not -Match 'com\.apple\.security\.cs\.allow-unsigned-executable-memory'
+                $entitlements | Should -Not -Match 'com\.apple\.security\.cs\.allow-dyld-environment-variables'
+                $entitlements | Should -Not -Match 'com\.apple\.security\.cs\.disable-library-validation'
+            }
         }
 
         It 'ad-hoc signature verifies' {

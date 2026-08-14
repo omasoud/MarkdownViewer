@@ -1491,6 +1491,15 @@ notarization material must remain outside version control.
 - [ ] **REL140-37** — Upload the final DMG to the draft GitHub release,
   download it again, verify its checksum and launch behavior, then create
   `v1.4.0-macos`.
+- [x] **REL140-52** — Add a release regression test reproducing that bundled
+  PowerShell passed pre-sign verification but failed to create CoreCLR after
+  Developer ID Hardened Runtime signing.
+- [x] **REL140-53** — Sign the bundled `pwsh` executable with the four standard
+  .NET Hardened Runtime exceptions while keeping executable entitlements off
+  bundled libraries and the Swift host.
+- [x] **REL140-54** — Exercise Hardened Runtime in ad-hoc macOS package tests,
+  rerun bundled-runtime verification after signing, and pass the targeted and
+  full macOS Pester suites.
 
 ## G.6 Snap Store Release
 
