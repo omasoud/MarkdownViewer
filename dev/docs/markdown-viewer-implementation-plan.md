@@ -1458,25 +1458,35 @@ notarization material must remain outside version control.
 
 ## G.4 Windows Store Release
 
-- [ ] **REL140-25** — Build a locally signed x64 1.4.0.0 MSIX from the exact
+- [x] **REL140-25** — Build a locally signed x64 1.4.0.0 MSIX from the exact
   release-candidate commit for installation testing.
-- [ ] **REL140-26** — Validate the signed QA package signature, version,
+- [x] **REL140-26** — Validate the signed QA package signature, version,
   identity, architecture, runtime contents, KaTeX contents, and staged tests.
-- [ ] **REL140-27** — Install the QA MSIX and test file activation, command-line
+- [x] **REL140-27** — Install the QA MSIX and test file activation, command-line
   activation, theme switching, math rendering, offline behavior, and
   uninstall/reinstall.
 - [ ] **REL140-28** — Run the applicable Windows App Certification Kit checks
   and record any advisory-only exceptions.
-- [ ] **REL140-29** — Delete or isolate the signed QA output, then make a fresh
+- [x] **REL140-29** — Delete or isolate the signed QA output, then make a fresh
   unsigned x64 Store build from the same release-candidate commit.
-- [ ] **REL140-30** — Prove the Store artifact is unsigned, is 1.4.0.0, has the
+- [x] **REL140-30** — Prove the Store artifact is unsigned, is 1.4.0.0, has the
   expected identity, and contains no `AppxSignature.p7x`.
-- [ ] **REL140-31** — Submit the minimal artifact set for product
+- [x] **REL140-31** — Submit the minimal artifact set for product
   `9MSWK3Q0JZ5N`, monitor certification, and use manual publication unless an
   intentional coordinated time is chosen.
-- [ ] **REL140-32** — After public availability, install from the Store, repeat
+- [x] **REL140-32** — After public availability, install from the Store, repeat
   the math smoke test, record the public version, and create
   `v1.4.0-windows`.
+
+Windows publication evidence (2026-08-14 UTC): Partner Center reports
+Submission 4 updated and available in Microsoft Store. A fresh product
+`9MSWK3Q0JZ5N` install reported x64 version 1.4.0.0, `SignatureKind: Store`,
+and status OK. Registered `mdview:` protocol activation reached the packaged
+host, produced ten math nodes with local KaTeX JavaScript, CSS, and 60 fonts,
+and retained the no-network CSP. The submitted MSIX was independently
+confirmed unsigned with no `AppxSignature.p7x`; `v1.4.0-windows` records its
+release-candidate commit `c29ac9c`. Local WACK task REL140-28 remains an
+advisory follow-up; Microsoft Store certification and publication passed.
 
 ## G.5 macOS DMG Release
 
