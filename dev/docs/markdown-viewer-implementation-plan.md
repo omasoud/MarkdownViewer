@@ -1480,15 +1480,15 @@ notarization material must remain outside version control.
 
 ## G.5 macOS DMG Release
 
-- [ ] **REL140-33** — Build the arm64 app and DMG from the exact
+- [x] **REL140-33** — Build the arm64 app and DMG from the exact
   release-candidate commit on the designated Apple Silicon release host.
 - [ ] **REL140-34** — Run the packaged-app tests and the supported browser
   matrix before signing.
-- [ ] **REL140-35** — Apply Developer ID signing, notarize the DMG, staple the
+- [x] **REL140-35** — Apply Developer ID signing, notarize the DMG, staple the
   ticket, and pass Gatekeeper verification.
-- [ ] **REL140-36** — Compute the final DMG SHA-256 after stapling and record it
+- [x] **REL140-36** — Compute the final DMG SHA-256 after stapling and record it
   in the release notes.
-- [ ] **REL140-37** — Upload the final DMG to the draft GitHub release,
+- [x] **REL140-37** — Upload the final DMG to the draft GitHub release,
   download it again, verify its checksum and launch behavior, then create
   `v1.4.0-macos`.
 - [x] **REL140-52** — Add a release regression test reproducing that bundled
@@ -1500,6 +1500,17 @@ notarization material must remain outside version control.
 - [x] **REL140-54** — Exercise Hardened Runtime in ad-hoc macOS package tests,
   rerun bundled-runtime verification after signing, and pass the targeted and
   full macOS Pester suites.
+
+macOS artifact evidence (2026-08-14 UTC): the Apple Silicon DMG was built from
+macOS packaging fix commit `3775569`, accepted under Apple notarization
+submission `9bc674e2-ea84-4205-9b26-92a5a188b098`, stapled, and accepted by
+Gatekeeper. Its final SHA-256 is
+`a01922afa0fe5f1de4a6aed2f1dfca3da2556171bce8f98e5d3df9c449e2ef49`.
+The private GitHub draft copy downloaded with the same checksum and passed
+quarantine, signature, staple, mounted-app, bundled PowerShell 7.6.3, and
+offline Chrome math-render checks. `v1.4.0-macos` records the packaging-fix
+commit. Safari WebDriver validation remains pending because Allow Remote
+Automation is disabled on the release host.
 
 ## G.6 Snap Store Release
 
