@@ -1259,7 +1259,7 @@ KaTeX CSS resolves fonts relative to `katex.min.css`, so the stylesheet and its 
 
 - [x] MATH-49 Add `tests/math-test.md` covering inline/display expressions, fractions, roots, sums, matrices, Unicode, invalid TeX, long equations, math beside links, and TeX-looking text inside code fences
 - [ ] MATH-50 Verify packaged Windows output in Edge, Chrome, and Firefox, including a path containing spaces and non-ASCII characters
-- [ ] MATH-51 Verify the Snap with Firefox under strict confinement and confirm fonts load from the content-addressed output directory
+- [x] MATH-51 Verify the Snap with Firefox under strict confinement and confirm fonts load from the content-addressed output directory
 - [ ] MATH-52 Verify the signed macOS app with Safari and Chrome and confirm no quarantine/signing regression from the added resources
 - [ ] MATH-53 With browser developer tools, verify a math document makes no network requests and a non-math document does not request or copy KaTeX assets
 - [ ] MATH-54 Temporarily remove/corrupt a KaTeX asset in a development copy and verify the page remains usable with readable TeX fallback
@@ -1503,21 +1503,30 @@ notarization material must remain outside version control.
 
 ## G.6 Snap Store Release
 
-- [ ] **REL140-38** — Build the core24 amd64 Snap from the exact
+- [x] **REL140-38** — Build the core24 amd64 Snap from the exact
   release-candidate commit on Ubuntu 24.04.
-- [ ] **REL140-39** — Build the core24 arm64 Snap from the same commit on an
+- [x] **REL140-39** — Build the core24 arm64 Snap from the same commit on an
   arm64 Ubuntu 24.04 host.
-- [ ] **REL140-40** — Inspect both Snaps for version, confinement, architecture,
+- [x] **REL140-40** — Inspect both Snaps for version, confinement, architecture,
   launchers, runtime, KaTeX contents, and absence of build-only material.
-- [ ] **REL140-41** — Upload both architectures to `latest/edge` with temporary
+- [x] **REL140-41** — Upload both architectures to `latest/edge` with temporary
   release credentials.
-- [ ] **REL140-42** — Install from edge on matching hardware and verify desktop
+- [x] **REL140-42** — Install from edge on matching hardware and verify desktop
   integration, launch paths, offline math, themes, fallback, accessibility,
   and non-math regressions.
-- [ ] **REL140-43** — Promote the verified revisions to `latest/stable` and
+- [x] **REL140-43** — Promote the verified revisions to `latest/stable` and
   confirm both architectures, public metadata, and install behavior.
-- [ ] **REL140-44** — Revoke/delete temporary credentials and create
+- [x] **REL140-44** — Revoke/delete temporary credentials and create
   `v1.4.0-linux` only after stable is verified.
+
+Linux publication evidence (2026-08-14 UTC): Snap Store stable and edge both
+serve amd64 revision 4 and arm64 revision 3 from release-candidate commit
+`c29ac9c`. Strict installs on matching hardware reported 1.4.0 and bundled
+PowerShell 7.6.3. The math fixture produced ten converter math nodes, loaded
+the content-addressed KaTeX JavaScript, CSS, and 60 font files with a
+no-network CSP, and typeset correctly in strictly confined Firefox. The
+temporary release credential was deleted after stable verification, and
+`v1.4.0-linux` records the build commit.
 
 ## G.7 Coordinated Publication and Closeout
 
